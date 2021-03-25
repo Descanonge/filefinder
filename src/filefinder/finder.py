@@ -18,11 +18,7 @@ log = logging.getLogger(__name__)
 
 
 class Finder():
-    """Find files using a regular expression.
-
-    Provides abilities to 'fix' some part of the regular expression, to
-    retrieve values from matches in the expression, and to create an
-    pre-processing function for `xarray.open_mfdataset`.
+    """Find files using a pre-regex.
 
     Parameters
     ----------

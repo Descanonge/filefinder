@@ -248,6 +248,9 @@ class Matches:
     def __iter__(self):
         return iter(self.matches)
 
+    def __len__(self):
+        return len(self.matches)
+
     def get_matches(self, key: Union[int, str]) -> Union[Match, List[Match]]:
         """Get matches corresponding to key.
 

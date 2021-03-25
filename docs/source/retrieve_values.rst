@@ -6,6 +6,7 @@ Retrieve information
 
 As some metadata might only be found in the filenames, FileFinder offer the
 possibility to retrieve it easily using matches.
+
 The :attr:`Finder.files` attribute stores files as a list of tuples
 containing a filename and its corresponding matches.
 One can also get matches from any filename with the

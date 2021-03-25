@@ -4,18 +4,17 @@
 filefinder documentation
 ==========================
 
-Welcome to the filefinder package documentation !
-
-FileFinder allows to specify the structure of filenames and using that, to
-find files matching this structure, select only a subset of thoses files
-according to parameters values, retrieve parameters values from found filenames,
-or to generate a filename according to a set of parameters values.
-
-The structure of the filename is specified with a single string. The parts
-of the structure varying from file to file can be indicated with format strings,
+FileFinder allows to specify the structure of filenames with a simple syntax.
+Parts of the file structure varying from file to file can be indicated with format strings
 or regular expressions, with some of those pre-defined (mainly for dates).
+Once setup, it can:
 
-The package also allows to interface easily with `xarray.open_mfdataset`.
+- Find corresponding files in a directory
+- Parse information from the filenames
+- Select only filenames with specific values
+- Generate filenames
+
+The package also interface easily with `xarray.open_mfdataset`.
 
 The following example will find all files with the structure `Data/[month]/Temperature_[depth]_[date].nc`::
 
@@ -29,7 +28,7 @@ We can also only select some files, for instance the first day of each month::
 
 We can retrieve values from found files::
 
-  matches = get_matches(finder.get_files()[0], relative=False)
+  matches = finder.files[0][1]
   print(matches)
   print(filefinder.library.get_date(matches))
 

@@ -4,19 +4,17 @@
 Finding files
 -------------
 
-The main entry point of this package is the :class:`Finder` class.
-This is the object that will find files according to a regular expression.
-An instance is created using the root directory containing the files, and
-a pre-regular expression (abbreviated pre-regex) that will be transformed into
-a proper regex later.
+The main entry point of this package is the :class:`Finder` class. An instance
+is created using the root directory containing the files, and a pre-regular
+expression (abbreviated pre-regex or pregex) that will be transformed into a
+proper regex later.
 
 When asking to find files, the finder will first create a regular-expression
 out of the pre-regex.
 It will then recursively find files in the root directory and its subfolders.
 Only the subfolders matching (part of) the regex will be looked into.
-Subfolders can simply be indicated in the pre-regex with the OS separator.
-The finder only keeps files that match the regex.
-The files can be retrieved using :func:`Finder.get_files`.
+Subfolders can simply be indicated in the pre-regex with the standard OS
+separator. The finder only keeps files that match the full regex.
 
 
 Pre-regex
@@ -81,7 +79,7 @@ class attribute will make the correspondance between name and regex:
 +------+-------------------+-----------+--------+
 | S    | Seconds (SS)      | \\d\\d    |    02d |
 +------+-------------------+-----------+--------+
-| I    | Index             | \\d*      |      d |
+| I    | Index             | \\d+      |      d |
 +------+-------------------+-----------+--------+
 | text | Letters           | \\w       |      s |
 +------+-------------------+-----------+--------+
@@ -98,7 +96,7 @@ replaced by the corresponding name in the table. This can be used in the
 custom regex. This still counts as a single matcher and its name will not
 be changed, only the regex.
 So ``%x`` will be replaced by ``%Y%m%d``, in turn replaced by
-``\\d{4}\\d\\d\\d\\d``.
+``\d{4}\d\d\d\d``.
 A percentage character in the regex is escaped by another percentage ('%%').
 
 
@@ -111,8 +109,8 @@ specify a matcher is by using a format string following the
 <https://docs.python.org/3/library/string.html#formatspec>`__.
 This will automatically be transformed into a regular expression.
 
-Having a format specified has other benefits: it can be used convert values
-into string to generate a filename from parameters values (using
+Having a format specified has other benefits: it can be used to convert values
+into strings to generate a filename from parameters values (using
 :func:`Finder.get_filename`), or vice-versa to parse filenames matches into
 parameters values.
 
@@ -120,7 +118,7 @@ It's easy as::
 
   scale_%(scale:fmt=.1f)
 
-.. note::
+.. warning::
 
    Only s, d, f, e, and E format types are supported.
 
@@ -131,7 +129,7 @@ It's easy as::
 Custom regex
 ############
 
-Finally, one can directly use a regular expression using. This will supersede
+Finally, one can directly use a regular expression. This will supersede
 the default regex, or the one generated from the format string if specified.
 
 It can be done like so::
@@ -141,7 +139,7 @@ It can be done like so::
 Discard keyword
 ###############
 
-doc:`Information can be retrieved<retrieving_values>` from the matches in the
+:doc:`Information can be retrieved<retrieve_values>` from the matches in the
 filename, but one might discard a matcher so that it is not used.
 For example for a file of weekly averages with a filename indicated the start
 and end dates of the average, we might want to only recover the starting date::
@@ -149,10 +147,18 @@ and end dates of the average, we might want to only recover the starting date::
   sst_%(x)-%(x:discard)
 
 
+.. note::
+
+   By default, when :doc:`fixing a matcher to a value<fix_matchers>`, discarded
+   matchers will not be fixed. This can be deactivated with the ``fix_discard``
+   keyword.
+
+
 Regex outside matchers
 ======================
 
-By default, special characters (`., ^, |, ...`) outside of matchers are escaped.
+By default, special characters (``()[]{}?*+-|^$\\.&~# \t\n\r\v\f``) outside of
+matchers are escaped.
 To use regular expressions outside of matchers, it is necessary to activate the
 ``use_regex`` argument when creating the Finder object.
 All characters outside of matchers will then be properly escaped.

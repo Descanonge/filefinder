@@ -21,19 +21,31 @@ def get_version(rel_path):
         raise RuntimeError("Unable to find version string")
 
 
+CLASSIFIERS = [
+    'Development Status :: 4 - Beta'
+    'License :: OSI Approved :: MIT License',
+
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3 :: Only',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Operating System :: OS Independent'
+
+    'Intended Audience :: Developers',
+    'Intended Audience :: Science/Research',
+    'Topic :: Utilities',
+]
+
+
 setup(name='filefinder',
       version=get_version('src/filefinder/__init__.py'),
 
-      description="Find files.",
+      description="Find files using a simple syntax.",
       long_description=get_long_description('README.md'),
       long_description_content_type='text/markdown',
 
       keywords='find files filename regular expression regex xarray',
-      classifiers=[
-          'License :: OSI Approved :: MIT License',
-          'Programming Language :: Python :: 3.7',
-          'Operating System :: OS Independent'
-      ],
+      classifiers=CLASSIFIERS,
 
       url='https://github.com/Descanonge/filefinder',
       project_urls={

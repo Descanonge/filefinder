@@ -1,4 +1,4 @@
-"""Find files using a pre-regex."""
+"""Main class."""
 
 # This file is part of the 'filefinder' project
 # (http://github.com/Descanonge/filefinder) and subject

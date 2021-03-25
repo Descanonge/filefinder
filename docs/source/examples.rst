@@ -5,32 +5,30 @@ Examples
 Plain time serie
 ================
 
-Here the files are all in the same folder. Only the timestamp differ from one
-file to the other::
+Here is an hypothetical list of files that will be used in some examples below::
 
     Data
-    ├── SSH
-    │   ├── SSH_20070101.nc
-    │   ├── SSH_20070109.nc
-    │   └── ...
     └── SST
-        ├── A_2007001_2007008.L3m_8D_sst.nc
-        ├── A_2007008_2007016.L3m_8D_sst.nc
+        ├── A_2007001_2007008.nc
+        ├── A_2007009_2007016.nc
+        ├── A_2007017_2007024.nc
         └── ...
 
-We will scan for SST files::
+Those are 8 days averages, so there are two varying parts in the filename: the
+starting and ending date of average. We will 'discard' the second one, so
+that the value that we will be able to fix and retrieve is the starting date::
 
   from filefinder import Finder, library
 
   root = 'Data/SST'
-  pregex = 'A_%(Y)%(j)_%(Y)%(j:discard)%(suffix)'
-  finder = Finder(root, pregex, suffix='.L3m_8D_sst.nc')
+  pregex = 'A_%(Y)%(j)_%(Y)%(j:discard).nc'
+  finder = Finder(root, pregex)
 
   files = finder.get_files()
 
-We would like to open all these files using Xarray, however the files lack a
-defined 'time' dimensions to concatenate all files. To make it work, we can
-use the 'preprocess' argument of `xarray.open_mfdataset`::
+Now we would like to open all these files using Xarray, however the files lack a
+defined 'time' dimensions to concatenate all files. To make it work, we can use
+the 'preprocess' argument of `xarray.open_mfdataset`::
 
   import pandas as pd
 
@@ -48,12 +46,23 @@ use the 'preprocess' argument of `xarray.open_mfdataset`::
 Nested files
 ============
 
+We now have two variables setup in a similar layout::
+
+     Data
+     ├── SSH
+     │   ├── SSH_20070101.nc
+     │   ├── SSH_20070102.nc
+     │   └── ...
+     └── SST
+         ├── SST_20070101.nc
+         ├── SST_20070102.nc
+         └── ...
+
 We can scan both variables at the same time but retrieve the files as a
 :ref:`nested list<Obtaining files>`.
-We assume the filenames for both variable are structured in the same way.
 Groups in the pre-regex will define what matchers will be grouped together::
 
-  pregex = '%(variable:char)/%(variable:char)_%(time:Y)%(time:j).nc'
+  pregex = '%(variable:char)/%(variable:char)_%(time:x).nc'
 
 We can now group the files by variable or time::
 
@@ -81,6 +90,10 @@ a floating point parameter::
 
   pregex = "index_%(index:fmt=d)/var_%(var:fmt=s)_scale_%(scale:fmt=+06.1f).txt"
   finder = Finder('/Data', pregex)
+
+This will automatically produce a regular expression based on the formats::
+  >>> print(finder.regex)
+  index_(-?\d+)/var_(.*?)_scale_(0*[+-]\d+\.\d{1})\.txt
 
 We might want to only capture files for a specific variable::
 

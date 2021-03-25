@@ -12,7 +12,7 @@
 
 FileFinder allows to specify the structure of filenames with a simple syntax.
 Parts of the file structure varying from file to file can be indicated with format strings
-or regular expressions, with some of those pre-defined (mainly for dates).
+or regular expressions, or with pre-defined defaults (mainly for dates).
 Once setup, it can:
 
 - Find corresponding files in a directory
@@ -38,8 +38,9 @@ print(finder.get_files())
 
 We can retrieve values from found files:
 ``` python
-matches = finder.files[0][1]
+filename, matches = finder.files[0]
 print(matches)
+print(matches.get_matches('depth').get_value())
 print(filefinder.library.get_date(matches))
 ```
 

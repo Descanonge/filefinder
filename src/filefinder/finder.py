@@ -189,7 +189,7 @@ class Finder():
         return files
 
     def fix_matcher(self, key: Union[int, str], value: Union[Any, List[Any]],
-                    discard: bool = False):
+                    fix_discard: bool = False):
         """Fix a matcher to a string.
 
         Parameters
@@ -205,17 +205,18 @@ class Finder():
             that will be formatted using the matcher format string.
             A list of values will be joined by the regex '|' OR.
             Special characters should be properly escaped in strings.
-        discard: bool
-            If true, matchers with the 'discard' option will not be fixed.
+        fix_discard: bool
+            If true, matchers with the 'discard' option will still be fixed.
+            Defaults to false.
         """
         for m in self.get_matchers(key):
-            if discard and m.discard:
+            if not fix_discard and m.discard:
                 continue
             self.fixed_matchers[m.idx] = value
         self.update_regex()
 
     def fix_matchers(self, fixes: Dict[Union[int, str], Any] = None,
-                     discard: bool = False,
+                     fix_discard: bool = False,
                      **fixes_kw):
         """Fix multiple values at once.
 
@@ -224,14 +225,15 @@ class Finder():
         fixes: dict
            Dictionnary of matcher key: value. See :func:`fix_matcher` for
            details. If None, no matcher will be fixed.
-        discard: bool
-            If true, matchers with the 'discard' option will not be fixed.
+        fix_discard: bool
+            If true, matchers with the 'discard' option will still be fixed.
+            Defaults to false.
         """
         if fixes is None:
             fixes = {}
         fixes.update(fixes_kw)
         for f in fixes.items():
-            self.fix_matcher(*f, discard=discard)
+            self.fix_matcher(*f, fix_discard=fix_discard)
 
     def unfix_matchers(self, *keys: str):
         """Unfix matchers.

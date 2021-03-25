@@ -22,18 +22,18 @@ def get_version(rel_path):
 
 
 CLASSIFIERS = [
-    'Development Status :: 4 - Beta'
+    'Development Status :: 4 - Beta',
     'License :: OSI Approved :: MIT License',
 
     'Programming Language :: Python',
     'Programming Language :: Python :: 3 :: Only',
     'Programming Language :: Python :: 3.7',
     'Programming Language :: Python :: 3.8',
-    'Operating System :: OS Independent'
+    'Operating System :: OS Independent',
 
     'Intended Audience :: Developers',
     'Intended Audience :: Science/Research',
-    'Topic :: Utilities',
+    'Topic :: Utilities'
 ]
 
 

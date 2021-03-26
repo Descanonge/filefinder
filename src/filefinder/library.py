@@ -17,17 +17,20 @@ def get_date(matches: List, default_date: Dict = None,
              group: str = None) -> datetime:
     """Retrieve date from matched elements.
 
-    If any element is not found in the filename, it will be replaced by the
-    element in the default date. If no match is found, None is returned.
+    If any matcher is *not* found in the filename, it will be replaced by the
+    element in the default date.
+    Matchers that can be used are (in order increasing priority): YBmdjHMSFxX
+    If two matchers have the same name, the last one in the pre-regex will
+    get priority.
 
     Supports matches with names from `Matcher.NAME_RGX`.
 
     Parameters
     ----------
-    matches: list
-        Matches from a filename, returned by `Finder.get_matches`
+    matches: list of :class:`Matches<filefinder.matcher.Matches>`
+        Matches obtained from a filename.
     group: str
-        If not None, restrict matcher to this group.
+        If not None, restrict matchers to this group.
     default_date: dict, optional
         Default date. Dictionnary with keys: year, month, day, hour, minute,
         and second. Defaults to 1970-01-01 00:00:00
@@ -36,22 +39,48 @@ def get_date(matches: List, default_date: Dict = None,
     ------
     KeyError: If no matchers are found to create a date from.
     """
+    NAME_TO_DATETIME = dict(
+        Y='year', m='month', d='day', H='hour', M='minute', S='second')
+
+    def get_elts(names: str, callback):
+        for name in names:
+            elt = elts.pop(name, None)
+            if elt is not None:
+                date.update(callback(elt, name))
+
+    def process_int(elt, name):
+        return {NAME_TO_DATETIME[name]: int(elt)}
+
+    def process_month_name(elt, name):
+        elt = _find_month_number(elt)
+        if elt is not None:
+            return dict(month=elt)
+        return {}
+
+    def process_doy(elt, name):
+        elt = datetime(date["year"], 1, 1) + timedelta(days=int(elt)-1)
+        return dict(month=elt.month, day=elt.day)
+
     date = {"year": 1970, "month": 1, "day": 1,
-            "hour": 00, "minute": 0, "second": 0}
+            "hour": 0, "minute": 0, "second": 0}
 
     if default_date is None:
         default_date = {}
     date.update(default_date)
 
-    elts = {m.matcher.name: m.get_match() for m in matches
+    elts = {m.matcher.name: m.get_match(parsed=False) for m in matches
             if (not m.matcher.discard
                 and (group is None or m.matcher.group == group))}
 
-    elts_needed = {'x', 'X', 'Y', 'm', 'd', 'B', 'j', 'H', 'M', 'S', 'F'}
+    elts_needed = set('xXYmdBjHMSF')
     if len(set(elts.keys()) & elts_needed) == 0:
         log.warning("No matchers to retrieve a date from."
                     " Returning default date.")
 
+    # Process month name first to keep element priorities simples
+    get_elts('B', process_month_name)
+
+    # Decompose elements
     elt = elts.pop("F", None)
     if elt is not None:
         elts["Y"] = elt[:4]
@@ -71,41 +100,10 @@ def get_date(matches: List, default_date: Dict = None,
         if len(elt) > 4:
             elts["S"] = elt[4:6]
 
-    elt = elts.pop("Y", None)
-    if elt is not None:
-        date["year"] = int(elt)
-
-    elt = elts.pop("m", None)
-    if elt is not None:
-        date["month"] = int(elt)
-
-    elt = elts.pop("B", None)
-    if elt is not None:
-        elt = _find_month_number(elt)
-        if elt is not None:
-            date["month"] = elt
-
-    elt = elts.pop("d", None)
-    if elt is not None:
-        date["day"] = int(elt)
-
-    elt = elts.pop("j", None)
-    if elt is not None:
-        elt = datetime(date["year"], 1, 1) + timedelta(days=int(elt)-1)
-        date["month"] = elt.month
-        date["day"] = elt.day
-
-    elt = elts.pop("H", None)
-    if elt is not None:
-        date["hour"] = int(elt)
-
-    elt = elts.pop("M", None)
-    if elt is not None:
-        date["minute"] = int(elt)
-
-    elt = elts.pop("S", None)
-    if elt is not None:
-        date["second"] = int(elt)
+    # Process elements
+    get_elts('Ymd', process_int)
+    get_elts('j', process_doy)
+    get_elts('HMS', process_int)
 
     return datetime(**date)
 
@@ -123,8 +121,8 @@ def _find_month_number(name: str) -> int:
 
     name = name.lower()
     if name in names:
-        return names.index(name)
+        return names.index(name) + 1
     if name in names_abbr:
-        return names_abbr.index(name)
+        return names_abbr.index(name) + 1
 
     return None

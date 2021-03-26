@@ -92,6 +92,7 @@ a floating point parameter::
   finder = Finder('/Data', pregex)
 
 This will automatically produce a regular expression based on the formats::
+
   >>> print(finder.regex)
   index_(-?\d+)/var_(.*?)_scale_(0*[+-]\d+\.\d{1})\.txt
 

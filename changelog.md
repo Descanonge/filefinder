@@ -1,4 +1,6 @@
 
+### v0.3.1
+
 - [2021-03-26] Fix get_date parsing of F, x and X elements. Better matchers priority.
 
 ## v0.3.0

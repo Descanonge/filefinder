@@ -154,6 +154,16 @@ and end dates of the average, we might want to only recover the starting date::
    keyword.
 
 
+Group
+#####
+
+The group name is completely optional, but it can help differentiate two
+matchers with the same name. It can also be used to regroup matchers together,
+for instance when returning nested lists of filename with
+:func:`Finder.get_filename`, or when getting a date with
+:func:`library.get_date()<filefinder.library.get_date>`.
+
+
 Regex outside matchers
 ======================
 

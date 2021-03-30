@@ -39,7 +39,7 @@ files = finder.get_files()
 We can retrieve values from found files:
 ``` python
 filename, matches = finder.files[0]
-depth = matches.get_matches('depth').get_value()
+depth = matches.get_matches('depth').get_match()
 date = filefinder.library.get_date(matches)
 ```
 

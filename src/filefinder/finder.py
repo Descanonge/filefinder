@@ -414,7 +414,7 @@ class Finder():
                 level -= 1
                 levels.append((i, level))
         if level != 0:
-            raise ValueError("Unbalanced parenthesis")
+            log.warning("Unbalanced parentheses in pre-regex.")
 
         matchers_starts = [m.start()+1
                            for m in re.finditer(r'%\(', self.pregex)]

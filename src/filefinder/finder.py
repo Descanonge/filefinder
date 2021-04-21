@@ -435,7 +435,7 @@ class Finder():
             assert end is not None, "No matcher end found"
             try:
                 self.matchers.append(Matcher(self.pregex[start+1:end], idx))
-                splits += [start, end]
+                splits += [start-1, end+1]  # -1 removes the %
             except InvalidMatcher:
                 pass
 

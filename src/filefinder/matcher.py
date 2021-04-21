@@ -71,7 +71,7 @@ class Matcher():
              r"(:fmt=(?P<fmt>.*?))?"
              r"(:rgx=(?P<rgx>.*?))?"
              r"(?P<discard>:discard)?")
-    """Regex to find matcher in pre-regex."""
+    """Regex to find matcher properties from pre-regex substring."""
 
     def __init__(self, matcher: str, idx: int):
         self.idx = idx

@@ -44,6 +44,12 @@ The full syntax is as follows: ``%([group:]name[:fmt=format string][:rgx=custom 
    Some other functions (see :func:`Finder.get_matches`) can use the string
    ``[group:]name`` to find one or more matchers.
 
+.. warning::
+
+   Matchers are first found in the pre-regex by looking at matching
+   parentheses. The pre-regex should thus have balanced parentheses or
+   unexpected behaviour can occur.
+
 
 Name
 ####

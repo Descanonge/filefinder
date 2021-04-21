@@ -404,18 +404,6 @@ class Finder():
         Add matchers objects to self.
         Set segments attribute.
         """
-        levels = []
-        level = 0
-        for i, c in enumerate(self.pregex):
-            if c == "(":
-                level += 1
-                levels.append((i, level))
-            elif c == ")":
-                level -= 1
-                levels.append((i, level))
-        if level != 0:
-            log.warning("Unbalanced parentheses in pre-regex.")
-
         matchers_starts = [m.start()+1
                            for m in re.finditer(r'%\(', self.pregex)]
 
@@ -423,16 +411,24 @@ class Finder():
         splits = [0]
         for idx, start in enumerate(matchers_starts):
             end = None
-            level = None
-            for i, lvl in levels:
-                if i == start:
-                    level = lvl
-                    continue
-                if level is not None:
-                    if lvl == level-1:
-                        end = i
+            level = 1
+            for i, c in enumerate(self.pregex[start+1:]):
+                if c == "(":
+                    level += 1
+                elif c == ")":
+                    level -= 1
+                    if level == 0:
+                        end = start+i+1
                         break
-            assert end is not None, "No matcher end found"
+
+            if end is None:
+                end = start+6
+                substr = self.pregex[start-1:end]
+                if end < len(self.pregex):
+                    substr += '...'
+                raise ValueError("No matcher end found for '{}'"
+                                 .format(substr))
+
             try:
                 self.matchers.append(Matcher(self.pregex[start+1:end], idx))
                 splits += [start-1, end+1]  # -1 removes the %

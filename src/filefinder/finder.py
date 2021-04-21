@@ -12,7 +12,8 @@ import re
 from typing import Any, Callable, Dict, List, Tuple, Union
 
 from filefinder.matcher import (Matcher, Matches,
-                                get_matchers_indices)
+                                get_matchers_indices,
+                                InvalidMatcher)
 
 log = logging.getLogger(__name__)
 
@@ -403,11 +404,41 @@ class Finder():
         Add matchers objects to self.
         Set segments attribute.
         """
-        splits = [0]
+        levels = []
+        level = 0
+        for i, c in enumerate(self.pregex):
+            if c == "(":
+                level += 1
+                levels.append((i, level))
+            elif c == ")":
+                level -= 1
+                levels.append((i, level))
+        if level != 0:
+            raise ValueError("Unbalanced parenthesis")
+
+        matchers_starts = [m.start()+1
+                           for m in re.finditer(r'%\(', self.pregex)]
+
         self.matchers = []
-        for i, m in enumerate(re.finditer(Matcher.REGEX, self.pregex)):
-            self.matchers.append(Matcher(m, i))
-            splits += [m.start(), m.end()]
+        splits = [0]
+        for idx, start in enumerate(matchers_starts):
+            end = None
+            level = None
+            for i, lvl in levels:
+                if i == start:
+                    level = lvl
+                    continue
+                if level is not None:
+                    if lvl == level-1:
+                        end = i
+                        break
+            assert end is not None, "No matcher end found"
+            try:
+                self.matchers.append(Matcher(self.pregex[start+1:end], idx))
+                splits += [start, end]
+            except InvalidMatcher:
+                pass
+
         self.segments = [self.pregex[i:j]
                          for i, j in zip(splits, splits[1:]+[None])]
 

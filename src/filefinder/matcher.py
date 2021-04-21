@@ -15,6 +15,11 @@ from .format import Format
 log = logging.getLogger(__name__)
 
 
+class InvalidMatcher(ValueError):
+    """No valid matcher could be found in pre-regex substring."""
+    pass
+
+
 class Matcher():
     """Manage a matcher inside the pre-regex.
 
@@ -61,14 +66,14 @@ class Matcher():
     }
     """Regex str for each type of element."""
 
-    REGEX = (r"%\((?:(?P<group>\w*):)?"
+    REGEX = (r"^(?:(?P<group>\w*):)??"
              r"(?P<name>\w*)"
              r"(:fmt=(?P<fmt>.*?))?"
              r"(:rgx=(?P<rgx>.*?))?"
-             r"(?P<discard>:discard)?\)")
+             r"(?P<discard>:discard)?")
     """Regex to find matcher in pre-regex."""
 
-    def __init__(self, m: re.Match, idx: int = 0):
+    def __init__(self, matcher: str, idx: int):
         self.idx = idx
         self.group = None
         self.name = None
@@ -77,7 +82,7 @@ class Matcher():
         self.fmt = None
         self.match = ''
 
-        self.set_matcher(m)
+        self.set_matcher(matcher)
 
     def __repr__(self):
         return '\n'.join([super().__repr__(), self.__str__()])
@@ -89,7 +94,7 @@ class Matcher():
         s += '{}:{:d}'.format(self.name, self.idx)
         return s
 
-    def set_matcher(self, m: re.Match):
+    def set_matcher(self, matcher: str):
         """Find attributes from match.
 
         Raises
@@ -97,9 +102,19 @@ class Matcher():
         NameError
             No name.
         ValueError
-            Empty custom regex.
+            Empty custom regex or format.
+        KeyError
+            No regex could be produced (name is not in defaults, and no regex
+            was specified).
+        InvalidMatcher
+            Pre-regex substring contains no valid matcher.
         """
-        self.match = m.group()[2:-1]  # slicing removes %()
+        m = re.fullmatch(self.REGEX, matcher)
+        if m is None:
+            log.warning("No matcher found in sub-string %s", matcher)
+            raise InvalidMatcher("No matcher found in sub-string")
+
+        self.match = matcher
         self.group = m.group('group')
         self.name = m.group('name')
         self.discard = m.group('discard') is not None
@@ -128,6 +143,10 @@ class Matcher():
         # Override regex
         if rgx:
             self.rgx = rgx
+
+        if self.rgx is None:
+            raise KeyError("No regex could have been produced for "
+                           "matcher '{}'.".format(matcher))
 
     def format(self, value: Any):
         return self.fmt.format(value)

@@ -25,17 +25,18 @@ directory. Parts that vary from file to file are indicated by *matchers*,
 enclosed by parenthesis and preceded by '%'. It is represented by the
 :class:`filefinder.matcher.Matcher` class.
 
-Inside the matchers parenthesis can be indicated multiple elements, separated by
+Inside the matchers parenthesis can be indicated multiple properties, separated by
 colons:
 
 - a group name (optional)
 - a name that will dictate the matcher regex using a correspondance table
 - a format string (optional)
+- an option switch (optional)
 - a custom regex (optional)
 - a keyword that will discard that matcher when retrieving information from a
   filename (optional)
 
-The full syntax is as follows: ``%([group:]name[:fmt=format string][:rgx=custom regex][:discard])``.
+The full syntax is as follows: ``%([group:]name[:fmt=format string][:opt[=A:B]][:rgx=custom regex][:discard])``.
 
 .. note::
 
@@ -130,6 +131,30 @@ It's easy as::
 
    Parsing will fail in some unrealistic cases described in
    :func:`format.Format.parse()<filefinder.format.Format.parse>`.
+
+
+Optional property
+#################
+
+If the option property can achieve two different features. If the flag `:opt` is
+present, this will append a '?' to the matcher regex, making it 'optional'.
+
+If two options are indicated as `:opt=A:B`, the regex will be set as an OR
+between the two options (`(A|B)`). The matcher can now be fixed using a boolean,
+that will fix the option A if true, B if false.
+Either options can be left blank.
+
+See thoses examples::
+
+  >>> Finder('', "foo_%(bar:fmt=d:opt).txt").regex
+  'foo_(-?\d+)?.txt'
+
+  >>> f = Finder('', "foo_%(bar:opt=:yes).txt")
+  >>> f.regex
+  'foo_(|yes)'
+  >>> f.fix_matchers(bar=True)
+  ... f.regex
+  'foo_yes'
 
 
 Custom regex

@@ -440,7 +440,7 @@ class Finder():
 
         # Replace matcher by its regex
         for idx, m in enumerate(self.matchers):
-            self.segments[2*idx+1] = '({})'.format(m.get_regex())
+            self.segments[2*idx+1] = m.get_regex()
 
     def update_regex(self):
         """Update regex.
@@ -454,6 +454,10 @@ class Finder():
                 segments[i] = s if i % 2 == 1 else re.escape(s)
 
         for idx, value in self.fixed_matchers.items():
+            if isinstance(value, bool):
+                if isinstance(self.matchers[idx].opt, tuple):
+                    segments[2*idx+1] = self.matchers[idx].opt[value]
+                    continue
             if not isinstance(value, (list, tuple)):
                 value = [value]
             value = [v if isinstance(v, str)

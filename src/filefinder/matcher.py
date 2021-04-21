@@ -69,6 +69,7 @@ class Matcher():
     REGEX = (r"^(?:(?P<group>\w*):)??"
              r"(?P<name>\w*)"
              r"(:fmt=(?P<fmt>.*?))?"
+             r"(?P<opt>:opt(?:=(?P<optA>.*?):(?P<optB>.*?))?)?"
              r"(:rgx=(?P<rgx>.*?))?"
              r"(?P<discard>:discard)?")
     """Regex to find matcher properties from pre-regex substring."""
@@ -80,6 +81,7 @@ class Matcher():
         self.rgx = None
         self.discard = False
         self.fmt = None
+        self.opt = None
         self.match = ''
 
         self.set_matcher(matcher)
@@ -140,6 +142,16 @@ class Matcher():
             if not rgx:  # No need to generate rgx if it is provided
                 self.rgx = self.fmt.generate_expression()
 
+        if m.group('opt') is not None:
+            optA, optB = m.group('optA'), m.group('optB')
+            if optA is not None or optB is not None:
+                optA = '' if optA is None else optA
+                optB = '' if optB is None else optB
+                self.opt = (optA, optB)
+                self.rgx = '{}|{}'.format(optA, optB)
+            else:
+                self.opt = True
+
         # Override regex
         if rgx:
             self.rgx = rgx
@@ -175,7 +187,15 @@ class Matcher():
                 return replacement
             raise KeyError("Unknown replacement '{}'.".format(match.group(0)))
 
-        return re.sub("%([a-zA-Z%])", replace, self.rgx)
+        rgx = re.sub("%([a-zA-Z%])", replace, self.rgx)
+
+        # Make it matching
+        rgx = '({})'.format(rgx)
+
+        if self.opt is True:
+            rgx += '?'
+
+        return rgx
 
 
 class Match:

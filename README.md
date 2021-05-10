@@ -5,8 +5,8 @@
 
 <div align="left">
 
-[![PyPI version](https://badge.fury.io/py/filefinder.svg)](https://badge.fury.io/py/filefinder)
-[![Release status](https://img.shields.io/github/v/release/Descanonge/filefinder)](https://github.com/Descanonge/filefinder/releases)
+[![PyPI](https://img.shields.io/pypi/v/filefinder)](https://pypi.org/project/filefinder)
+[![GitHub release](https://img.shields.io/github/v/release/Descanonge/filefinder)](https://github.com/Descanonge/filefinder/releases)
 
 </div>
 

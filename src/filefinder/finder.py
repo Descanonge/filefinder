@@ -324,6 +324,8 @@ class Finder():
         segments = self.segments.copy()
 
         for idx, value in fixed_matchers.items():
+            if isinstance(value, bool):
+                value = self.matchers[idx].opt[value]
             if isinstance(value, (list, tuple)):
                 value = value[0]
             if not isinstance(value, str):
@@ -456,8 +458,7 @@ class Finder():
         for idx, value in self.fixed_matchers.items():
             if isinstance(value, bool):
                 if isinstance(self.matchers[idx].opt, tuple):
-                    segments[2*idx+1] = self.matchers[idx].opt[value]
-                    continue
+                    value = self.matchers[idx].opt[value]
             if not isinstance(value, (list, tuple)):
                 value = [value]
             value = [v if isinstance(v, str)

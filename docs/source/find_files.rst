@@ -141,7 +141,7 @@ present, this will append a '?' to the matcher regex, making it 'optional'.
 
 If two options are indicated as `:opt=A:B`, the regex will be set as an OR
 between the two options (`(A|B)`). The matcher can now be fixed using a boolean,
-that will fix the option A if true, B if false.
+that will fix the option B if true, A if false.
 Either options can be left blank.
 
 See thoses examples::

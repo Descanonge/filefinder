@@ -149,9 +149,9 @@ See thoses examples::
   >>> Finder('', "foo_%(bar:fmt=d:opt).txt").regex
   'foo_(-?\d+)?.txt'
 
-  >>> f = Finder('', "foo_%(bar:opt=:yes).txt")
+  >>> f = Finder('', "foo%(bar:opt=:_yes).txt")
   >>> f.regex
-  'foo_(|yes)'
+  'foo(|_yes)'
   >>> f.fix_matchers(bar=True)
   ... f.regex
   'foo_yes'

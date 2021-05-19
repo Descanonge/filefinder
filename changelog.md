@@ -1,4 +1,6 @@
 
+- [2021-05-19] Fix 0 alignment in regex creation from regex.
+
 ### v0.3.1
 
 - [2021-03-26] Fix get_date parsing of F, x and X elements. Better matchers priority.

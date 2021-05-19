@@ -100,6 +100,7 @@ class Format:
             self.zero = self.zero == '0'
             if self.align is None and self.zero:
                 self.fill = '0'
+                self.align = '='
             for k, v in defaults.items():
                 if self.params[k] is None:
                     self.params[k] = v

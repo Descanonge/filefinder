@@ -1,4 +1,6 @@
 
+## v0.4.0
+
 - [2021-05-19] Add optional flag in matcher. 
 - [2021-05-19] Fix 0 alignment in regex creation from format.
 - [2021-05-19] Add tests for Finder class.

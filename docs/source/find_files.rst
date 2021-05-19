@@ -136,7 +136,7 @@ It's easy as::
 Optional property
 #################
 
-If the option property can achieve two different features. If the flag `:opt` is
+The option property can achieve two different features. If the flag `:opt` is
 present, this will append a '?' to the matcher regex, making it 'optional'.
 
 If two options are indicated as `:opt=A:B`, the regex will be set as an OR

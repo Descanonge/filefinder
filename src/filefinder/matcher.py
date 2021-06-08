@@ -298,7 +298,7 @@ class Matches:
         See :func:`Finder.get_matchers
         <filefinder.finder.Finder.get_matchers>` for details on
         `key` argument.
-        :func:<__getitem__> wraps around this method.
+        :func:`__getitem__` wraps around this method.
 
         Returns
         -------

@@ -144,7 +144,8 @@ class Finder():
 
         Raises
         ------
-        KeyError: A level in `nested` is not in the pre-regex groups.
+        KeyError
+            A level in `nested` is not in the pre-regex groups.
         """
         def make_abs(f):
             return os.path.join(self.root, f)
@@ -267,9 +268,12 @@ class Finder():
 
         Raises
         ------
-        AttributeError: The regex is empty.
-        ValueError: The filename did not match the pattern.
-        IndexError: Not as many matches as matchers.
+        AttributeError
+            The regex is empty.
+        ValueError
+            The filename did not match the pattern.
+        IndexError
+            Not as many matches as matchers.
         """
         if not self.regex:
             raise AttributeError("Finder is missing a regex.")
@@ -300,7 +304,8 @@ class Finder():
 
         Raises
         ------
-        ValueError: use_regex is activated.
+        ValueError
+            `use_regex` is activated.
         """
         if self.use_regex:
             raise ValueError("Cannot generate a valid filename if regex "
@@ -552,8 +557,10 @@ class Finder():
 
         Raises
         ------
-        KeyError: No matcher found.
-        TypeError: Key type is not valid.
+        KeyError
+            No matcher found.
+        TypeError
+            Key type is not valid.
         """
         selected = get_matchers_indices(self.matchers, key)
         matchers = [self.matchers[i] for i in selected]

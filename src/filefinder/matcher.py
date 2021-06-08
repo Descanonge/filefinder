@@ -257,8 +257,10 @@ class Matches:
 
     Raises
     ------
-    ValueError: Filename did not match pattern.
-    IndexError: Not as many matches as matchers.
+    ValueError
+        Filename did not match pattern.
+    IndexError
+        Not as many matches as matchers.
     """
 
     def __init__(self, matchers: List[Matcher], filename: str,
@@ -319,8 +321,10 @@ def get_matchers_indices(matchers: List[Matcher],
 
     Raises
     ------
-    IndexError: No matcher found corresponding to the key
-    TypeError: Key is not int or str
+    IndexError
+        No matcher found corresponding to the key
+    TypeError
+        Key is not int or str
     """
     if isinstance(key, int):
         return [key]

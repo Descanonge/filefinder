@@ -36,7 +36,8 @@ def get_date(matches: Matches, default_date: Dict = None,
 
     Raises
     ------
-    KeyError: If no matchers are found to create a date from.
+    KeyError
+        If no matchers are found to create a date from.
     """
     NAME_TO_DATETIME = dict(
         Y='year', m='month', d='day', H='hour', M='minute', S='second')

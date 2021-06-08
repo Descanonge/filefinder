@@ -25,6 +25,16 @@ A specific match can be obtained using :func:`Matches.get_matches()
     syntax 'group:name'). If multiple matches correspond to the string, a list
     of matches is returned.
 
+.. note ::
+    :func:`Matches.__getitem__<filefinder.matcher.Matches.__getitem__>` wraps
+    around this method::
+
+        filename, matches = finder.files[0]
+        year = matches.get_matches('Y').get_match()
+        # or
+        year = matches['Y'].get_match()
+
+
 The package supply the function :func:`library.get_date
 <filefinder.library.get_date>` to retrieve a datetime object from those
 matches::

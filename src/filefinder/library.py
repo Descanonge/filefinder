@@ -5,29 +5,28 @@
 # to the MIT License as defined in the file 'LICENSE',
 # at the root of this project. © 2021 Clément Haëck
 
-import logging
-from typing import Dict, List
-
 from datetime import datetime, timedelta
+import logging
+from typing import Dict
+
+from filefinder.matcher import Matches
 
 log = logging.getLogger(__name__)
 
 
-def get_date(matches: List, default_date: Dict = None,
+def get_date(matches: Matches, default_date: Dict = None,
              group: str = None) -> datetime:
     """Retrieve date from matched elements.
 
     If any matcher is *not* found in the filename, it will be replaced by the
     element in the default date.
-    Matchers that can be used are (in order increasing priority): YBmdjHMSFxX
-    If two matchers have the same name, the last one in the pre-regex will
-    get priority.
-
-    Supports matches with names from `Matcher.NAME_RGX`.
+    Matchers that can be used are (in order of increasing priority):
+    YBmdjHMSFxX. If two matchers have the same name, the last one in the
+    pre-regex will get priority.
 
     Parameters
     ----------
-    matches: list of :class:`Matches<filefinder.matcher.Matches>`
+    matches: :class:`Matches<filefinder.matcher.Matches>`
         Matches obtained from a filename.
     group: str
         If not None, restrict matchers to this group.

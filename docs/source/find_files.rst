@@ -172,7 +172,7 @@ Discard keyword
 
 :doc:`Information can be retrieved<retrieve_values>` from the matches in the
 filename, but one might discard a matcher so that it is not used.
-For example for a file of weekly averages with a filename indicated the start
+For example for a file of weekly averages with a filename indicating the start
 and end dates of the average, we might want to only recover the starting date::
 
   sst_%(x)-%(x:discard)
@@ -191,7 +191,7 @@ Group
 The group name is completely optional, but it can help differentiate two
 matchers with the same name. It can also be used to regroup matchers together,
 for instance when returning nested lists of filename with
-:func:`Finder.get_filename`, or when getting a date with
+:func:`Finder.get_files`, or when getting a date with
 :func:`library.get_date()<filefinder.library.get_date>`.
 
 

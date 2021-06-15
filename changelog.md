@@ -1,4 +1,7 @@
 
+
+- [2021-06-15] Better error message when no files are found
+
 ## v0.4.0
 
 - [2021-05-19] Add optional flag in matcher. 

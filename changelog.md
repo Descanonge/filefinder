@@ -1,6 +1,8 @@
 
+### v0.4.1
 
-- [2021-06-15] Better error message when no files are found
+- [2021-11-25] Simple eE exponent regex and various reformating.
+- [2021-06-15] Better error message when no files are found.
 
 ## v0.4.0
 

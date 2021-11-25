@@ -31,7 +31,7 @@ def autoprop(*props):
     """Generate properties for class."""
     def factory_get(name):
         def getter(self):
-            return self.params[name]
+            return self.params.get(name, None)
         return getter
 
     def factory_set(name):
@@ -68,6 +68,7 @@ class Format:
 
     def __init__(self, fmt: str):
         self.fmt = fmt
+        self.params = {}
         self.parse_params(fmt)
         self.set_defaults()
 

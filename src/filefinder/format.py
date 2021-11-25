@@ -155,7 +155,7 @@ class Format:
     def generate_expression_e(self) -> str:
         rgx = r'\d'
         rgx += self.get_right_point()
-        rgx += r'{}[+-]\d+?\d'.format(self.type)
+        rgx += r'{}[+-]\d+'.format(self.type)
         return self.insert_in_alignement(rgx)
 
     def insert_in_alignement(self, rgx: str) -> str:

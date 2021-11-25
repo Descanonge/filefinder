@@ -18,8 +18,8 @@ def get_date(matches: Matches, default_date: Dict = None,
              group: str = None) -> datetime:
     """Retrieve date from matched elements.
 
-    If any matcher is *not* found in the filename, it will be replaced by the
-    element in the default date.
+    If a matcher is *not* found in the filename, it will be replaced by the
+    element of the default date argument.
     Matchers that can be used are (in order of increasing priority):
     YBmdjHMSFxX. If two matchers have the same name, the last one in the
     pre-regex will get priority.

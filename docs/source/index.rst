@@ -21,7 +21,7 @@ The following example will find all files with the structure `Data/[month]/Tempe
     finder = Finder('/.../Data', '%(m)/Temperature_%(depth:fmt=d)_%(Y)%(m)%(d).nc')
     files = finder.get_files()
 
-We can also only select some files, for instance the first day of each month::
+We can also select only some files, for instance the first day of each month::
 
     finder.fix_matcher('d', 1)
     files = finder.get_files()

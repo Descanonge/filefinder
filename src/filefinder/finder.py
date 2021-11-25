@@ -30,8 +30,8 @@ class Finder():
         Only the matchers vary from file to file. See documentation
         for details.
     use_regex: bool
-        Characters outside of matcher are considered as valid regex (and not
-        escaped).
+        Characters outside of matchers are considered as valid regex (and not
+        escaped) if True. Default is False.
     replacements : str, optional
         Matchers to replace by a string:
         `'matcher name' = 'replacement string'`.
@@ -45,7 +45,7 @@ class Finder():
     regex: str
         Regex obtained from the pre-regex.
     use_regex: bool
-        Characters outside of matcher are considered as valid regex (and not
+        Characters outside of matchers are considered as valid regex (and not
         escaped) if true.
     pattern: re.pattern
         Compiled regex.
@@ -135,7 +135,7 @@ class Finder():
         ----------
         relative : bool
             If True, filenames are returned relative to the finder
-            root directory. If not, paths are absolute. Defaults to False.
+            root directory. If not, paths are absolute (default).
         nested : list of str
             If not None, return nested list of filenames with each level
             corresponding to a group in this argument. Last group in the list
@@ -204,8 +204,8 @@ class Finder():
             A list of values will be joined by the regex '|' OR.
             Special characters should be properly escaped in strings.
         fix_discard: bool
-            If true, matchers with the 'discard' option will still be fixed.
-            Defaults to false.
+            If True, matchers with the 'discard' option will still be fixed.
+            Default is False.
         """
         for m in self.get_matchers(key):
             if not fix_discard and m.discard:
@@ -224,8 +224,8 @@ class Finder():
            Dictionnary of matcher key: value. See :func:`fix_matcher` for
            details. If None, no matcher will be fixed.
         fix_discard: bool
-            If true, matchers with the 'discard' option will still be fixed.
-            Defaults to false.
+            If True, matchers with the 'discard' option will still be fixed.
+            Default is False.
         """
         if fixes is None:
             fixes = {}
@@ -262,9 +262,9 @@ class Finder():
         filename: str
             Filename to retrieve matches from.
         relative: bool
-            Is true if the filename is relative to the finder root directory.
-            If false, the filename is made relative before being matched.
-            Default to true.
+            True if the filename is relative to the finder root directory
+            (default). If False, the filename is made relative before being
+            matched.
 
         Raises
         ------
@@ -298,7 +298,7 @@ class Finder():
             prior. If prior fix is a list, first item will be used.
         relative: bool
             If the filename should be relative to the finder root directory.
-            Defaults to False.
+            Default is False.
         kw_fixes:
             Same as fixes. Takes precedence.
 
@@ -359,9 +359,9 @@ class Finder():
             `Finder`, \*args, \*\*kwargs)
             Should return a Dataset.
             Filename is retrieved from the dataset encoding attribute.
-        relative: If True, `filename` is made relative to finder root.
-            This is necessary to match the filename against the finder regex.
-            Defaults to True.
+        relative: If True (default), `filename` is made relative to the finder
+            root. This is necessary to match the filename against the finder
+            regex.
         args: optional
             Passed to `func` when called.
         kwargs: optional

@@ -24,11 +24,14 @@ The regex generation and parsing are tested in `tests/unit/test_format.py`.
 # at the root of this project. © 2021 Clément Haëck
 
 import re
-from typing import Any, Tuple, Union
+from typing import Any, Union
 
 
 def autoprop(*props):
-    """Generate properties for class."""
+    """Generate properties for class.
+
+    Properties all link to `cls.params` dictionnary.
+    """
     def factory_get(name):
         def getter(self):
             return self.params.get(name, None)

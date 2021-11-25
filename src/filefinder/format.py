@@ -160,21 +160,23 @@ class Format:
         return self.insert_in_alignement(rgx)
 
     def insert_in_alignement(self, rgx: str) -> str:
-        align, loc = self.get_align()
+        fill_rgx = ''
+        if self.width > 0:
+            fill_rgx += '{}*'.format(re.escape(self.fill))
         out_rgx = ''
 
-        if loc in ['left', 'center']:
-            out_rgx += align
+        if self.align in '>^':
+            out_rgx += fill_rgx
 
         out_rgx += self.get_sign()
 
-        if loc == 'middle':
-            out_rgx += align
+        if self.align == '=':
+            out_rgx += fill_rgx
 
         out_rgx += rgx
 
-        if loc in ['right', 'center']:
-            out_rgx += align
+        if self.align in '<^':
+            out_rgx += fill_rgx
 
         return out_rgx
 
@@ -189,21 +191,6 @@ class Format:
         else:
             raise KeyError("Sign not in {+- }")
         return rgx
-
-    def get_align(self) -> Tuple[str, str]:
-        """Get alignment with fill regex and its location."""
-        rgx = ''
-        if self.width > 0:
-            rgx += '{}*'.format(re.escape(self.fill))
-
-        loc = {
-            '=': 'middle',
-            '>': 'left',
-            '<': 'right',
-            '^': 'center'
-        }[self.align]
-
-        return rgx, loc
 
     def get_left_point(self) -> str:
         """Get regex for numbers left of decimal point."""
@@ -229,7 +216,7 @@ class Format:
         """Parse float from formatted string."""
         return float(self.remove_special(s))
 
-    def remove_special(self, s: str) -> int:
+    def remove_special(self, s: str) -> str:
         """Remove special characters.
 
         Remove characters that throw off int() and float() parsing.

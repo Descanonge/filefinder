@@ -120,8 +120,8 @@ def test_file_scan(fs):
     files.sort()
 
     finder = Finder(datadir,
-                    (r'%(Y){}test_%(Y)-%(m)-%(d)_'
-                     r'%(param:fmt=.1f)%(option:opt=:_yes).ext')
+                    ('%(Y){}test_%(Y)-%(m)-%(d)_'
+                     '%(param:fmt=.1f)%(option:opt=:_yes).ext')
                     .format(path.sep))
     assert len(finder.files) == len(files)
     for f, f_ref in zip(finder.get_files(relative=True), files):

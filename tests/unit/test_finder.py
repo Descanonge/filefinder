@@ -108,19 +108,21 @@ options = [False, True]
 
 @pytest.mark.skipif(not _pyfakefs, reason='pyfakefs not installed')
 def test_file_scan(fs):
-    datadir = '/data'
-    fs.create_dir('/data')
+    datadir = path.sep + 'data'
+    fs.create_dir(datadir)
     files = []
     for d, p, o in itertools.product(dates, params, options):
-        filename = '{}/test_{}_{:.1f}{}.ext'.format(
-            d.year, d.strftime('%F'), p, '_yes' if o else '')
+        filename = '{}{}test_{}_{:.1f}{}.ext'.format(
+            d.year, path.sep,
+            d.strftime('%F'), p, '_yes' if o else '')
         files.append(filename)
         fs.create_file(path.join(datadir, filename))
     files.sort()
 
     finder = Finder(datadir,
-                    ('%(Y)/test_%(Y)-%(m)-%(d)_'
-                     '%(param:fmt=.1f)%(option:opt=:_yes).ext'))
+                    ('%(Y){}test_%(Y)-%(m)-%(d)_'
+                     '%(param:fmt=.1f)%(option:opt=:_yes).ext')
+                    .format(path.sep))
     assert len(finder.files) == len(files)
     for f, f_ref in zip(finder.get_files(relative=True), files):
         assert f == f_ref

@@ -1,4 +1,6 @@
 
+- [2022-01-13] Add methods to get absolute/relative paths
+
 ### v0.4.1
 
 - [2021-11-25] Simple eE exponent regex and various reformating.

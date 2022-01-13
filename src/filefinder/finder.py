@@ -147,8 +147,10 @@ class Finder():
         KeyError
             A level in `nested` is not in the pre-regex groups.
         """
-        def make_abs(f):
-            return os.path.join(self.root, f)
+        def _get_files(files_matches):
+            if relative:
+                return [f for f, _ in files_matches]
+            return [self.get_absolute(f) for f, _ in files_matches]
 
         def get_match(m, group):
             return ''.join([m_.get_match(parsed=False) for m_ in m
@@ -156,8 +158,7 @@ class Finder():
 
         def nest(files_matches, groups, relative):
             if len(groups) == 0:
-                return [make_abs(f) if not relative else f
-                        for f, m in files_matches]
+                return _get_files(files_matches)
 
             group = groups[0]
             files_grouped = []
@@ -175,8 +176,7 @@ class Finder():
             self.find_files()
 
         if nested is None:
-            files = [make_abs(f) if not relative else f
-                     for f, m in self._files]
+            files = _get_files(self._files)
         else:
             groups = [m.group for m in self.matchers]
             for g in nested:
@@ -185,6 +185,14 @@ class Finder():
             files = nest(self._files, nested, relative)
 
         return files
+
+    def get_relative(self, filename):
+        """Get filename path relative to root."""
+        return os.path.relpath(filename, self.root)
+
+    def get_absolute(self, filename):
+        """Get absolute path to filename."""
+        return os.path.join(self.root, filename)
 
     def fix_matcher(self, key: Union[int, str], value: Union[Any, List[Any]],
                     fix_discard: bool = False):
@@ -279,7 +287,7 @@ class Finder():
             raise AttributeError("Finder is missing a regex.")
 
         if not relative:
-            filename = os.path.relpath(filename, self.root)
+            filename = self.get_relative(filename)
 
         return Matches(self.matchers, filename, self.pattern)
 
@@ -340,7 +348,7 @@ class Finder():
         filename = ''.join(segments)
 
         if not relative:
-            filename = os.path.join(self.root, filename)
+            filename = self.get_absolute(filename)
 
         return filename
 
@@ -391,7 +399,7 @@ class Finder():
         def f(ds):
             filename = ds.encoding['source']
             if relative:
-                filename = os.path.relpath(filename, self.root)
+                filename = self.get_relative(filename)
             return func(ds, filename, self, *args, **kwargs)
         return f
 
@@ -503,7 +511,7 @@ class Finder():
 
             if depth == len(subpatterns)-1:
                 dirnames.clear()  # Look no deeper
-                files += [os.path.relpath(os.path.join(dirpath, f), self.root)
+                files += [self.get_relative(os.path.join(dirpath, f))
                           for f in filenames]
             else:
                 dirlogs = dirnames[:3]

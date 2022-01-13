@@ -96,9 +96,24 @@ def test_get_matchers():
 
 
 def test_get_filename():
-    finder = Finder('', 'test_%(m)_%(c:fmt=.2f)_%(b:opt=:yes)')
+    root = path.join('data', 'root')
+    filename_rel = 'test_01_5.00_yes'
+    filename_abs = path.join(root, filename_rel)
+    finder = Finder(root, 'test_%(m)_%(c:fmt=.2f)_%(b:opt=:yes)')
+
+    # Without fix
+    assert finder.get_filename(m=1, c=5, b=True) == filename_abs
+    # With dictionnary
+    assert finder.get_filename(dict(m=1, c=5, b=True)) == filename_abs
+    # With mix
+    assert finder.get_filename(dict(m=1, c=5), b=True) == filename_abs
+    # Relative file
+    assert finder.get_filename(relative=True, m=1, c=5, b=True) == filename_rel
+
+    # With fix
     finder.fix_matchers(m=1)
-    assert finder.get_filename(c=5, b=True) == 'test_01_5.00_yes'
+    assert finder.get_filename(c=5, b=True) == filename_abs
+    assert finder.get_filename(dict(c=5), b=True) == filename_abs
 
 
 dates = [datetime(2000, 1, 1) + i*timedelta(days=15) for i in range(50)]

@@ -1,4 +1,6 @@
 
+### v0.4.2
+
 - [2022-01-13] Add methods to get absolute/relative paths
 
 ### v0.4.1

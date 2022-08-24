@@ -1,4 +1,6 @@
 
+## v0.5.0
+
 - [2022-08-24] Make parts of the API private
 - [2022-08-24] Do not throw if no files are found in the filetree.
 

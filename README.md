@@ -22,7 +22,7 @@ Once setup, it can:
 
 The package also interface easily with `xarray.open_mfdataset`.
 
-# Quick examples
+## Quick examples
 
 The following example will find all files with the structure ``Data/[month]/Temperature_[depth]_[date].nc``:
 ``` python

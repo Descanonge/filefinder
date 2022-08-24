@@ -5,11 +5,12 @@
 # to the MIT License as defined in the file 'LICENSE',
 # at the root of this project. © 2021 Clément Haëck
 
+from __future__ import annotations
 import os
 import logging
 import re
 
-from typing import Any, Callable, Dict, List, Tuple, Union
+from typing import Any, Callable, Dict, List, Tuple
 
 from filefinder.matcher import (Matcher, Matches,
                                 get_matchers_indices,
@@ -23,7 +24,7 @@ class Finder():
 
     Parameters
     ----------
-    root : str
+    root: str
         The root directory of a filetree where all files can be found.
     pregex: str
         The pre-regex. A regular expression with added 'Matchers'.
@@ -32,7 +33,7 @@ class Finder():
     use_regex: bool
         Characters outside of matchers are considered as valid regex (and not
         escaped) if True. Default is False.
-    replacements : str, optional
+    replacements: str, optional
         Matchers to replace by a string:
         `'matcher name' = 'replacement string'`.
 
@@ -40,30 +41,9 @@ class Finder():
     ----------
     root: str
         The root directory of the finder.
-    pregex: str
-        Pre-regex.
-    regex: str
-        Regex obtained from the pre-regex.
     use_regex: bool
         Characters outside of matchers are considered as valid regex (and not
         escaped) if true.
-    pattern: re.pattern
-        Compiled regex.
-    matchers: list of :class:`Matcher<filefinder.matcher.Matcher>`
-        List of matchers for this finder, in order.
-    segments: list of str
-        Segments of the pre-regex. Used to replace specific matchers.
-        `['text before matcher 1', 'matcher 1',
-        'text before matcher 2, 'matcher 2', ...]`
-    fixed_matchers: dict
-        Dictionnary of matchers with a set value.
-        'matcher index': 'replacement string'
-    _files: list of tuples
-        List of tuples containing the filename relative to the root,
-        and :class:`Matches<filefinder.matcher.Matches>` object.
-    scanned: bool
-        If the finder has scanned files.
-
     """
 
     def __init__(self, root: str, pregex: str, use_regex: bool = False,
@@ -71,34 +51,43 @@ class Finder():
 
         if isinstance(root, (list, tuple)):
             root = os.path.join(*root)
-        self.root = root
+        self.root: str = root
+        self.use_regex: bool = use_regex
 
-        self.pregex = ''
-        self.regex = ''
-        self.use_regex = use_regex
-        self.pattern = None
-        self.matchers = []
-        self.segments = []
-        self.fixed_matchers = dict()
-        self._files = []
-        self.scanned = False
+        self._pregex: str = ''
+        self._regex: str = ''
+
+        self._pattern: re.Pattern | None = None
+        self._matchers: List[Matcher] = []
+        self._segments: List[str] = []
+        """Segments of the pre-regex. Used to replace specific matchers.
+        `['text before matcher 1', 'matcher 1',
+        'text before matcher 2, 'matcher 2', ...]`
+        """
+        self._fixed_matchers: Dict[str, str] = dict()
+        self._files: List[Tuple[str, Matcher]] = []
+        self._scanned: bool = False
 
         self.set_pregex(pregex, **replacements)
-        self.scan_pregex()
-        self.update_regex()
+        self._update_regex()
 
     @property
     def n_matchers(self) -> int:
         """Number of matchers in pre-regex."""
-        return len(self.matchers)
+        return len(self._matchers)
+
+    @property
+    def scanned(self) -> bool:
+        """If files have been scanned."""
+        return self._scanned
 
     @property
     def files(self) -> List[Tuple[str, Matches]]:
         """List of filenames and their matches.
 
-        Will scan files if not already.
+        Will scan files if not already done.
         """
-        if not self.scanned:
+        if not self._scanned:
             self.find_files()
         return self._files
 
@@ -107,23 +96,23 @@ class Finder():
 
     def __str__(self):
         s = ['root: {}'.format(self.root)]
-        s += ["pre-regex: {}".format(self.pregex)]
-        if self.regex is not None:
-            s += ["regex: {}".format(self.regex)]
+        s += ["pre-regex: {}".format(self._pregex)]
+        if self._regex is not None:
+            s += ["regex: {}".format(self._regex)]
         else:
             s += ["regex not created"]
-        if self.fixed_matchers:
+        if self._fixed_matchers:
             s += ["fixed matchers:"]
             s += ["\t fixed #{} to {}".format(i, v)
-                  for i, v in self.fixed_matchers.items()]
-        if not self.scanned:
+                  for i, v in self._fixed_matchers.items()]
+        if not self._scanned:
             s += ["not scanned"]
         else:
             s += ["scanned: found {} files".format(len(self._files))]
         return '\n'.join(s)
 
     def get_files(self, relative: bool = False,
-                  nested: List[str] = None) -> List[str]:
+                  nested: List[str] | None = None) -> List[str]:
         """Return files that matches the regex.
 
         Lazily scan files: if files were already scanned, just return
@@ -133,10 +122,10 @@ class Finder():
 
         Parameters
         ----------
-        relative : bool
+        relative: bool
             If True, filenames are returned relative to the finder
             root directory. If not, paths are absolute (default).
-        nested : list of str
+        nested: list of str
             If not None, return nested list of filenames with each level
             corresponding to a group in this argument. Last group in the list
             is at the innermost level. A level specified as None refer to
@@ -178,7 +167,7 @@ class Finder():
         if nested is None:
             files = _get_files(self._files)
         else:
-            groups = [m.group for m in self.matchers]
+            groups = [m.group for m in self._matchers]
             for g in nested:
                 if g not in groups:
                     raise KeyError(f'{g} is not in Finder groups.')
@@ -186,27 +175,30 @@ class Finder():
 
         return files
 
-    def get_relative(self, filename):
+    def get_relative(self, filename: str) -> str:
         """Get filename path relative to root."""
         return os.path.relpath(filename, self.root)
 
-    def get_absolute(self, filename):
+    def get_absolute(self, filename: str) -> str:
         """Get absolute path to filename."""
         return os.path.join(self.root, filename)
 
-    def fix_matcher(self, key: Union[int, str], value: Union[Any, List[Any]],
-                    fix_discard: bool = False):
+    def fix_matcher(
+            self, key: int | str | Tuple[str],
+            value: Any,
+            fix_discard: bool = False
+    ):
         """Fix a matcher to a string.
 
         Parameters
         ----------
-        key : int, or str, or tuple of str of length 2.
+        key: int, or str, or tuple of str of length 2.
             If int, is matcher index, starts at 0.
             If str, can be matcher name, or a group and name combination with
             the syntax 'group:name'.
             When using strings, if multiple matchers are found with the same
             name or group/name combination, all are fixed to the same value.
-        value : str or value, or list of
+        value: str or value, or list of
             Will replace the match for all files. Can be a string, or a value
             that will be formatted using the matcher format string.
             A list of values will be joined by the regex '|' OR.
@@ -215,31 +207,39 @@ class Finder():
             If True, matchers with the 'discard' option will still be fixed.
             Default is False.
         """
+        self._fix_matcher_no_update(key, value, fix_discard)
+        self._update_regex()
+
+    def _fix_matcher_no_update(self, key, value, fix_discard):
         for m in self.get_matchers(key):
             if not fix_discard and m.discard:
                 continue
-            self.fixed_matchers[m.idx] = value
-        self.update_regex()
+            self._fixed_matchers[m.idx] = value
 
-    def fix_matchers(self, fixes: Dict[Union[int, str], Any] = None,
-                     fix_discard: bool = False,
-                     **fixes_kw):
+    def fix_matchers(
+            self, fixes: Dict[int | str | Tuple[str], Any] = None,
+            fix_discard: bool = False,
+            **fixes_kw
+    ):
         """Fix multiple values at once.
 
         Parameters
         ----------
         fixes: dict
-           Dictionnary of matcher key: value. See :func:`fix_matcher` for
-           details. If None, no matcher will be fixed.
+            Dictionnary of matcher key: value. See :func:`fix_matcher` for
+            details. If None, no matcher will be fixed.
         fix_discard: bool
             If True, matchers with the 'discard' option will still be fixed.
             Default is False.
+        fixes_kw:
+            Same as `fixes`. Takes precedence.
         """
         if fixes is None:
             fixes = {}
         fixes.update(fixes_kw)
         for f in fixes.items():
-            self.fix_matcher(*f, fix_discard=fix_discard)
+            self._fix_matcher_no_update(*f, fix_discard=fix_discard)
+        self._update_regex()
 
     def unfix_matchers(self, *keys: str):
         """Unfix matchers.
@@ -251,19 +251,20 @@ class Finder():
            If no key is provided, all matchers will be unfixed.
         """
         if not keys:
-            self.fixed_matchers = {}
+            self._fixed_matchers = {}
         else:
             for key in keys:
                 matchers = self.get_matchers(key)
                 for m in matchers:
-                    self.fixed_matchers.pop(m.idx, None)
-        self.update_regex()
+                    self._fixed_matchers.pop(m.idx, None)
+        self._update_regex()
 
     def get_matches(self, filename: str,
                     relative: bool = True) -> Matches:
         """Get matches for a given filename.
 
-        Apply regex to `filename` and return a dictionary of the results.
+        Apply regex to `filename` and return the results as a
+        :class:`Matches<filefinder.matcher.Matches>` object.
 
         Parameters
         ----------
@@ -283,15 +284,15 @@ class Finder():
         IndexError
             Not as many matches as matchers.
         """
-        if not self.regex:
+        if not self._regex:
             raise AttributeError("Finder is missing a regex.")
 
         if not relative:
             filename = self.get_relative(filename)
 
-        return Matches(self.matchers, filename, self.pattern)
+        return Matches(self._matchers, filename, re.compile(self._regex))
 
-    def get_filename(self, fixes: Dict = None, relative: bool = False,
+    def get_filename(self, fixes: Dict | None = None, relative: bool = False,
                      **kw_fixes: Any) -> str:
         """Return a filename.
 
@@ -308,7 +309,7 @@ class Finder():
             If the filename should be relative to the finder root directory.
             Default is False.
         kw_fixes:
-            Same as fixes. Takes precedence.
+            Same as `fixes`. Takes precedence.
 
         Raises
         ------
@@ -319,7 +320,7 @@ class Finder():
             raise ValueError("Cannot generate a valid filename if regex "
                              "is present outside matchers.")
 
-        fixed_matchers = self.fixed_matchers.copy()
+        fixed_matchers = self._fixed_matchers.copy()
         if fixes is None:
             fixes = {}
         fixes.update(kw_fixes)
@@ -331,18 +332,18 @@ class Finder():
                      if i not in fixed_matchers]
         if any(non_fixed):
             log.error("Matchers not fixed: %s",
-                      ', '.join([str(self.matchers[i]) for i in non_fixed]))
+                      ', '.join([str(self._matchers[i]) for i in non_fixed]))
             raise TypeError("Not all matchers were fixed.")
 
-        segments = self.segments.copy()
+        segments = self._segments.copy()
 
         for idx, value in fixed_matchers.items():
             if isinstance(value, bool):
-                value = self.matchers[idx].opt[value]
+                value = self._matchers[idx].opt[value]
             if isinstance(value, (list, tuple)):
                 value = value[0]
             if not isinstance(value, str):
-                value = self.matchers[idx].format(value)
+                value = self._matchers[idx].format(value)
             segments[2*idx+1] = value
 
         filename = ''.join(segments)
@@ -411,23 +412,25 @@ class Finder():
         pregex = pregex.strip()
         for k, z in replacements.items():
             pregex = pregex.replace("%({:s})".format(k), z)
-        self.pregex = pregex
+        self._pregex = pregex
+        self._scan_pregex()
+        self._update_regex()
 
-    def scan_pregex(self):
+    def _scan_pregex(self):
         """Scan pregex for matchers.
 
         Add matchers objects to self.
         Set segments attribute.
         """
         matchers_starts = [m.start()+1
-                           for m in re.finditer(r'%\(', self.pregex)]
+                           for m in re.finditer(r'%\(', self._pregex)]
 
-        self.matchers = []
+        self._matchers = []
         splits = [0]
         for idx, start in enumerate(matchers_starts):
             end = None
             level = 1
-            for i, c in enumerate(self.pregex[start+1:]):
+            for i, c in enumerate(self._pregex[start+1:]):
                 if c == "(":
                     level += 1
                 elif c == ")":
@@ -438,55 +441,56 @@ class Finder():
 
             if end is None:
                 end = start+6
-                substr = self.pregex[start-1:end]
-                if end < len(self.pregex):
+                substr = self._pregex[start-1:end]
+                if end < len(self._pregex):
                     substr += '...'
                 raise ValueError("No matcher end found for '{}'"
                                  .format(substr))
 
             try:
-                self.matchers.append(Matcher(self.pregex[start+1:end], idx))
+                self._matchers.append(Matcher(self._pregex[start+1:end], idx))
                 splits += [start-1, end+1]  # -1 removes the %
             except InvalidMatcher:
                 pass
 
-        self.segments = [self.pregex[i:j]
-                         for i, j in zip(splits, splits[1:]+[None])]
+        self._segments = [self._pregex[i:j]
+                          for i, j in zip(splits, splits[1:]+[None])]
 
         # Replace matcher by its regex
-        for idx, m in enumerate(self.matchers):
-            self.segments[2*idx+1] = m.get_regex()
+        for idx, m in enumerate(self._matchers):
+            self._segments[2*idx+1] = m.get_regex()
 
-    def update_regex(self):
+    def _update_regex(self):
         """Update regex.
 
-        Set fixed matchers. Re-compile pattern. Scrap previous scanning.
+        Set fixed matchers. Compute regex. Scrap previous scanning.
         """
-        segments = self.segments.copy()
+        segments = self._segments.copy()
         if not self.use_regex:
             for i, s in enumerate(segments):
                 # Escape outside matchers
                 segments[i] = s if i % 2 == 1 else re.escape(s)
 
-        for idx, value in self.fixed_matchers.items():
+        for idx, value in self._fixed_matchers.items():
             if isinstance(value, bool):
-                if isinstance(self.matchers[idx].opt, tuple):
-                    value = self.matchers[idx].opt[value]
+                if isinstance(self._matchers[idx].opt, tuple):
+                    value = self._matchers[idx].opt[value]
             if not isinstance(value, (list, tuple)):
                 value = [value]
             value = [v if isinstance(v, str)
-                     else re.escape(self.matchers[idx].format(v))
+                     else re.escape(self._matchers[idx].format(v))
                      for v in value]
             segments[2*idx+1] = '({})'.format('|'.join(value))
 
-        self.regex = ''.join(segments)
-        self.pattern = re.compile(self.regex)
-        self.scanned = False
+        self._regex = ''.join(segments)
+        self._scanned = False
         self._files = []
 
     def find_files(self):
-        """Find files to scan.
+        """Find files to scan and store them.
 
+        Is automatically called when accessing :attr:`files` or
+        :func:`get_files`.
         Sort files alphabetically.
 
         Raises
@@ -496,13 +500,13 @@ class Finder():
         IndexError
             If no files are found in the filetree.
         """
-        if self.regex is None:
+        if self._regex is None:
             self.create_regex()
-        if self.regex == '':
+        if self._regex == '':
             raise AttributeError("Finder is missing a regex.")
 
         subpatterns = [re.compile(rgx)
-                       for rgx in self.regex.split(os.path.sep)]
+                       for rgx in self._regex.split(os.path.sep)]
         files = []
         for dirpath, dirnames, filenames in os.walk(self.root):
             # Feels hacky, better way ?
@@ -540,14 +544,14 @@ class Finder():
         filelogs = files[:3]
         if len(files) > 3:
             filelogs += ['...']
-        log.debug("regex: %s, files:\n\t%s", self.regex, '\n\t'.join(filelogs))
+        log.debug("regex: %s, files:\n\t%s", self._regex, '\n\t'.join(filelogs))
         log.debug("Found %s matching files in %s",
                   len(files_matched), self.root)
 
-        self.scanned = True
+        self._scanned = True
         self._files = files_matched
 
-    def get_matchers(self, key: Union[int, str]) -> List[Matcher]:
+    def get_matchers(self, key: int | str) -> List[Matcher]:
         """Return list of matchers corresponding to key.
 
         Parameters
@@ -567,6 +571,6 @@ class Finder():
         TypeError
             Key type is not valid.
         """
-        selected = get_matchers_indices(self.matchers, key)
-        matchers = [self.matchers[i] for i in selected]
+        selected = get_matchers_indices(self._matchers, key)
+        matchers = [self._matchers[i] for i in selected]
         return matchers

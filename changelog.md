@@ -1,4 +1,7 @@
 
+- [2022-08-24] Make parts of the API private
+- [2022-08-24] Do not throw if no files are found in the filetree.
+
 ### v0.4.2
 
 - [2022-01-13] Add methods to get absolute/relative paths

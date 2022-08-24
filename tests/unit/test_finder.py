@@ -18,7 +18,7 @@ else:
 
 def assert_pregex(pregex, regex):
     finder = Finder('', pregex)
-    assert finder.regex == regex
+    assert finder._regex == regex
 
 
 def test_date_matchers():
@@ -31,8 +31,8 @@ def test_date_matchers():
 def test_multiple_matchers():
     finder = Finder('', 'test_%(m)_%(d)')
     assert finder.n_matchers == 2
-    assert finder.matchers[0].name == 'm'
-    assert finder.matchers[1].name == 'd'
+    assert finder._matchers[0].name == 'm'
+    assert finder._matchers[1].name == 'd'
 
 
 def test_custom_regex():
@@ -54,7 +54,7 @@ def test_format_regex():
 def test_name_group():
     def assert_group_name(pregex, names):
         finder = Finder('', pregex)
-        for m, (group, name) in zip(finder.matchers, names):
+        for m, (group, name) in zip(finder._matchers, names):
             assert(m.group == group)
             assert(m.name == name)
 
@@ -73,7 +73,7 @@ def test_fix_matcher_string():
     finder = Finder('', 'test_%(m)_%(c:fmt=.1f)')
     finder.fix_matcher(0, '01')
     finder.fix_matcher(1, r'11\.1')
-    assert finder.regex == r'test_(01)_(11\.1)'
+    assert finder._regex == r'test_(01)_(11\.1)'
 
 
 def test_fix_matcher_value():
@@ -81,7 +81,7 @@ def test_fix_matcher_value():
     finder.fix_matcher(0, 1)
     finder.fix_matcher(1, 11)
     finder.fix_matcher(2, True)
-    assert finder.regex == r'test_(01)_(11\.0)_(B)'
+    assert finder._regex == r'test_(01)_(11\.0)_(B)'
 
 
 def test_get_matchers():

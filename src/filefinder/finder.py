@@ -528,10 +528,6 @@ class Finder():
 
         files.sort()
 
-        if len(files) == 0:
-            raise IndexError(f"No files were found in '{self.root}' "
-                             f"for regex '{self.regex}'.")
-
         files_matched = []
         for f in files:
             try:

@@ -1,6 +1,6 @@
 
-API
-===
+API References
+==============
 
 .. automodule:: filefinder
 
@@ -10,8 +10,7 @@ API
 
 .. rubric:: Submodules
 .. autosummary::
-   :toctree:
-   :nosignatures:
+   :toctree: _autosummary
 
    finder
 

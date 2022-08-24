@@ -10,7 +10,7 @@
 
 </div>
 
-FileFinder allows to specify the structure of filenames with a simple syntax.
+To find files, FileFinder allows to specify the structure of filenames with a simple syntax.
 Parts of the file structure varying from file to file can be indicated with format strings
 or regular expressions, or with pre-defined defaults (mainly for dates).
 Once setup, it can:
@@ -26,7 +26,7 @@ The package also interface easily with `xarray.open_mfdataset`.
 
 The following example will find all files with the structure ``Data/[month]/Temperature_[depth]_[date].nc``:
 ``` python
-finder = Finder('/.../Data', '%(m)/Temperature_%(depth:fmt=d)_%(Y)%(m)%(d).nc')
+finder = Finder('/.../Data', '%(m)/Temperature_%(depth:fmt=03d)_%(Y)%(m)%(d).nc')
 files = finder.get_files()
 ```
 

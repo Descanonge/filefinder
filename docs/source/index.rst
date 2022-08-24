@@ -50,7 +50,7 @@ And we can generate a filename with a set of parameters::
 .. toctree::
    :maxdepth: 1
 
-   _references/filefinder.rst
+   api
 
 
 Source code: `<https://github.com/Descanonge/filefinder>`__

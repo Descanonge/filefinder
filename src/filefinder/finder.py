@@ -53,7 +53,6 @@ class Finder:
         `['text before group 1', 'group 1',
         'text before group 2, 'group 2', ...]`
         """
-        self._fixed_groups: dict[str, str] = dict()
         self._files: list[tuple[str, Group]] = []
         self._scanned: bool = False
 
@@ -86,12 +85,20 @@ class Finder:
     def __str__(self):
         s = [
             f'root: {self.root}',
-            f'pattern: {self._pattern}'
+            f'pattern: {self._pattern}',
+            f'regex: {self.get_regex()}'
         ]
-        if self._fixed_groups:
+
+        fixed_groups = [
+            (i, g.fixed_value)
+            for i, g in enumerate(self._groups)
+            if g.fixed_value is not None
+        ]
+        if fixed_groups:
             s.append('fixed groups:')
             s += [f'\t fixed #{i} to {v}'
-                  for i, v in self._fixed_groups.items()]
+                  for i, v in fixed_groups]
+
         if not self._scanned:
             s.append('not scanned')
         else:
@@ -198,7 +205,8 @@ class Finder:
             if not fix_discard and m.discard:
                 continue
             m.fix_value(value)
-            self._fixed_groups[m.idx] = value
+        # invalid the cached files
+        self._scanned = False
 
     def fix_groups(
             self, fixes: dict[int | str | tuple[str], Any] = None,
@@ -241,6 +249,8 @@ class Finder:
                 groups = self.get_groups(key)
                 for g in groups:
                     g.unfix()
+        # invalid cached files
+        self._scanned = False
 
     def get_matches(self, filename: str,
                     relative: bool = True) -> Matches:
@@ -301,7 +311,11 @@ class Finder:
             raise ValueError('Cannot generate a valid filename if regex '
                              'is present outside groups.')
 
-        fixed_groups = self._fixed_groups.copy()
+        fixed_groups = {
+            i: group.fixed_value
+            for i, group in enumerate(self._groups)
+            if group.fixed_value is not None
+        }
         if fixes is None:
             fixes = {}
         fixes.update(kw_fixes)

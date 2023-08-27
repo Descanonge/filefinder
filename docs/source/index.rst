@@ -1,7 +1,7 @@
 
 .. currentmodule:: filefinder
 
-filefinder documentation
+FileFinder documentation
 ==========================
 
 FileFinder allows to specify the structure of filenames with a simple syntax.
@@ -16,7 +16,7 @@ Once setup, it can:
 
 The package also interface easily with `xarray.open_mfdataset`.
 
-The following example will find all files with the structure `Data/[month]/Temperature_[depth]_[date].nc`::
+The following example will find all files with the structure ``Data/[month]/Temperature_[depth]_[date].nc``::
 
     finder = Finder('/.../Data', '%(m)/Temperature_%(depth:fmt=d)_%(Y)%(m)%(d).nc')
     files = finder.get_files()
@@ -38,9 +38,11 @@ And we can generate a filename with a set of parameters::
     # Specifying the day is optional since we already fixed it to 1.
 
 
+Contents
+--------
+
 .. toctree::
-   :maxdepth: 3
-   :caption: Contents:
+   :maxdepth: 2
 
    find_files
    retrieve_values
@@ -56,7 +58,7 @@ And we can generate a filename with a set of parameters::
 Source code: `<https://github.com/Descanonge/filefinder>`__
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`

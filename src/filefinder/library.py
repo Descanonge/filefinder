@@ -5,16 +5,15 @@
 # to the MIT License as defined in the file 'LICENSE',
 # at the root of this project. © 2021 Clément Haëck
 
-from datetime import datetime, timedelta
 import logging
-from typing import Dict
+from datetime import datetime, timedelta
 
-from filefinder.matcher import Matches
+from filefinder.group import Matches
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
-def get_date(matches: Matches, default_date: Dict = None,
+def get_date(matches: Matches, default_date: dict = None,
              group: str = None) -> datetime:
     """Retrieve date from matched elements.
 
@@ -39,7 +38,7 @@ def get_date(matches: Matches, default_date: Dict = None,
     KeyError
         If no matchers are found to create a date from.
     """
-    NAME_TO_DATETIME = dict(
+    name_to_datetime = dict(
         Y='year', m='month', d='day', H='hour', M='minute', S='second')
 
     def get_elts(names: str, callback):
@@ -49,7 +48,7 @@ def get_date(matches: Matches, default_date: Dict = None,
                 date.update(callback(elt, name))
 
     def process_int(elt, name):
-        return {NAME_TO_DATETIME[name]: int(elt)}
+        return {name_to_datetime[name]: int(elt)}
 
     def process_month_name(elt, name):
         elt = _find_month_number(elt)
@@ -58,11 +57,11 @@ def get_date(matches: Matches, default_date: Dict = None,
         return {}
 
     def process_doy(elt, name):
-        elt = datetime(date["year"], 1, 1) + timedelta(days=int(elt)-1)
+        elt = datetime(date['year'], 1, 1) + timedelta(days=int(elt)-1)
         return dict(month=elt.month, day=elt.day)
 
-    date = {"year": 1970, "month": 1, "day": 1,
-            "hour": 0, "minute": 0, "second": 0}
+    date = {'year': 1970, 'month': 1, 'day': 1,
+            'hour': 0, 'minute': 0, 'second': 0}
 
     if default_date is None:
         default_date = {}
@@ -74,31 +73,31 @@ def get_date(matches: Matches, default_date: Dict = None,
 
     elts_needed = set('xXYmdBjHMSF')
     if len(set(elts.keys()) & elts_needed) == 0:
-        log.warning("No matchers to retrieve a date from."
-                    " Returning default date.")
+        logger.warning('No matchers to retrieve a date from.'
+                       ' Returning default date.')
 
     # Process month name first to keep element priorities simples
     get_elts('B', process_month_name)
 
     # Decompose elements
-    elt = elts.pop("F", None)
+    elt = elts.pop('F', None)
     if elt is not None:
-        elts["Y"] = elt[:4]
-        elts["m"] = elt[5:7]
-        elts["d"] = elt[8:10]
+        elts['Y'] = elt[:4]
+        elts['m'] = elt[5:7]
+        elts['d'] = elt[8:10]
 
-    elt = elts.pop("x", None)
+    elt = elts.pop('x', None)
     if elt is not None:
-        elts["Y"] = elt[:4]
-        elts["m"] = elt[4:6]
-        elts["d"] = elt[6:8]
+        elts['Y'] = elt[:4]
+        elts['m'] = elt[4:6]
+        elts['d'] = elt[6:8]
 
-    elt = elts.pop("X", None)
+    elt = elts.pop('X', None)
     if elt is not None:
-        elts["H"] = elt[:2]
-        elts["M"] = elt[2:4]
+        elts['H'] = elt[:2]
+        elts['M'] = elt[2:4]
         if len(elt) > 4:
-            elts["S"] = elt[4:6]
+            elts['S'] = elt[4:6]
 
     # Process elements
     get_elts('Ymd', process_int)

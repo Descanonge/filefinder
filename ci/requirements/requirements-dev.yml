@@ -1,0 +1,16 @@
+dependencies:
+- sphinx == 6.2.1
+- sphinx-book-theme == 1.0.1
+
+- ipykernel
+- ipython
+- jupyter_client
+
+- ruff
+- mypy>=1.5
+- pytest>=7.4
+- pyfakefs
+
+- pip
+- pip:
+    - --no-deps -e ../../../

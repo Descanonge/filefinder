@@ -6,21 +6,21 @@ Finding files
 
 The main entry point of this package is the :class:`Finder` class. An instance
 is created using the root directory containing the files, and a pre-regular
-expression (abbreviated pre-regex or pregex) that will be transformed into a
+expression (abbreviated pattern or pregex) that will be transformed into a
 proper regex later.
 
 When asking to find files, the finder will first create a regular-expression
-out of the pre-regex.
+out of the pattern.
 It will then recursively find files in the root directory and its subfolders.
 Only the subfolders matching (part of) the regex will be looked into.
-Subfolders can simply be indicated in the pre-regex with the standard OS
+Subfolders can simply be indicated in the pattern with the standard OS
 separator. The finder only keeps files that match the full regex.
 
 
-Pre-regex
-=========
+Pattern
+=======
 
-The pre-regex specifies the structure of the filenames relative to the root
+The pattern specifies the structure of the filenames relative to the root
 directory. Parts that vary from file to file are indicated by *matchers*,
 enclosed by parenthesis and preceded by '%'. It is represented by the
 :class:`filefinder.matcher.Matcher` class.
@@ -40,15 +40,15 @@ The full syntax is as follows: ``%([group:]name[:fmt=format string][:opt[=A:B]][
 
 .. note::
 
-   The matchers are uniquely identified by their index in the pre-regex
+   The matchers are uniquely identified by their index in the pattern
    (starting at 0).
    Some other functions (see :func:`Finder.get_matches`) can use the string
    ``[group:]name`` to find one or more matchers.
 
 .. warning::
 
-   Matchers are first found in the pre-regex by looking at matching
-   parentheses. The pre-regex should thus have balanced parentheses or
+   Matchers are first found in the pattern by looking at matching
+   parentheses. The pattern should thus have balanced parentheses or
    unexpected behaviour can occur.
 
 

@@ -6,11 +6,13 @@ API References
 
 .. rubric:: Content
 .. autosummary::
+   :nosignatures:
+
    finder.Finder
 
 .. rubric:: Submodules
 .. autosummary::
-   :toctree: _autosummary
+   :toctree: _api
 
    finder
 
@@ -18,4 +20,4 @@ API References
 
    library
 
-   matcher
+   group

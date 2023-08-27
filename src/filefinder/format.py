@@ -105,7 +105,7 @@ class Format:
             if self.align is None and self.zero:
                 self.fill = '0'
                 self.align = '='
-            for k, v in defaults.items():
+            for k, v in defaults.items():  # self.params |= defaults
                 if self.params[k] is None:
                     self.params[k] = v
             self.width = int(self.width)

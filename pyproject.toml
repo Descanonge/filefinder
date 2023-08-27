@@ -1,0 +1,83 @@
+# Project build file
+
+[build-system]
+requires = ['setuptools']
+build-backend = 'setuptools.build_meta'
+
+[project]
+version = '1.0.0'
+
+name = 'filefinder'
+authors = [
+    {name='Clément Haëck', email='clement.haeck@locean.ipsl.fr'}
+]
+description = 'Find files using a simple syntax.'
+
+readme = 'README.md'
+requires-python = '>=3.9'
+classifiers = [
+    'Development Status :: 4 - Beta',
+    'License :: OSI Approved :: MIT License',
+
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3 :: Only',
+    'Programming Language :: Python :: 3.8',
+    'Operating System :: OS Independent',
+
+    'Intended Audience :: Developers',
+    'Intended Audience :: Science/Research',
+    'Topic :: Utilities'
+]
+
+dependencies = [
+]
+
+[project.optional-dependencies]
+dev = [
+    'sphinx==6.2.1',
+    'sphinx-book-theme==1.0.1',
+    'ipykernel',
+    'ipython',
+    'jupyter_client',
+    'ruff',
+    'mypy>=1.5',
+    'pytest>=7.4',
+    'pyfakefs'
+]
+
+[project.urls]
+'Source' = 'https://github.com/Descanonge/filefinder'
+'Documentation' = 'https://filefinder.readthedocs.io'
+
+[tool.mypy]
+plugins = 'numpy.typing.mypy_plugin'
+
+[tool.ruff]
+select = [
+       'E',  # pycodestyle
+       'W',  # pycodestyle
+       'I',  # isort
+       'N',  # pep8-name
+       'B',  # bugbear
+       'G',  # flake8-logging-format
+       'Q',  # flake8-quotes
+       'F',  # pyflakes
+       'UP',  #pyupgrade
+       'D',  #pydocstyle
+]
+line-length = 88
+target-version = 'py39'
+
+ignore = [
+       'E226', # missing whitespace around arithmetic operator
+       'D204', # one blank line after class
+       'D213', # multiline docstring start at 2nd line
+       'D417', # not all parameters need doc
+]
+
+[tool.ruff.pydocstyle]
+convention = 'numpy'
+
+[tool.ruff.flake8-quotes]
+docstring-quotes = 'double'
+inline-quotes = 'single'

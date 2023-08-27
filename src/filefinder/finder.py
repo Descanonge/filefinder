@@ -470,7 +470,8 @@ class Finder:
         files = []
         for dirpath, dirnames, filenames in os.walk(self.root):
             # Feels hacky, better way ?
-            depth = dirpath.count(os.sep) - self.root.count(os.sep)
+            depth = (dirpath.rstrip(os.sep).count(os.sep)
+                     - self.root.rstrip(os.sep).count(os.sep))
             pattern = subpatterns[depth]
 
             if depth == len(subpatterns)-1:
@@ -485,12 +486,12 @@ class Finder:
                              depth, pattern.pattern, '\n\t'.join(dirlogs))
 
             # Removes directories not matching regex
-            # We do double regex on directories, but good enough
             to_remove = [d for d in dirnames if not pattern.fullmatch(d)]
             for d in to_remove:
                 dirnames.remove(d)
 
         files.sort()
+        logger.debug('Found %s non-matching files in directories', len(files))
 
         files_matched = []
         for f in files:

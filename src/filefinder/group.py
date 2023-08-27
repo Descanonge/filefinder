@@ -199,6 +199,8 @@ class Group:
         the corresponding regex from `NAME_RGX`. '%%' is replaced by a single
         percentage character.
 
+        Also applies 'optional' specification.
+
         Raises
         ------
         KeyError

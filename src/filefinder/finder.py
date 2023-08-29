@@ -474,6 +474,8 @@ class Finder:
         IndexError
             If no files are found in the filetree.
         """
+        max_log_lines = 3
+
         regex = self.get_regex()
 
         # patterns for each filetree depth
@@ -491,8 +493,8 @@ class Finder:
                 files += [self.get_relative(os.path.join(dirpath, f))
                           for f in filenames]
             else:
-                dirlogs = dirnames[:3]
-                if len(dirnames) > 3:
+                dirlogs = dirnames[:max_log_lines]
+                if len(dirnames) > max_log_lines:
                     dirlogs += ['...']
                 logger.debug('depth: %d, pattern: %s, folders:\n\t%s',
                              depth, pattern.pattern, '\n\t'.join(dirlogs))
@@ -505,17 +507,18 @@ class Finder:
         files.sort()
         logger.debug('Found %s non-matching files in directories', len(files))
 
-        files_matched = []
+        pattern = re.compile(regex)  # because we are goint to use it a bunch of times
+        files_matched: list[tuple[Matches, str]] = []
         for f in files:
             try:
-                matches = self.get_matches(f, relative=True)
+                matches = Matches(self._groups, f, pattern)
             except ValueError:  # Filename did not match pattern
                 pass
             else:
                 files_matched.append((f, matches))
 
-        filelogs = files[:3]
-        if len(files) > 3:
+        filelogs = files[:max_log_lines]
+        if len(files) > max_log_lines:
             filelogs += ['...']
         logger.debug('regex: %s, files:\n\t%s', regex, '\n\t'.join(filelogs))
         logger.debug('Found %s matching files in %s',

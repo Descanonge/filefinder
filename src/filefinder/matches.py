@@ -63,14 +63,17 @@ class Match:
 
 
 class Matches:
-    """Store multiples matches.
+    """Scan an input file and store the results.
 
-    Attributes
-    ----------
-    matches: list of :class:`Match`
-        Matches for a single filename.
-    groups: list of :class:`Group`
-        Groups used.
+    Parameter
+    ---------
+    groups:
+        Groups present in the pattern.
+    filename:
+        Input filename to test.
+    pattern:
+        Regex to test, compiled.
+
 
     Raises
     ------
@@ -80,10 +83,13 @@ class Matches:
         Not as many matches as groups.
     """
 
-    def __init__(self, groups: list[Group], filename: str,
+    def __init__(self, groups: list[Group],
+                 filename: str,
                  pattern: re.Pattern):
-        self.matches = []
+        self.matches: list[Match] = []
+        """Matches for a single filename."""
         self.groups = groups
+        """Groups used."""
 
         m = pattern.fullmatch(filename)
         if m is None:

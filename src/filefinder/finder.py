@@ -9,7 +9,7 @@ import itertools
 import logging
 import os
 import re
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from typing import Any, Callable
 
 from filefinder.group import Group, GroupKey, get_groups_indices
@@ -50,28 +50,23 @@ class Finder:
         """If True, characters outside of groups are considered as valid regex
         (and not escaped). Default is False."""
 
-        self._pattern: str = pattern
+        self._pattern: str
 
-        self._groups: list[Group] = []
+        self.groups: list[Group] = []
         self._segments: list[str] = []
         """Segments of the pattern. Used to replace specific groups.
         `['text before group 1', 'group 1',
         'text before group 2, 'group 2', ...]`
         """
         self._files: list[tuple[str, Matches]] = []
-        self._scanned: bool = False
+        self.scanned: bool = False
 
-        self._parse_pattern()
+        self.set_pattern(pattern)
 
     @property
     def n_groups(self) -> int:
         """Number of groups in pre-regex."""
-        return len(self._groups)
-
-    @property
-    def scanned(self) -> bool:
-        """If files have been scanned."""
-        return self._scanned
+        return len(self.groups)
 
     @property
     def files(self) -> list[tuple[str, Matches]]:
@@ -80,14 +75,9 @@ class Finder:
         Will scan files when accessed and cache the result, if it has not
         already been done.
         """
-        if not self._scanned:
+        if not self.scanned:
             self.find_files()
         return self._files
-
-    @property
-    def groups(self) -> Iterator[Group]:
-        """Iterator on groups."""
-        return iter(self._groups)
 
     def __repr__(self) -> str:
         """Human readable information."""
@@ -103,7 +93,7 @@ class Finder:
 
         fixed_groups = [
             (i, g.fixed_value)
-            for i, g in enumerate(self._groups)
+            for i, g in enumerate(self.groups)
             if g.fixed_value is not None
         ]
         if fixed_groups:
@@ -111,7 +101,7 @@ class Finder:
             s += [f'\t fixed #{i} to {v}'
                   for i, v in fixed_groups]
 
-        if not self._scanned:
+        if not self.scanned:
             s.append('not scanned')
         else:
             s.append(f'scanned: found {len(self._files)} files')
@@ -224,7 +214,7 @@ class Finder:
                 continue
             m.fix_value(value)
         # invalid the cached files
-        self._scanned = False
+        self.scanned = False
 
     def fix_groups(
             self, fixes: dict[GroupKey, str | Any] | None = None,
@@ -260,7 +250,7 @@ class Finder:
            If no key is provided, all groups will be unfixed.
         """
         if not keys:
-            for g in self._groups:
+            for g in self.groups:
                 g.unfix()
         else:
             for key in keys:
@@ -268,7 +258,7 @@ class Finder:
                 for g in groups:
                     g.unfix()
         # invalid cached files
-        self._scanned = False
+        self.scanned = False
 
     def find_matches(self, filename: str,
                     relative: bool = True) -> Matches:
@@ -290,7 +280,7 @@ class Finder:
             filename = self.get_relative(filename)
 
         regex = self.get_regex()
-        return Matches(self._groups, filename, re.compile(regex))
+        return Matches(self.groups, filename, re.compile(regex))
 
     def get_filename(self, fixes: dict[GroupKey, str | Any] | None = None,
                      relative: bool = False,
@@ -323,7 +313,7 @@ class Finder:
 
         fixed_groups = {
             i: group.fixed_value
-            for i, group in enumerate(self._groups)
+            for i, group in enumerate(self.groups)
             if group.fixed_value is not None
         }
         if fixes is None:
@@ -337,11 +327,11 @@ class Finder:
                      if i not in fixed_groups]
         if any(non_fixed):
             logger.error('Groups not fixed: %s',
-                      ', '.join([str(self._groups[i]) for i in non_fixed]))
+                      ', '.join([str(self.groups[i]) for i in non_fixed]))
             raise TypeError('Not all groups were fixed.')
 
         segments = self._segments.copy()
-        groups = self._groups.copy()
+        groups = self.groups.copy()
 
         for idx, value in fixed_groups.items():
             groups[idx].fix_value(value, for_regex=False)
@@ -408,18 +398,25 @@ class Finder:
             return func(ds, filename, self, *args, **kwargs)
         return f
 
-    def _parse_pattern(self):
-        """Parse pattern for group objects."""
+    def get_pattern(self) -> str:
+        """Get filename pattern."""
+        return self._pattern
+
+    def set_pattern(self, pattern: str):
+        """Set pattern and parse for group objects."""
+        # invalid cached files
+        self.scanned = False
+        self._pattern = pattern
         groups_starts = [m.start()+1
-                         for m in re.finditer(r'%\(', self._pattern)]
+                         for m in re.finditer(r'%\(', pattern)]
 
         # This finds the matching end parenthesis for each group start
-        self._groups = []
+        self.groups = []
         splits = [0] # separation between groups
         for idx, start in enumerate(groups_starts):
             end = None
             level = 1
-            for i, c in enumerate(self._pattern[start+1:]):
+            for i, c in enumerate(pattern[start+1:]):
                 if c == '(':
                     level += 1
                 elif c == ')':
@@ -430,18 +427,18 @@ class Finder:
 
             if end is None:  # did not find matching parenthesis :(
                 end = start+6
-                substr = self._pattern[start-1:end]
+                substr = pattern[start-1:end]
                 if end < len(self._pattern):
                     substr += '...'
                 raise ValueError(f"No group end found for '{substr}'")
 
             try:
-                self._groups.append(Group(self._pattern[start+1:end], idx))
+                self.groups.append(Group(pattern[start+1:end], idx))
                 splits += [start-1, end+1]  # -1 removes the %
             except ValueError: # unable to parse group
                 pass
 
-        self._segments = [self._pattern[i:j]
+        self._segments = [pattern[i:j]
                           for i, j in zip(splits, splits[1:]+[None])]
 
     def get_regex(self) -> str:
@@ -454,7 +451,7 @@ class Finder:
                 for i, s in enumerate(segments)
             ]
 
-        for idx, group in enumerate(self._groups):
+        for idx, group in enumerate(self.groups):
             segments[2*idx+1] = group.get_regex()
 
         return ''.join(segments)
@@ -508,7 +505,7 @@ class Finder:
         files_matched: list[tuple[Matches, str]] = []
         for f in files:
             try:
-                matches = Matches(self._groups, f, pattern)
+                matches = Matches(self.groups, f, pattern)
             except ValueError:  # Filename did not match pattern
                 pass
             else:
@@ -521,7 +518,7 @@ class Finder:
         logger.debug('Found %s matching files in %s',
                      len(files_matched), self.root)
 
-        self._scanned = True
+        self.scanned = True
         self._files = files_matched
 
     def get_groups(self, key: GroupKey) -> list[Group]:
@@ -544,6 +541,6 @@ class Finder:
         TypeError
             Key type is not valid.
         """
-        selected = get_groups_indices(self._groups, key)
-        groups = [self._groups[i] for i in selected]
+        selected = get_groups_indices(self.groups, key)
+        groups = [self.groups[i] for i in selected]
         return groups

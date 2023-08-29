@@ -7,13 +7,7 @@ from datetime import datetime, timedelta
 from filefinder import Finder
 
 import pytest
-
-try:
-    import pyfakefs
-except ImportError:
-    _pyfakefs = False
-else:
-    _pyfakefs = True
+import pyfakefs
 
 
 def assert_pattern(pattern, regex):
@@ -31,8 +25,8 @@ def test_date_groups():
 def test_multiple_groups():
     finder = Finder('', 'test_%(m)_%(d)')
     assert finder.n_groups == 2
-    assert finder._groups[0].name == 'm'
-    assert finder._groups[1].name == 'd'
+    assert finder.groups[0].name == 'm'
+    assert finder.groups[1].name == 'd'
 
 
 def test_custom_regex():
@@ -54,7 +48,7 @@ def test_format_regex():
 def test_name_group():
     def assert_group_name(pattern, names):
         finder = Finder('', pattern)
-        for m, (group, name) in zip(finder._groups, names):
+        for m, (group, name) in zip(finder.groups, names):
             assert(m.group == group)
             assert(m.name == name)
 
@@ -120,7 +114,9 @@ params = [-1.5, 0., 1.5]
 options = [False, True]
 
 
-@pytest.mark.skipif(not _pyfakefs, reason='pyfakefs not installed')
+# TODO add files than do not match
+# TODO test nested
+
 def test_file_scan(fs):
     datadir = path.sep + 'data'
     fs.create_dir(datadir)

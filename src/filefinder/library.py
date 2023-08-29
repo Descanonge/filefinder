@@ -126,3 +126,58 @@ def _find_month_number(name: str) -> int:
         return names_abbr.index(name) + 1
 
     raise ValueError(f"Could not interpret month name '{name}'")
+
+
+def get_func_process_filename(
+        finder: Finder,
+        func: Callable[..., 'xarray.Dataset'],
+        relative: bool = True,
+        *args, **kwargs) -> Callable[['xarray.Dataset'], 'xarray.Dataset']:
+    r"""Get a function that can preprocess a dataset.
+
+    Written to be used as the 'process' argument of
+    `xarray.open_mfdataset`. Allows to use a function with additional
+    arguments, that can retrieve information from the filename.
+
+    Parameters
+    ----------
+    func:
+        Input arguments are (`xarray.Dataset`, filename: `str`,
+        `Finder`, \*args, \*\*kwargs).
+        Should return a Dataset.
+        The filename is retrieved from the dataset encoding attribute.
+    relative:
+        If True (default), `filename` is made relative to the finder root. This
+        is necessary to match the filename against the finder regex.
+    args:
+        Passed to `func` when called.
+    kwargs:
+        Passed to `func` when called.
+
+    Returns
+    -------
+    preprocess
+            Function with signature suitable for :func:`xarray.open_mfdataset`.
+
+    Examples
+    --------
+    This retrieve the date from the filename, and add a time dimensions
+    to the dataset with the corresponding value.
+    >>> from filefinder import library
+    ... def process(ds, filename, finder, default_date=None):
+    ...     matches = finder.find_matches(filename)
+    ...     date = library.get_date(matches, default_date=default_date)
+    ...     ds = ds.assign_coords(time=[date])
+    ...     return ds
+    ...
+    ... ds = xr.open_mfdataset(
+    ...     finder.get_files(),
+    ...     preprocess=get_func_process_filename(
+    ...         finder, process, default_date={'hour': 12}))
+    """
+    def f(ds):
+        filename = ds.encoding['source']
+        if relative:
+            filename = finder.get_relative(filename)
+        return func(ds, filename, finder, *args, **kwargs)
+    return f

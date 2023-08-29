@@ -335,57 +335,6 @@ class Finder:
 
         return filename
 
-    def get_func_process_filename(self, func: Callable, relative: bool = True,
-                                  *args, **kwargs) -> Callable:
-        r"""Get a function that can preprocess a dataset.
-
-        Written to be used as the 'process' argument of
-        `xarray.open_mfdataset`. Allows to use a function with additional
-        arguments, that can retrieve information from the filename.
-
-        Parameters
-        ----------
-        func: Callable
-            Input arguments (`xarray.Dataset`, filename: `str`,
-            `Finder`, \*args, \*\*kwargs)
-            Should return a Dataset.
-            Filename is retrieved from the dataset encoding attribute.
-        relative: If True (default), `filename` is made relative to the finder
-            root. This is necessary to match the filename against the finder
-            regex.
-        args: optional
-            Passed to `func` when called.
-        kwargs: optional
-            Passed to `func` when called.
-
-        Returns
-        -------
-        Callable
-             Function with the signature of the 'process' argument of
-             `xarray.open_mfdataset`.
-
-        Examples
-        --------
-        This retrieve the date from the filename, and add a time dimensions
-        to the dataset with the corresponding value.
-        >>> from filefinder import library
-        ... def process(ds, filename, finder, default_date=None):
-        ...     matches = finder.find_matches(filename)
-        ...     date = library.get_date(matches, default_date=default_date)
-        ...     ds = ds.assign_coords(time=[date])
-        ...     return ds
-        ...
-        ... ds = xr.open_mfdataset(finder.get_files(),
-        ...                        preprocess=finder.get_func_process_filename(
-        ...     process, default_date={'hour': 12}))
-        """
-        def f(ds):
-            filename = ds.encoding['source']
-            if relative:
-                filename = self.get_relative(filename)
-            return func(ds, filename, self, *args, **kwargs)
-        return f
-
     def get_pattern(self) -> str:
         """Get filename pattern."""
         return self._pattern

@@ -110,8 +110,10 @@ class Finder:
             s.append(f'scanned: found {len(self._files)} files')
         return '\n'.join(s)
 
-    def get_files(self, relative: bool = False,
-                  nested: list[str] | None = None) -> list[str]:
+    def get_files(self,
+                  relative: bool = False,
+                  nested: Sequence[str | Sequence[str]] | None = None
+                  ) -> list:
         """Return files that matches the regex.
 
         Lazily scan files: if files were already scanned, just return
@@ -121,55 +123,60 @@ class Finder:
 
         Parameters
         ----------
-        relative: bool
+        relative:
             If True, filenames are returned relative to the finder
             root directory. If not, paths are absolute (default).
-        nested: list of str
+        nested:
             If not None, return nested list of filenames with each level
-            corresponding to a group in this argument. Last group in the list
-            is at the innermost level. A level specified as None refer to
-            groups without a group.
+            corresponding to a group, or set of group. Last set in the list
+            is at the innermost level.
 
         Raises
         ------
         KeyError
-            A level in `nested` is not in the pre-regex groups.
+            A group name in `nested` is not found in the pattern.
         """
-        def _get_files(files_matches):
+        def get_files(files_matches):
             if relative:
                 return [f for f, _ in files_matches]
             return [self.get_absolute(f) for f, _ in files_matches]
 
-        def get_match(m, group):
-            return ''.join([m_.get_match(parsed=False) for m_ in m
-                            if m_.group.group == group])
+        def get_key(matches: Matches, level: list[str]) -> str:
+            return ':'.join([match.get_match(parsed=False) for match in matches
+                             if match.group.name in level])
 
-        def nest(files_matches, groups, relative):
-            if len(groups) == 0:
-                return _get_files(files_matches)
+        def nest(files_matches, levels, relative):
+            if len(levels) == 0:
+                return get_files(files_matches)
 
-            group = groups[0]
+            level = levels[0]
             files_grouped = []
-            matches = {}
+            matches: dict[str, int] = {}
+            # We need to sort files by their value.
+            # We use all unparsed matches joined in a single string as a key
+            # (using get_key). We store it in a dictionnary, the value being
+            # the corresponding index
             for f, m in files_matches:
-                match = get_match(m, group)
-                if match not in matches:
-                    matches[match] = len(matches)
+                key = get_key(m, level)
+                if key not in matches:
+                    matches[key] = len(matches)
                     files_grouped.append([])
-                files_grouped[matches[match]].append((f, m))
+                files_grouped[matches[key]].append((f, m))
 
-            return [nest(grp, groups[1:], relative) for grp in files_grouped]
+            return [nest(grp, levels[1:], relative) for grp in files_grouped]
 
         if not self.scanned:
             self.find_files()
 
         if nested is None:
-            files = _get_files(self._files)
+            files = get_files(self._files)
         else:
-            groups = [m.group for m in self._groups]
-            for g in nested:
-                if g not in groups:
-                    raise KeyError(f'{g} is not in Finder groups.')
+            names = set(g.name for g in self.groups)
+            nested = [[name] if isinstance(name, str) else name
+                      for name in nested]
+            for name in itertools.chain(*nested):
+                if name not in names:
+                    raise KeyError(f'{name} is not in Finder groups.')
             files = nest(self._files, nested, relative)
 
         return files

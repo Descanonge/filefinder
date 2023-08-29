@@ -8,7 +8,7 @@
 import logging
 from datetime import datetime, timedelta
 
-from filefinder.group import Matches
+from filefinder.matches import Matches
 
 logger = logging.getLogger(__name__)
 

@@ -50,7 +50,9 @@ dev = [
 'Documentation' = 'https://filefinder.readthedocs.io'
 
 [tool.mypy]
-plugins = 'numpy.typing.mypy_plugin'
+disable_error_code = ['annotation-unchecked']
+allow_untyped_defs = true
+ignore_missing_imports = true
 
 [tool.ruff]
 select = [
@@ -64,6 +66,7 @@ select = [
        'F',  # pyflakes
        'UP',  #pyupgrade
        'D',  #pydocstyle
+       'PL', #pylint
 ]
 line-length = 88
 target-version = 'py39'

@@ -7,6 +7,8 @@
 
 import logging
 import re
+from collections.abc import Iterator
+from typing import Any
 
 from .group import Group, GroupKey, get_groups_indices
 
@@ -43,16 +45,23 @@ class Match:
             logger.warning('Failed to parse for group %s', str(group))
 
     def __repr__(self):
+        """Human readable information."""
         return '\n'.join([super().__repr__(), self.__str__()])
 
     def __str__(self):
+        """Human readable information."""
         return str(self.group) + f' = {self.match_str}'
 
-    def get_match(self, parsed: bool = True):
+    def get_match(self, parsed: bool = True) -> str | Any:
         """Get match string or value.
 
         If `parsed` is true, and the parsing was successful, return the
         parsed value instead of the matched string.
+
+        Raises
+        ------
+        ValueError:
+            Could not parse the match. Could
         """
         if parsed:
             if self.match_parsed is None:
@@ -100,19 +109,24 @@ class Matches:
         for i in range(len(groups)):
             self.matches.append(Match(groups[i], m, i))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Human readable information."""
         return '\n'.join([super().__repr__(), self.__str__()])
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Human readable information."""
         return '\n'.join([str(m) for m in self.matches])
 
-    def __getitem__(self, key: GroupKey):
+    def __getitem__(self, key: GroupKey) -> Match | list[Match]:
+        """Get matches corresponding to key."""
         return self.get_matches(key)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Match]:
+        """Iterate over matches."""
         return iter(self.matches)
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """Return number of matches."""
         return len(self.matches)
 
     def get_matches(self, key: GroupKey) -> Match | list[Match]:

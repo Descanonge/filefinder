@@ -21,7 +21,7 @@ GroupKey = int | str
 class GroupParseError(Exception):
     """Custom errors when parsing group definition."""
 
-    def __init__(self, definition, message):
+    def __init__(self, definition: str, message: str):
         self.definition = definition
         self.message = message + f' ({definition})'
 
@@ -154,17 +154,19 @@ class Group:
             raise GroupParseError(
                 self.definition, 'No regex has been produced.')
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Human readable information."""
         return '\n'.join([super().__repr__(), self.__str__()])
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Human readable information."""
         return f'{self.name}:{self.idx:d}'
 
-    def format(self, value: Any):
+    def format(self, value: Any) -> str:
         """Return formatted string from value."""
         return self.fmt.format(value)
 
-    def fix_value(self, fix: Any | bool | str):
+    def fix_value(self, fix: Any | bool | str, for_regex: bool=True):
         """Fix the group regex to a specific value.
 
         Parameters

@@ -5,12 +5,14 @@
 # to the MIT License as defined in the file 'LICENSE',
 # at the root of this project. © 2021 Clément Haëck
 
+import itertools
 import logging
 import os
 import re
+from collections.abc import Iterator, Sequence
 from typing import Any, Callable
 
-from filefinder.group import Group, get_groups_indices
+from filefinder.group import Group, GroupKey, get_groups_indices
 from filefinder.matches import Matches
 
 logger = logging.getLogger(__name__)
@@ -35,7 +37,10 @@ class Finder:
         not escaped). Default is False.
     """
 
-    def __init__(self, root: str, pattern: str, use_regex: bool = False):
+    def __init__(self,
+                 root: str,
+                 pattern: str,
+                 use_regex: bool = False):
 
         if isinstance(root, (list, tuple)):
             root = os.path.join(*root)
@@ -53,7 +58,7 @@ class Finder:
         `['text before group 1', 'group 1',
         'text before group 2, 'group 2', ...]`
         """
-        self._files: list[tuple[str, Group]] = []
+        self._files: list[tuple[str, Matches]] = []
         self._scanned: bool = False
 
         self._parse_pattern()
@@ -79,15 +84,17 @@ class Finder:
             self.find_files()
         return self._files
 
-    def __repr__(self):
     @property
     def groups(self) -> Iterator[Group]:
         """Iterator on groups."""
         return iter(self._groups)
 
+    def __repr__(self) -> str:
+        """Human readable information."""
         return '\n'.join([super().__repr__(), self.__str__()])
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Human readable information."""
         s = [
             f'root: {self.root}',
             f'pattern: {self._pattern}',
@@ -190,26 +197,25 @@ class Finder:
         return os.path.join(self.root, filename)
 
     def fix_group(
-            self, key: int | str,
-            value: Any,
+            self, key: GroupKey,
+            value: str | Any,
             fix_discard: bool = False
     ):
         """Fix a group to a string.
 
         Parameters
         ----------
-        key: int, or str, or tuple of str of length 2.
-            If int, is group index, starts at 0.
-            If str, can be group name, or a group and name combination with
-            the syntax 'group:name'.
-            When using strings, if multiple groups are found with the same
-            name or group/name combination, all are fixed to the same value.
-        value: str or value, or list of
+        key:
+            Can be the index of a group in the pattern (starts at 0), or the
+            name of a group. If multiple groups share the same name, they are
+            all fixed to the same value.
+        value:
             Will replace the match for all files. Can be a string, or a value
             that will be formatted using the group format string.
             A list of values will be joined by the regex '|' OR.
-            Special characters should be properly escaped in strings.
-        fix_discard: bool
+            A string will be interpreted as a regular expression, so all special
+            characters should be properly escaped.
+        fix_discard:
             If True, groups with the 'discard' option will still be fixed.
             Default is False.
         """
@@ -221,18 +227,18 @@ class Finder:
         self._scanned = False
 
     def fix_groups(
-            self, fixes: dict[int | str | tuple[str], Any] = None,
+            self, fixes: dict[GroupKey, str | Any] | None = None,
             fix_discard: bool = False,
-            **fixes_kw
+            **fixes_kw: str | Any
     ):
-        """Fix multiple values at once.
+        """Fix multiple groups at once.
 
         Parameters
         ----------
-        fixes: dict
-            Dictionnary of group key: value. See :func:`fix_group` for
-            details. If None, no group will be fixed.
-        fix_discard: bool
+        fixes:
+            Dictionnary of `{group key: value}`. See :func:`fix_group` for
+            details.
+        fix_discard:
             If True, groups with the 'discard' option will still be fixed.
             Default is False.
         fixes_kw:
@@ -240,7 +246,7 @@ class Finder:
         """
         if fixes is None:
             fixes = {}
-        fixes.update(fixes_kw)
+        fixes.update(**fixes_kw)
         for f in fixes.items():
             self.fix_group(*f, fix_discard=fix_discard)
 
@@ -249,7 +255,7 @@ class Finder:
 
         Parameters
         ----------
-        keys: str
+        keys:
            Keys to find groups to unfix. See :func:`get_groups`.
            If no key is provided, all groups will be unfixed.
         """
@@ -264,30 +270,21 @@ class Finder:
         # invalid cached files
         self._scanned = False
 
-    def get_matches(self, filename: str,
+    def find_matches(self, filename: str,
                     relative: bool = True) -> Matches:
-        """Get matches for a given filename.
+        """Find matches for a given filename.
 
-        Apply regex to `filename` and return the results as a
-        :class:`Matches<filefinder.group.Matches>` object.
+        Apply regex to `filename` and return the results as a :class:`Matches`
+        object. Fixed values are applied as normal.
 
         Parameters
         ----------
-        filename: str
+        filename:
             Filename to retrieve matches from.
-        relative: bool
+        relative:
             True if the filename is relative to the finder root directory
             (default). If False, the filename is made relative before being
             matched.
-
-        Raises
-        ------
-        AttributeError
-            The regex is empty.
-        ValueError
-            The filename did not match the pattern.
-        IndexError
-            Not as many matches as groups.
         """
         if not relative:
             filename = self.get_relative(filename)
@@ -395,7 +392,7 @@ class Finder:
         to the dataset with the corresponding value.
         >>> from filefinder import library
         ... def process(ds, filename, finder, default_date=None):
-        ...     matches = finder.get_matches(filename)
+        ...     matches = finder.find_matches(filename)
         ...     date = library.get_date(matches, default_date=default_date)
         ...     ds = ds.assign_coords(time=[date])
         ...     return ds
@@ -527,7 +524,7 @@ class Finder:
         self._scanned = True
         self._files = files_matched
 
-    def get_groups(self, key: int | str) -> list[Group]:
+    def get_groups(self, key: GroupKey) -> list[Group]:
         """Return list of groups corresponding to key.
 
         Parameters

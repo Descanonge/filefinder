@@ -80,6 +80,11 @@ class Finder:
         return self._files
 
     def __repr__(self):
+    @property
+    def groups(self) -> Iterator[Group]:
+        """Iterator on groups."""
+        return iter(self._groups)
+
         return '\n'.join([super().__repr__(), self.__str__()])
 
     def __str__(self):

@@ -14,8 +14,6 @@ Once setup, it can:
 - Select only filenames with specific values
 - Generate filenames
 
-The package also interface easily with `xarray.open_mfdataset`.
-
 The following example will find all files with the structure ``Data/[month]/Temperature_[depth]_[date].nc``::
 
     finder = Finder('/.../Data', '%(m)/Temperature_%(depth:fmt=d)_%(Y)%(m)%(d).nc')
@@ -23,7 +21,7 @@ The following example will find all files with the structure ``Data/[month]/Temp
 
 We can also select only some files, for instance the first day of each month::
 
-    finder.fix_matcher('d', 1)
+    finder.fix_group('d', 1)
     files = finder.get_files()
 
 We can retrieve values from found files::
@@ -46,7 +44,7 @@ Contents
 
    find_files
    retrieve_values
-   fix_matchers
+   fix_groups
    examples
 
 .. toctree::

@@ -15,9 +15,7 @@ API References
    :toctree: _api
 
    finder
-
    format
-
-   library
-
    group
+   library
+   matches

@@ -295,7 +295,8 @@ class Finder:
         regex = self.get_regex()
         return Matches(self._groups, filename, re.compile(regex))
 
-    def get_filename(self, fixes: dict | None = None, relative: bool = False,
+    def get_filename(self, fixes: dict[GroupKey, str | Any] | None = None,
+                     relative: bool = False,
                      **kw_fixes: Any) -> str:
         """Return a filename.
 
@@ -304,11 +305,11 @@ class Finder:
 
         Parameters
         ----------
-        fixes: dict
+        fixes:
             Dictionnary of fixes (group key: value). For details, see
             :func:`fix_group`. Will (temporarily) supplant group fixed
             prior. If prior fix is a list, first item will be used.
-        relative: bool
+        relative:
             If the filename should be relative to the finder root directory.
             Default is False.
         kw_fixes:
@@ -330,7 +331,7 @@ class Finder:
         }
         if fixes is None:
             fixes = {}
-        fixes.update(kw_fixes)
+        fixes.update(**kw_fixes)
         for key, value in fixes.items():
             for m in self.get_groups(key):
                 fixed_groups[m.idx] = value
@@ -343,15 +344,14 @@ class Finder:
             raise TypeError('Not all groups were fixed.')
 
         segments = self._segments.copy()
+        groups = self._groups.copy()
 
         for idx, value in fixed_groups.items():
-            if isinstance(value, bool):
-                value = self._groups[idx].opt[value]
-            if isinstance(value, (list, tuple)):
-                value = value[0]
-            if not isinstance(value, str):
-                value = self._groups[idx].format(value)
-            segments[2*idx+1] = value
+            groups[idx].fix_value(value, for_regex=False)
+            if (fixed_string := groups[idx].fixed_string) is not None:
+                segments[2*idx+1] = fixed_string
+            else:
+                raise ValueError(f"Group '{groups[idx]!s}' has no fixed value.")
 
         filename = ''.join(segments)
 

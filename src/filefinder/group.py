@@ -85,9 +85,12 @@ class Group:
         """Format string object."""
         self.discard: bool = False
         """If the group should not be used when retrieving values from matches."""
-        self.opt: tuple[str] | bool = None
-        """Optional keyword. If True, the whole group is optional. Else is a
-        tuple of the two possibilities."""
+        self.options: tuple[str] | None = None
+        """Tuple of the two possibilities indicated by the full ':opt'
+        specification."""
+        self.optional: bool = False
+        """If True, the whole group is marked as optional (``()?``).
+        Is set to False unless specification ':opt' is indicated."""
 
         self.fixed_value: Any | None = None
         self.fixed_string: str | None = None
@@ -136,11 +139,11 @@ class Group:
         if m.group('opt') is not None:
             opt_a, opt_b = m.group('optA'), m.group('optB')
             if opt_a is None and opt_b is None:
-                self.opt = True
+                self.optional = True
             else:
                 opt_a = '' if opt_a is None else opt_a
                 opt_b = '' if opt_b is None else opt_b
-                self.opt = (opt_a, opt_b)
+                self.options = (opt_a, opt_b)
                 self.rgx = f'{opt_a}|{opt_b}'
 
         # Override regex
@@ -169,21 +172,38 @@ class Group:
         fix:
             A string is directly used as a regular expression, otherwise the
             value is formatted according to the group 'format' specification.
+        for_regex:
+            If True (default), format the string for a regular expression. If
+            False, format it for a filename generation (ie: if multiple values
+            only take the first one, do not escape characters).
         """
         self.fixed_value = fix
 
         # if optional A|B choice
-        if isinstance(fix, bool) and isinstance(self.opt, tuple):
-            fix = self.opt[fix]
+        if isinstance(fix, bool):
+            if self.options is not None:
+                fix = self.options[fix]
+            else:
+                raise ValueError(f'{self.name} group has no A|B options, '
+                                 'cannot fix value with a boolean.')
 
         if not isinstance(fix, (list, tuple)):
             fix = [fix]
 
-        fixes = [
-            f if isinstance(f, str)  # if a string, leave it as is
-            else re.escape(self.format(f))  # otherwise format it
-            for f in fix
-        ]
+        fixes = []
+        for f in fix:
+            if isinstance(f, str): # if a string, leave it as is
+                out = f
+            else:
+                out = self.format(f)
+                if for_regex:
+                    out = re.escape(out)
+            fixes.append(out)
+
+        # only keep the first value for filenames
+        if not for_regex:
+            fixes = fixes[0:]
+
         self.fixed_string = '|'.join(fixes)
 
     def unfix(self):
@@ -225,7 +245,7 @@ class Group:
         # Make it matching
         rgx = f'({rgx})'
 
-        if self.opt is True:
+        if self.optional is True:
             rgx += '?'
 
         return rgx

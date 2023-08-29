@@ -10,6 +10,7 @@ import logging
 import os
 import re
 from collections.abc import Sequence
+from copy import copy
 from typing import Any, Callable
 
 from filefinder.group import Group, GroupKey, get_groups_indices
@@ -309,36 +310,23 @@ class Finder:
         """
         if self.use_regex:
             raise ValueError('Cannot generate a valid filename if regex '
-                             'is present outside groups.')
+                             'is present outside groups (`use_regex=True`).')
 
-        fixed_groups = {
-            i: group.fixed_value
-            for i, group in enumerate(self.groups)
-            if group.fixed_value is not None
-        }
         if fixes is None:
             fixes = {}
         fixes.update(**kw_fixes)
-        for key, value in fixes.items():
-            for m in self.get_groups(key):
-                fixed_groups[m.idx] = value
-
-        non_fixed = [i for i in range(self.n_groups)
-                     if i not in fixed_groups]
-        if any(non_fixed):
-            logger.error('Groups not fixed: %s',
-                      ', '.join([str(self.groups[i]) for i in non_fixed]))
-            raise TypeError('Not all groups were fixed.')
 
         segments = self._segments.copy()
-        groups = self.groups.copy()
+        groups = [copy(g) for g in self.groups]  # shallow copy (no reparsing of def)
 
-        for idx, value in fixed_groups.items():
-            groups[idx].fix_value(value, for_regex=False)
-            if (fixed_string := groups[idx].fixed_string) is not None:
-                segments[2*idx+1] = fixed_string
+        for i, g in enumerate(groups):
+            if g.name in fixes:
+                g.fix_value(fixes[g.name], for_regex=False)
+
+            if g.fixed_string is not None:
+                segments[2*i+1] = g.fixed_string
             else:
-                raise ValueError(f"Group '{groups[idx]!s}' has no fixed value.")
+                raise ValueError(f"Group '{g!s}' has no fixed value.")
 
         filename = ''.join(segments)
 

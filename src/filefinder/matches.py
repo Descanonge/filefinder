@@ -37,11 +37,10 @@ class Match:
         self.end = match.end(idx+1)
 
         self.match_parsed = None
-        if group.fmt is not None:
-            try:
-                self.match_parsed = group.fmt.parse(self.match_str)
-            except Exception:
-                logger.warning('Failed to parse for group %s', str(group))
+        try:
+            self.match_parsed = group.fmt.parse(self.match_str)
+        except Exception:
+            logger.warning('Failed to parse for group %s', str(group))
 
     def __repr__(self):
         return '\n'.join([super().__repr__(), self.__str__()])
@@ -55,7 +54,10 @@ class Match:
         If `parsed` is true, and the parsing was successful, return the
         parsed value instead of the matched string.
         """
-        if parsed and self.match_parsed is not None:
+        if parsed:
+            if self.match_parsed is None:
+                raise ValueError(f"Failed to parse value '{self.match_str}' "
+                                 f"for group '{self.group!s}'.")
             return self.match_parsed
         return self.match_str
 

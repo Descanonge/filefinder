@@ -77,11 +77,11 @@ class Group:
         self.idx: int = idx
         """Index inside the pre-regex."""
 
-        self.name: str | None = None
+        self.name: str
         """Group name."""
-        self.rgx: str | None = None
+        self.rgx: str
         """Regex."""
-        self.fmt: Format | None = None
+        self.fmt: Format = Format('s')
         """Format string object."""
         self.discard: bool = False
         """If the group should not be used when retrieving values from matches."""

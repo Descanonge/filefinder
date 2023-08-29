@@ -6,15 +6,22 @@
 # at the root of this project. © 2021 Clément Haëck
 
 import logging
+from collections.abc import Callable
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
-from filefinder.matches import Matches
+from .finder import Finder
+from .matches import Matches
+
+if TYPE_CHECKING:
+    import xarray
 
 logger = logging.getLogger(__name__)
 
 
-def get_date(matches: Matches, default_date: dict = None,
-             group: str = None) -> datetime:
+def get_date(matches: Matches,
+             default_date: dict | None = None,
+             groups: list[str] | None = None) -> datetime:
     """Retrieve date from matched elements.
 
     If a matcher is *not* found in the filename, it will be replaced by the
@@ -25,23 +32,19 @@ def get_date(matches: Matches, default_date: dict = None,
 
     Parameters
     ----------
-    matches: :class:`Matches<filefinder.matcher.Matches>`
+    matches:
         Matches obtained from a filename.
-    group: str
-        If not None, restrict matchers to this group.
-    default_date: dict, optional
+    groups:
+        If not None, restrict matches for the groups which names are in this
+        list.
+    default_date:
         Default date. Dictionnary with keys: year, month, day, hour, minute,
         and second. Defaults to 1970-01-01 00:00:00
-
-    Raises
-    ------
-    KeyError
-        If no matchers are found to create a date from.
     """
     name_to_datetime = dict(
         Y='year', m='month', d='day', H='hour', M='minute', S='second')
 
-    def get_elts(names: str, callback):
+    def get_elts(elts, names: str, callback):
         for name in names:
             elt = elts.pop(name, None)
             if elt is not None:
@@ -51,10 +54,7 @@ def get_date(matches: Matches, default_date: dict = None,
         return {name_to_datetime[name]: int(elt)}
 
     def process_month_name(elt, name):
-        elt = _find_month_number(elt)
-        if elt is not None:
-            return dict(month=elt)
-        return {}
+        return dict(month=_find_month_number(elt))
 
     def process_doy(elt, name):
         elt = datetime(date['year'], 1, 1) + timedelta(days=int(elt)-1)
@@ -67,9 +67,10 @@ def get_date(matches: Matches, default_date: dict = None,
         default_date = {}
     date.update(default_date)
 
-    elts = {m.matcher.name: m.get_match(parsed=False) for m in matches
-            if (not m.matcher.discard
-                and (group is None or m.matcher.group == group))}
+    elts = {m.group.name: m.get_match(parsed=False)
+            for m in matches
+            if (not m.group.discard
+                and (groups is None or m.group.name in groups))}
 
     elts_needed = set('xXYmdBjHMSF')
     if len(set(elts.keys()) & elts_needed) == 0:
@@ -77,7 +78,7 @@ def get_date(matches: Matches, default_date: dict = None,
                        ' Returning default date.')
 
     # Process month name first to keep element priorities simples
-    get_elts('B', process_month_name)
+    get_elts(elts, 'B', process_month_name)
 
     # Decompose elements
     elt = elts.pop('F', None)
@@ -100,11 +101,11 @@ def get_date(matches: Matches, default_date: dict = None,
             elts['S'] = elt[4:6]
 
     # Process elements
-    get_elts('Ymd', process_int)
-    get_elts('j', process_doy)
-    get_elts('HMS', process_int)
+    get_elts(elts, 'Ymd', process_int)
+    get_elts(elts, 'j', process_doy)
+    get_elts(elts, 'HMS', process_int)
 
-    return datetime(**date)
+    return datetime(**date) # type: ignore
 
 
 def _find_month_number(name: str) -> int:
@@ -124,4 +125,4 @@ def _find_month_number(name: str) -> int:
     if name in names_abbr:
         return names_abbr.index(name) + 1
 
-    return None
+    raise ValueError(f"Could not interpret month name '{name}'")

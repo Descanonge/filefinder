@@ -205,7 +205,7 @@ and end dates of the average, we might want to only recover the starting date::
 
 
 Regex outside groups
-======================
+====================
 
 By default, special characters (``()[]{}?*+-|^$\\.&~# \t\n\r\v\f``) outside of
 groups are escaped, and thus not interpreted as a regular expression.

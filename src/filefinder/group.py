@@ -162,6 +162,11 @@ class Group:
         Replacements are taken from :attr:`Group.DEFAULT_GROUPS`.
 
         A '%' in the regex should be escaped by another: '%%'.
+
+        Raises
+        ------
+        KeyError
+            Unknown replacement.
         """
         def replace(match: re.Match):
             group = match.group(1)
@@ -238,17 +243,9 @@ class Group:
     def get_regex(self) -> str:
         """Get group regex.
 
-         there is
-        a custom regex, recursively replace '%' followed by a single letter by
-        the corresponding regex from `NAME_RGX`. '%%' is replaced by a single
-        percentage character.
-
-        Also applies 'optional' specification.
-
-        Raises
-        ------
-        KeyError
-            Unknown replacement.
+        Returns the fixed value if previously specified.
+        Insert the regex into a matching group, and make it optional if
+        the ``:opt`` was indicated
         """
         if self.fixed_string is not None:
             rgx = self.fixed_string

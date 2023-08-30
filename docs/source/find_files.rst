@@ -58,7 +58,7 @@ Name
 
 The name of the group will dictate the regex and format string used for that
 group (unless overriden the 'fmt' and 'rgx' properties).
-The :attr:`Group._DEFAULT_GROUPS<filefinder.group.Group._DEFAULT_GROUPS>`
+The :attr:`Group.DEFAULT_GROUPS<filefinder.group.Group.DEFAULT_GROUPS>`
 class attribute will make the correspondance between name and regex:
 
 +------+-------------------+-----------+--------+
@@ -118,7 +118,7 @@ This will automatically be transformed into a regular expression.
 
 Having a format specified has other benefits: it can be used to convert values
 into strings to generate a filename from parameters values (using
-:func:`Finder.get_filename`), or vice-versa to parse filenames matches into
+:func:`Finder.make_filename`), or vice-versa to parse filenames matches into
 parameters values.
 
 It's easy as::
@@ -133,7 +133,7 @@ directly with a value::
 
 or we can generate a filename::
 
-  >>> finder.get_filename(scale=2.5)
+  >>> finder.make_filename(scale=2.5)
   'scale_2.5'
 
 In the opposite direction, we can retrieve a value from a filename::
@@ -214,7 +214,7 @@ To use regular expressions outside of groups, it is necessary to activate the
 
 .. note::
 
-   When using regex outside groups, :func:`Finder.get_filename` won't
+   When using regex outside groups, :func:`Finder.make_filename` won't
    work.
 
 

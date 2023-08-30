@@ -130,5 +130,5 @@ Lastly, we can generate a filename following that structure.
 We must specify all parameters, except for the scale we fixed earlier (the
 first value of the list will be used)::
 
-  >>> finder.get_filename(index=1, var='SSH')
+  >>> finder.make_filename(index=1, var='SSH')
   /Data/index_1/SSH_scale_+010.0.txt

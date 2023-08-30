@@ -283,9 +283,9 @@ class Finder:
         regex = self.get_regex()
         return Matches(self.groups, filename, re.compile(regex))
 
-    def get_filename(self, fixes: dict[GroupKey, str | Any] | None = None,
-                     relative: bool = False,
-                     **kw_fixes: Any) -> str:
+    def make_filename(self, fixes: dict[GroupKey, str | Any] | None = None,
+                      relative: bool = False,
+                      **kw_fixes: Any) -> str:
         """Return a filename.
 
         Replace groups with provided values.

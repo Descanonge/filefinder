@@ -10,7 +10,7 @@ import re
 from collections.abc import Iterator
 from typing import Any
 
-from .group import Group, GroupKey, get_groups_indices
+from .group import Group, GroupKey
 
 logger = logging.getLogger(__name__)
 
@@ -52,18 +52,21 @@ class Match:
         """Human readable information."""
         return str(self.group) + f' = {self.match_str}'
 
-    def get_match(self, parsed: bool = True) -> str | Any:
+    def get_match(self, parse: bool = True) -> str | Any:
         """Get match string or value.
 
-        If `parsed` is true, and the parsing was successful, return the
-        parsed value instead of the matched string.
+        Parameters
+        ----------
+        parse:
+            If True (default), and the parsing was successful, return the
+            parsed value instead of the matched string.
 
         Raises
         ------
         ValueError:
-            Could not parse the match. Could
+            Could not parse the match.
         """
-        if parsed:
+        if parse:
             if self.match_parsed is None:
                 raise ValueError(f"Failed to parse value '{self.match_str}' "
                                  f"for group '{self.group!s}'.")
@@ -129,23 +132,57 @@ class Matches:
         """Return number of matches."""
         return len(self.matches)
 
-    def get_matches(self, key: GroupKey) -> Match | list[Match]:
+    def get_values(self, key: GroupKey,
+                   parse: bool = True) -> list[str | Any]:
+        """Get matched values corresponding to key.
+
+        Return a list of values, even if only one group is selected.
+
+        Parameters
+        ----------
+        key:
+            Group(s) to select, either by index or name.
+        parse:
+            If True (default), return the parsed value. If False return the
+            matched string.
+        """
+        matches = self.get_matches(key)
+        values = [m.get_match(parse=parse) for m in matches]
+        return values
+
+    def get_value(self, key: GroupKey,
+                  parse: bool = True) -> str | Any:
+        """Get matched value corresponding to key.
+
+        Return a single value. If multiple groups correspond to ``key``,
+        the value of the first one to appear in the pattern is returned.
+
+        Parameters
+        ----------
+        key:
+            Group(s) to select, either by index or name.
+        parse:
+            If True (default), return the parsed value. If False return the
+            matched string.
+        """
+        return self.get_values(key, parse)[0]
+
+    def get_matches(self, key: GroupKey) -> list[Match]:
         """Get matches corresponding to key.
 
-        See :func:`Finder.get_groups
-        <filefinder.finder.Finder.get_groups>` for details on
-        `key` argument.
         :func:`__getitem__` wraps around this method.
+
+        Parameters
+        ----------
+        key:
+            Group(s) to select, either by index or name.
 
         Returns
         -------
-        List of Match corresponding to the key. If only one Match corresponds,
-        return it directly.
+        List of Match corresponding to the key.
         """
         selected = get_groups_indices(self.groups, key)
         matches = [self.matches[k] for k in selected]
-        if len(matches) == 1:
-            return matches[0]
         return matches
 
 

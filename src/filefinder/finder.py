@@ -140,7 +140,7 @@ class Finder:
             return [self.get_absolute(f) for f, _ in files_matches]
 
         def get_key(matches: Matches, level: list[str]) -> str:
-            return ':'.join([match.get_match(parsed=False) for match in matches
+            return ':'.join([match.get_match(parse=False) for match in matches
                              if match.group.name in level])
 
         def nest(files_matches, levels, relative):

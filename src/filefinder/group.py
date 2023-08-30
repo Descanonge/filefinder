@@ -31,7 +31,7 @@ class Group:
 
     Parameters
     ----------
-    group:
+    definition:
         Group definition.
     idx:
         Index of the group in the filename pattern.
@@ -44,7 +44,7 @@ class Group:
         Invalid definition.
     """
 
-    _DEFAULT_GROUPS = {
+    DEFAULT_GROUPS = {
         'I': [r'\d+', 'd'],
         'Y': [r'\d{4}', '04d'],
         'm': [r'\d\d', '02d'],
@@ -62,7 +62,7 @@ class Group:
     }
     """Regex str for each type of element."""
 
-    _GROUP_REGEX = (
+    GROUP_REGEX = (
         r'(?P<name>\w*)'
         r'(:fmt=(?P<fmt>.*?))?'
         r'(?P<opt>:opt(?:=(?P<optA>.*?):(?P<optB>.*?))?)?'
@@ -99,7 +99,7 @@ class Group:
 
     def _parse_group_definition(self):
         """Parse group definition against a regex to retrieve specs."""
-        m = re.fullmatch(self._GROUP_REGEX, self.definition)
+        m = re.fullmatch(self.GROUP_REGEX, self.definition)
         if m is None:
             raise ValueError(f'Unable to parse group definition ({self.definition})')
 
@@ -125,7 +125,7 @@ class Group:
             )
 
         # Set to defaults if name is known
-        default = self._DEFAULT_GROUPS.get(self.name)
+        default = self.DEFAULT_GROUPS.get(self.name)
         if default is not None:
             self.rgx, fmt_def = default
             self.fmt = Format(fmt_def)
@@ -153,6 +153,28 @@ class Group:
         if self.rgx is None:
             raise GroupParseError(
                 self.definition, 'No regex has been produced.')
+
+        self.rgx = self._replace_regex_defaults(self.rgx)
+
+    def _replace_regex_defaults(self, regex: str):
+        """Recursively replace defaults regexes of the form ``%[a-zA-Z]``.
+
+        Replacements are taken from :attr:`Group.DEFAULT_GROUPS`.
+
+        A '%' in the regex should be escaped by another: '%%'.
+        """
+        def replace(match: re.Match):
+            group = match.group(1)
+            if group == '%':
+                return '%'
+            if group in self.DEFAULT_GROUPS:
+                replacement = self.DEFAULT_GROUPS[group][0]
+                if '%' in replacement: # need to go recursive
+                    return self._replace_regex_defaults(replacement)
+                return replacement
+            raise KeyError(f"Unknown replacement '{match.group(0)}'.")
+
+        return re.sub('%([a-zA-Z%])', replace, self.rgx)
 
     def __repr__(self) -> str:
         """Human readable information."""
@@ -216,7 +238,7 @@ class Group:
     def get_regex(self) -> str:
         """Get group regex.
 
-        Replace the matchers name by regex from `Matcher.NAME_RGX`. If there is
+         there is
         a custom regex, recursively replace '%' followed by a single letter by
         the corresponding regex from `NAME_RGX`. '%%' is replaced by a single
         percentage character.
@@ -228,21 +250,10 @@ class Group:
         KeyError
             Unknown replacement.
         """
-        def replace(match):
-            group = match.group(1)
-            if group == '%':
-                return '%'
-            if group in self._DEFAULT_GROUPS:
-                replacement = self._DEFAULT_GROUPS[group][0]
-                if '%' in replacement:
-                    return self.get_regex(replacement)
-                return replacement
-            raise KeyError(f"Unknown replacement '{match.group(0)}'.")
-
         if self.fixed_string is not None:
             rgx = self.fixed_string
         else:
-            rgx = re.sub('%([a-zA-Z%])', replace, self.rgx)
+            rgx = self.rgx
 
         # Make it matching
         rgx = f'({rgx})'

@@ -11,10 +11,10 @@ import os
 import re
 from collections.abc import Sequence
 from copy import copy
-from typing import Any, Callable
+from typing import Any
 
-from filefinder.group import Group, GroupKey, get_groups_indices
-from filefinder.matches import Matches
+from filefinder.group import Group, GroupKey
+from filefinder.matches import Matches, get_groups_indices
 
 logger = logging.getLogger(__name__)
 

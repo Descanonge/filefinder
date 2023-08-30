@@ -251,29 +251,3 @@ class Group:
             rgx += '?'
 
         return rgx
-
-def get_groups_indices(groups: list[Group],
-                       key: GroupKey) -> list[int]:
-    """Get list of groups indices corresponding to key.
-
-    Key can be an integer index, or a string of the name, or a combination
-    of the group and the name with the syntax 'group:name'
-
-    Raises
-    ------
-    IndexError
-        No group found corresponding to the key
-    TypeError
-        Key is not int or str
-    """
-    if isinstance(key, int):
-        return [key]
-    if isinstance(key, str):
-        selected = [i for i, group in enumerate(groups)
-                    if group.name == key]
-
-        if len(selected) == 0:
-            raise IndexError(f"No group found for key '{key}'")
-        return selected
-
-    raise TypeError('Key must be int or str.')

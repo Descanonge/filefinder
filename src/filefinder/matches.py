@@ -147,3 +147,30 @@ class Matches:
         if len(matches) == 1:
             return matches[0]
         return matches
+
+
+def get_groups_indices(groups: list[Group],
+                       key: GroupKey) -> list[int]:
+    """Get sorted list of groups indices corresponding to key.
+
+    Key can be an integer index, or a string of a group name. Since multiple
+    groups can share the same name, multiple indices can be returned (sorted).
+
+    Raises
+    ------
+    IndexError
+        No group found corresponding to the key
+    TypeError
+        Key is not int or str
+    """
+    if isinstance(key, int):
+        return [key]
+    if isinstance(key, str):
+        selected = [i for i, group in enumerate(groups)
+                    if group.name == key]
+
+        if len(selected) == 0:
+            raise IndexError(f"No group found for key '{key}'")
+        return selected
+
+    raise TypeError('Key must be int or str.')

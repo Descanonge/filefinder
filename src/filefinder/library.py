@@ -67,7 +67,7 @@ def get_date(matches: Matches,
         default_date = {}
     date.update(default_date)
 
-    elts = {m.group.name: m.get_match(parsed=False)
+    elts = {m.group.name: m.get_match(parse=False)
             for m in matches
             if (not m.group.discard
                 and (groups is None or m.group.name in groups))}

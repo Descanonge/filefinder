@@ -27,14 +27,13 @@ We can also select only some files, for instance the first day of each month::
 We can retrieve values from found files::
 
     filename, matches = finder.files[0]
-    depth = matches['depth'].get_match()
+    depth = matches.get_value('depth')
     date = filefinder.library.get_date(matches)
 
 And we can generate a filename with a set of parameters::
 
     finder.make_filename(depth=100, Y=2000, m=1, d=1)
     # Specifying the day is optional since we already fixed it to 1.
-
 
 Contents
 --------

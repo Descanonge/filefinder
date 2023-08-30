@@ -17,19 +17,36 @@ In both cases, matches are stored as a
 position in the filename string (starting at the end of the root directory), the
 matched characters, and if available its parsed value.
 
-A specific match can be obtained using :func:`Matches.get_matches` and either:
+A specific match can be obtained using :func:`Matches.get_matches` and either
+the index of the group in the pattern (starting at 0), or a group name.
+Because multiple groups can share the same name, a list of all corresponding
+:class:`Match` is returned.
 
-  - the index of the group in the pre-regex (starting at 0)
-  - a string specifying the name of the group. If multiple matches correspond to
-    the string, a list of matches is returned.
+.. warning::
 
-.. note ::
-    ``Matches.__getitem__`` wraps around this method::
+    By default, groups with the 'discard' option are not kept.
+    This can be overridden with the ``discard=False`` keyword argument.
 
-        filename, matches = finder.files[0]
-        year = matches.get_matches('Y').get_match()
-        # or
-        year = matches['Y'].get_match()
+In most cases, we only care about the value of the group (parsed or not). In
+that case we can use :func:`Matches.get_values` or :func:`Matches.get_value`
+which directly returned the value (parsed or not, depending on the ``parse``
+keyword argument).
+
+:func:`Matches.get_values` always returns a list of values, and
+:func:`Matches.get_value` a single value (if multiple groups are selected,
+the value from the first one in the filename pattern is returned).
+
+.. note::
+
+   :func:`Matches.__getitem__` wraps around :func:`Matches.get_value`,
+   with ``parse=True`` and ``discard=True``.
+
+So, here are a couple of ways to retrieve values from a filename::
+
+  finder = Finder('/data', '%(Y)/SST_%(Y)%(m)%(d).nc')
+  file, matches = finder.files[0]
+
+  # Finding the Match
 
 .. currentmodule:: filefinder
 

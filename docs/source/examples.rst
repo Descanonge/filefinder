@@ -29,7 +29,7 @@ that the value that we will be able to fix and retrieve is the starting date::
 We can retrieve information on the date as well::
 
   for file, matches in finder.files:
-      print(file, 'dayofyear: ', matches['j'].get_match())
+      print(file, 'dayofyear: ', matches.get_value('j'))
 
   Data/SST/A_2007001_2007008.nc    dayofyear:   1
   Data/SST/A_2007009_2007016.nc    dayofyear:   9
@@ -51,7 +51,7 @@ the 'preprocess' argument of :func:`xarray.open_mfdataset`::
   from filefinder import library
 
   def preprocess(ds, filename, finder):
-    matches = finder.get_matches(filename)
+    matches = finder.find_matches(filename)
     date = library.get_date(matches)
     ds = ds.assign_coords(time=pd.to_datetime([value]))
     return ds

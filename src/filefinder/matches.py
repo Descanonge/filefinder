@@ -120,9 +120,12 @@ class Matches:
         """Human readable information."""
         return '\n'.join([str(m) for m in self.matches])
 
-    def __getitem__(self, key: GroupKey) -> Match | list[Match]:
-        """Get matches corresponding to key."""
-        return self.get_matches(key)
+    def __getitem__(self, key: GroupKey) -> Any:
+        """Get parsed values corresponding to key.
+
+        Ignore groups with the 'discard' option.
+        """
+        return self.get_value(key, parse=True, discard=True)
 
     def __iter__(self) -> Iterator[Match]:
         """Iterate over matches."""
@@ -133,7 +136,8 @@ class Matches:
         return len(self.matches)
 
     def get_values(self, key: GroupKey,
-                   parse: bool = True) -> list[str | Any]:
+                   parse: bool = True,
+                   discard: bool = True) -> list[str | Any]:
         """Get matched values corresponding to key.
 
         Return a list of values, even if only one group is selected.
@@ -145,13 +149,16 @@ class Matches:
         parse:
             If True (default), return the parsed value. If False return the
             matched string.
+        discard:
+            If True (default), groups with the 'discard' option are not kept.
         """
-        matches = self.get_matches(key)
+        matches = self.get_matches(key, discard)
         values = [m.get_match(parse=parse) for m in matches]
         return values
 
     def get_value(self, key: GroupKey,
-                  parse: bool = True) -> str | Any:
+                  parse: bool = True,
+                  discard: bool = True) -> str | Any:
         """Get matched value corresponding to key.
 
         Return a single value. If multiple groups correspond to ``key``,
@@ -164,18 +171,29 @@ class Matches:
         parse:
             If True (default), return the parsed value. If False return the
             matched string.
+        discard:
+            If True (default), groups with the 'discard' option are not kept.
+
+        Raises
+        ------
+        KeyError:
+            No group with no 'discard' option was found.
         """
-        return self.get_values(key, parse)[0]
+        values = self.get_values(key, parse, discard)
+        if len(values) == 0:
+            raise KeyError("No group without a 'discard' option was found "
+                           f"(key: {key})")
+        return values[0]
 
-    def get_matches(self, key: GroupKey) -> list[Match]:
+    def get_matches(self, key: GroupKey, discard: bool = True) -> list[Match]:
         """Get matches corresponding to key.
-
-        :func:`__getitem__` wraps around this method.
 
         Parameters
         ----------
         key:
             Group(s) to select, either by index or name.
+        discard:
+            If True (default), groups with the 'discard' option are not kept.
 
         Returns
         -------
@@ -183,6 +201,8 @@ class Matches:
         """
         selected = get_groups_indices(self.groups, key)
         matches = [self.matches[k] for k in selected]
+        if discard:
+            matches = [m for m in matches if not m.group.discard]
         return matches
 
 

@@ -44,21 +44,21 @@ def get_date(matches: Matches,
     name_to_datetime = dict(
         Y='year', m='month', d='day', H='hour', M='minute', S='second')
 
-    def get_elts(elts, names: str, callback):
+    def get_elts(elts: dict[str, str], names: str, callback: Callable):
         for name in names:
             elt = elts.pop(name, None)
             if elt is not None:
                 date.update(callback(elt, name))
 
-    def process_int(elt, name):
+    def process_int(elt: str, name: str) -> dict[str, int]:
         return {name_to_datetime[name]: int(elt)}
 
-    def process_month_name(elt, name):
+    def process_month_name(elt: str, name: str) -> dict[str, int]:
         return dict(month=_find_month_number(elt))
 
-    def process_doy(elt, name):
-        elt = datetime(date['year'], 1, 1) + timedelta(days=int(elt)-1)
-        return dict(month=elt.month, day=elt.day)
+    def process_doy(elt: str, name: str) -> dict[str, int]:
+        d = datetime(date['year'], 1, 1) + timedelta(days=int(elt)-1)
+        return dict(month=d.month, day=d.day)
 
     date = {'year': 1970, 'month': 1, 'day': 1,
             'hour': 0, 'minute': 0, 'second': 0}
@@ -97,7 +97,7 @@ def get_date(matches: Matches,
     if elt is not None:
         elts['H'] = elt[:2]
         elts['M'] = elt[2:4]
-        if len(elt) > 4:
+        if len(elt) > 4:  # noqa: PLR2004
             elts['S'] = elt[4:6]
 
     # Process elements

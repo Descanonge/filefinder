@@ -78,7 +78,7 @@ def test_format_d(align, sign, width, grouping, number):
 @pytest.mark.parametrize("width", widths)
 @pytest.mark.parametrize("grouping", groupings)
 @pytest.mark.parametrize("precision", precisions)
-@pytest.mark.parametrize("number", numbers_d + numbers_f)
+@pytest.mark.parametrize("number", numbers_d + numbers_f)  # type: ignore
 def test_format_f(align, sign, width, grouping, precision, number):
     fmt = Format(align + sign + width + grouping + precision + "f")
     s = fmt.format(number)
@@ -90,7 +90,7 @@ def test_format_f(align, sign, width, grouping, precision, number):
 @pytest.mark.parametrize("sign", signs)
 @pytest.mark.parametrize("width", widths)
 @pytest.mark.parametrize("precision", precisions)
-@pytest.mark.parametrize("number", numbers_d + numbers_f)
+@pytest.mark.parametrize("number", numbers_d + numbers_f)  # type: ignore
 def test_format_e(align, sign, width, precision, number):
     fmt = Format(align + sign + width + precision + "e")
     s = fmt.format(number)

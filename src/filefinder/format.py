@@ -24,47 +24,19 @@ The regex generation and parsing are tested in `tests/unit/test_format.py`.
 # at the root of this project. © 2021 Clément Haëck
 
 import re
-from typing import Any, Union
+from typing import Any
 
-
-def autoprop(*props):
-    """Generate properties for class.
-
-    Properties all link to `cls.params` dictionnary.
-    """
-
-    def factory_get(name):
-        def getter(self):
-            return self.params.get(name, None)
-
-        return getter
-
-    def factory_set(name):
-        def setter(self, value):
-            self.params[name] = value
-
-        return setter
-
-    def decorator(cls):
-        for name in props:
-            prop = property(factory_get(name), factory_set(name))
-            setattr(cls, name, prop)
-        return cls
-
-    return decorator
-
-
-@autoprop(
-    "fill",
-    "align",
-    "sign",
-    "alternate",
-    "zero",
-    "width",
-    "grouping",
-    "precision",
-    "type",
+FORMAT_REGEX = (
+    r"((?P<fill>.)?(?P<align>[<>=^]))?"
+    r"(?P<sign>[-+ ])?(?P<alternate>#)?"
+    r"(?P<zero>0)?(?P<width>\d+?)?"
+    r"(?P<grouping>[,_])?"
+    r"(?P<precision>\.\d+?)?"
+    r"(?P<type>[a-zA-Z])"
 )
+FORMAT_PATTERN = re.compile(FORMAT_REGEX)
+
+
 class Format:
     """Parse a format string.
 
@@ -82,42 +54,62 @@ class Format:
     ALLOWED_TYPES = "fdeEs"
 
     def __init__(self, fmt: str):
-        self.fmt = fmt
-        self.params = {}
+        self.fmt: str = fmt
+
+        self.type: str
+        self.align: str
+        self.fill: str
+        self.sign: str
+        self.alternate: bool
+        self.zero: bool
+        self.width: int
+        self.grouping: str | None
+        self.precision: int
+
         self.parse_params(fmt)
-        self.set_defaults()
 
     def parse_params(self, format: str):
         """Parse format parameters."""
-        p = (
-            r"((?P<fill>.)?(?P<align>[<>=^]))?"
-            r"(?P<sign>[-+ ])?(?P<alternate>#)?"
-            r"(?P<zero>0)?(?P<width>\d+?)?"
-            r"(?P<grouping>[,_])?"
-            r"(?P<precision>\.\d+?)?"
-            r"(?P<type>[a-zA-Z])"
-        )
-        m = re.fullmatch(p, format)
+        m = FORMAT_PATTERN.fullmatch(format)
         if m is None:
             raise ValueError("Format spec not valid.")
-        self.params = m.groupdict()
-        if not self.type or self.type not in self.ALLOWED_TYPES:
-            raise ValueError("format spec %r not supported" % self.type)
+        params = m.groupdict()
 
-    def set_defaults(self):
-        """Set parameters defaults values."""
-        if self.type in "dfeE":
-            defaults = dict(align=">", fill=" ", sign="-", width="0", precision=".6")
-            self.alternate = self.alternate == "#"
-            self.zero = self.zero == "0"
-            if self.align is None and self.zero:
-                self.fill = "0"
-                self.align = "="
-            for k, v in defaults.items():  # self.params |= defaults
-                if self.params[k] is None:
-                    self.params[k] = v
-            self.width = int(self.width)
-            self.precision = int(self.precision[1:])
+        t = params["type"]
+        if not t or t not in self.ALLOWED_TYPES:
+            raise KeyError(
+                f"Invalid format type '{t}', expected one of {self.ALLOWED_TYPES}."
+            )
+        self.type = t
+
+        # nothing else to do for string
+        if self.type == "s":
+            return
+
+        # fill boolean parameters
+        self.alternate = params.pop("alternate") == "#"
+        self.zero = params.pop("zero") == "0"
+
+        # special case
+        if params["align"] is None and self.zero:
+            params["fill"] = "0"
+            params["align"] = "="
+
+        # defaults values for remaining parameters
+        defaults = dict(
+            align=">", fill=" ", sign="-", width="0", precision=".6", grouping=None
+        )
+        for k, v in defaults.items():
+            if params.get(k, None) is None:
+                params[k] = v
+
+        # convert to correct type
+        self.width = int(params.pop("width"))
+        self.precision = int(params.pop("precision").removeprefix("."))
+
+        # fill the rest
+        for k, v in params.items():
+            setattr(self, k, v)
 
     def format(self, value: Any) -> str:
         """Return formatted string."""
@@ -134,7 +126,11 @@ class Format:
         if self.type in "eE":
             return self.generate_expression_e()
 
-    def parse(self, s: str) -> Union[str, int, float]:
+        raise KeyError(
+            f"Invalid format type '{type}', expected one of {self.ALLOWED_TYPES}."
+        )
+
+    def parse(self, s: str) -> str | int | float:
         """Parse string generated with format.
 
         This simply use int() and float() to parse strings. Those are thrown
@@ -145,12 +141,20 @@ class Format:
         number, or when padding with numbers. If you use such formats, please
         contact me to explain me why in the hell you do.
         """
-        if self.type == "d":
-            return self.parse_d(s)
-        if self.type in "feE":
-            return self.parse_f(s)
         if self.type == "s":
             return s
+
+        # Remove special characters (fill or groupings)
+        s = self.remove_special(s)
+
+        if self.type == "d":
+            return int(s)
+        if self.type in "feE":
+            return float(s)
+
+        raise KeyError(
+            f"Invalid format type '{type}', expected one of {self.ALLOWED_TYPES}."
+        )
 
     def generate_expression_s(self) -> str:
         return ".*?"

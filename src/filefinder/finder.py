@@ -38,11 +38,7 @@ class Finder:
         not escaped). Default is False.
     """
 
-    def __init__(self,
-                 root: str,
-                 pattern: str,
-                 use_regex: bool = False):
-
+    def __init__(self, root: str, pattern: str, use_regex: bool = False):
         if isinstance(root, (list, tuple)):
             root = os.path.join(*root)
         self.root: str = root
@@ -82,14 +78,14 @@ class Finder:
 
     def __repr__(self) -> str:
         """Human readable information."""
-        return '\n'.join([super().__repr__(), self.__str__()])
+        return "\n".join([super().__repr__(), self.__str__()])
 
     def __str__(self) -> str:
         """Human readable information."""
         s = [
-            f'root: {self.root}',
-            f'pattern: {self._pattern}',
-            f'regex: {self.get_regex()}'
+            f"root: {self.root}",
+            f"pattern: {self._pattern}",
+            f"regex: {self.get_regex()}",
         ]
 
         fixed_groups = [
@@ -98,20 +94,20 @@ class Finder:
             if g.fixed_value is not None
         ]
         if fixed_groups:
-            s.append('fixed groups:')
-            s += [f'\t fixed #{i} to {v}'
-                  for i, v in fixed_groups]
+            s.append("fixed groups:")
+            s += [f"\t fixed #{i} to {v}" for i, v in fixed_groups]
 
         if not self.scanned:
-            s.append('not scanned')
+            s.append("not scanned")
         else:
-            s.append(f'scanned: found {len(self._files)} files')
-        return '\n'.join(s)
+            s.append(f"scanned: found {len(self._files)} files")
+        return "\n".join(s)
 
-    def get_files(self,
-                  relative: bool = False,
-                  nested: Sequence[str | Sequence[str]] | None = None
-                  ) -> list:
+    def get_files(
+        self,
+        relative: bool = False,
+        nested: Sequence[str | Sequence[str]] | None = None,
+    ) -> list:
         """Return files that matches the regex.
 
         Lazily scan files: if files were already scanned, just return
@@ -134,14 +130,20 @@ class Finder:
         KeyError
             A group name in `nested` is not found in the pattern.
         """
+
         def get_files(files_matches):
             if relative:
                 return [f for f, _ in files_matches]
             return [self.get_absolute(f) for f, _ in files_matches]
 
         def get_key(matches: Matches, level: list[str]) -> str:
-            return ':'.join([match.get_match(parse=False) for match in matches
-                             if match.group.name in level])
+            return ":".join(
+                [
+                    match.get_match(parse=False)
+                    for match in matches
+                    if match.group.name in level
+                ]
+            )
 
         def nest(files_matches, levels, relative):
             if len(levels) == 0:
@@ -170,11 +172,10 @@ class Finder:
             files = get_files(self._files)
         else:
             names = set(g.name for g in self.groups)
-            nested = [[name] if isinstance(name, str) else name
-                      for name in nested]
+            nested = [[name] if isinstance(name, str) else name for name in nested]
             for name in itertools.chain(*nested):
                 if name not in names:
-                    raise KeyError(f'{name} is not in Finder groups.')
+                    raise KeyError(f"{name} is not in Finder groups.")
             files = nest(self._files, nested, relative)
 
         return files
@@ -187,11 +188,7 @@ class Finder:
         """Get absolute path to filename."""
         return os.path.join(self.root, filename)
 
-    def fix_group(
-            self, key: GroupKey,
-            value: str | Any,
-            fix_discard: bool = False
-    ):
+    def fix_group(self, key: GroupKey, value: str | Any, fix_discard: bool = False):
         """Fix a group to a string.
 
         Parameters
@@ -218,9 +215,10 @@ class Finder:
         self.scanned = False
 
     def fix_groups(
-            self, fixes: dict[GroupKey, str | Any] | None = None,
-            fix_discard: bool = False,
-            **fixes_kw: str | Any
+        self,
+        fixes: dict[GroupKey, str | Any] | None = None,
+        fix_discard: bool = False,
+        **fixes_kw: str | Any,
     ):
         """Fix multiple groups at once.
 
@@ -261,8 +259,7 @@ class Finder:
         # invalid cached files
         self.scanned = False
 
-    def find_matches(self, filename: str,
-                    relative: bool = True) -> Matches:
+    def find_matches(self, filename: str, relative: bool = True) -> Matches:
         """Find matches for a given filename.
 
         Apply regex to `filename` and return the results as a :class:`Matches`
@@ -283,9 +280,12 @@ class Finder:
         regex = self.get_regex()
         return Matches(self.groups, filename, re.compile(regex))
 
-    def make_filename(self, fixes: dict[GroupKey, str | Any] | None = None,
-                      relative: bool = False,
-                      **kw_fixes: Any) -> str:
+    def make_filename(
+        self,
+        fixes: dict[GroupKey, str | Any] | None = None,
+        relative: bool = False,
+        **kw_fixes: Any,
+    ) -> str:
         """Return a filename.
 
         Replace groups with provided values.
@@ -309,8 +309,10 @@ class Finder:
             `use_regex` is activated.
         """
         if self.use_regex:
-            raise ValueError('Cannot generate a valid filename if regex '
-                             'is present outside groups (`use_regex=True`).')
+            raise ValueError(
+                "Cannot generate a valid filename if regex "
+                "is present outside groups (`use_regex=True`)."
+            )
 
         if fixes is None:
             fixes = {}
@@ -324,11 +326,11 @@ class Finder:
                 g.fix_value(fixes[g.name], for_regex=False)
 
             if g.fixed_string is not None:
-                segments[2*i+1] = g.fixed_string
+                segments[2 * i + 1] = g.fixed_string
             else:
                 raise ValueError(f"Group '{g!s}' has no fixed value.")
 
-        filename = ''.join(segments)
+        filename = "".join(segments)
 
         if not relative:
             filename = self.get_absolute(filename)
@@ -344,39 +346,37 @@ class Finder:
         # invalid cached files
         self.scanned = False
         self._pattern = pattern
-        groups_starts = [m.start()+1
-                         for m in re.finditer(r'%\(', pattern)]
+        groups_starts = [m.start() + 1 for m in re.finditer(r"%\(", pattern)]
 
         # This finds the matching end parenthesis for each group start
         self.groups = []
-        splits = [0] # separation between groups
+        splits = [0]  # separation between groups
         for idx, start in enumerate(groups_starts):
             end = None
             level = 1
-            for i, c in enumerate(pattern[start+1:]):
-                if c == '(':
+            for i, c in enumerate(pattern[start + 1 :]):
+                if c == "(":
                     level += 1
-                elif c == ')':
+                elif c == ")":
                     level -= 1
                     if level == 0:  # matching parenthesis
-                        end = start+i+1
+                        end = start + i + 1
                         break
 
             if end is None:  # did not find matching parenthesis :(
-                end = start+6
-                substr = pattern[start-1:end]
+                end = start + 6
+                substr = pattern[start - 1 : end]
                 if end < len(self._pattern):
-                    substr += '...'
+                    substr += "..."
                 raise ValueError(f"No group end found for '{substr}'")
 
             try:
-                self.groups.append(Group(pattern[start+1:end], idx))
-                splits += [start-1, end+1]  # -1 removes the %
-            except ValueError: # unable to parse group
+                self.groups.append(Group(pattern[start + 1 : end], idx))
+                splits += [start - 1, end + 1]  # -1 removes the %
+            except ValueError:  # unable to parse group
                 pass
 
-        self._segments = [pattern[i:j]
-                          for i, j in zip(splits, splits[1:]+[None])]
+        self._segments = [pattern[i:j] for i, j in zip(splits, splits[1:] + [None])]
 
     def get_regex(self) -> str:
         """Return regex."""
@@ -384,14 +384,13 @@ class Finder:
         if not self.use_regex:
             # escape regex outside groups
             segments = [
-                s if (i % 2 == 1) else re.escape(s)
-                for i, s in enumerate(segments)
+                s if (i % 2 == 1) else re.escape(s) for i, s in enumerate(segments)
             ]
 
         for idx, group in enumerate(self.groups):
-            segments[2*idx+1] = group.get_regex()
+            segments[2 * idx + 1] = group.get_regex()
 
-        return ''.join(segments)
+        return "".join(segments)
 
     def find_files(self):
         """Find files to scan and store them.
@@ -410,25 +409,30 @@ class Finder:
         regex = self.get_regex()
 
         # patterns for each filetree depth
-        subpatterns = [re.compile(rgx)
-                       for rgx in regex.split(os.path.sep)]
+        subpatterns = [re.compile(rgx) for rgx in regex.split(os.path.sep)]
         files = []
         for dirpath, dirnames, filenames in os.walk(self.root):
             # Feels hacky, better way ?
-            depth = (dirpath.rstrip(os.sep).count(os.sep)
-                     - self.root.rstrip(os.sep).count(os.sep))
+            depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
+                os.sep
+            ).count(os.sep)
             pattern = subpatterns[depth]
 
-            if depth == len(subpatterns)-1:
+            if depth == len(subpatterns) - 1:
                 dirnames.clear()  # Look no deeper
-                files += [self.get_relative(os.path.join(dirpath, f))
-                          for f in filenames]
+                files += [
+                    self.get_relative(os.path.join(dirpath, f)) for f in filenames
+                ]
             else:
                 dirlogs = dirnames[:max_log_lines]
                 if len(dirnames) > max_log_lines:
-                    dirlogs += ['...']
-                logger.debug('depth: %d, pattern: %s, folders:\n\t%s',
-                             depth, pattern.pattern, '\n\t'.join(dirlogs))
+                    dirlogs += ["..."]
+                logger.debug(
+                    "depth: %d, pattern: %s, folders:\n\t%s",
+                    depth,
+                    pattern.pattern,
+                    "\n\t".join(dirlogs),
+                )
 
             # Removes directories not matching regex
             to_remove = [d for d in dirnames if not pattern.fullmatch(d)]
@@ -436,7 +440,7 @@ class Finder:
                 dirnames.remove(d)
 
         files.sort()
-        logger.debug('Found %s non-matching files in directories', len(files))
+        logger.debug("Found %s non-matching files in directories", len(files))
 
         pattern = re.compile(regex)  # because we are goint to use it a bunch of times
         files_matched: list[tuple[Matches, str]] = []
@@ -450,10 +454,9 @@ class Finder:
 
         filelogs = files[:max_log_lines]
         if len(files) > max_log_lines:
-            filelogs += ['...']
-        logger.debug('regex: %s, files:\n\t%s', regex, '\n\t'.join(filelogs))
-        logger.debug('Found %s matching files in %s',
-                     len(files_matched), self.root)
+            filelogs += ["..."]
+        logger.debug("regex: %s, files:\n\t%s", regex, "\n\t".join(filelogs))
+        logger.debug("Found %s matching files in %s", len(files_matched), self.root)
 
         self.scanned = True
         self._files = files_matched

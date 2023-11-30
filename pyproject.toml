@@ -50,8 +50,8 @@ dev = [
 'Documentation' = 'https://filefinder.readthedocs.io'
 
 [tool.mypy]
-disable_error_code = ['annotation-unchecked']
-allow_untyped_defs = true
+# disable_error_code = ['annotation-unchecked']
+# allow_untyped_defs = true
 ignore_missing_imports = true
 
 [tool.ruff]
@@ -62,7 +62,6 @@ select = [
        'N',  # pep8-name
        'B',  # bugbear
        'G',  # flake8-logging-format
-       'Q',  # flake8-quotes
        'F',  # pyflakes
        'UP',  #pyupgrade
        'D',  #pydocstyle
@@ -78,9 +77,11 @@ ignore = [
        'D417', # not all parameters need doc
 ]
 
+[too.ruff.pycodestyle]
+max-line-length = 90
+
 [tool.ruff.pydocstyle]
 convention = 'numpy'
 
-[tool.ruff.flake8-quotes]
-docstring-quotes = 'double'
-inline-quotes = 'single'
+[tool.ruff.format]
+quote-style = 'double'

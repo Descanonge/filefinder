@@ -34,23 +34,23 @@ class Match:
 
     def __init__(self, group: Group, match: re.Match, idx: int):
         self.group = group
-        self.match_str = match.group(idx+1)
-        self.start = match.start(idx+1)
-        self.end = match.end(idx+1)
+        self.match_str = match.group(idx + 1)
+        self.start = match.start(idx + 1)
+        self.end = match.end(idx + 1)
 
         self.match_parsed = None
         try:
             self.match_parsed = group.fmt.parse(self.match_str)
         except Exception:
-            logger.warning('Failed to parse for group %s', str(group))
+            logger.warning("Failed to parse for group %s", str(group))
 
     def __repr__(self):
         """Human readable information."""
-        return '\n'.join([super().__repr__(), self.__str__()])
+        return "\n".join([super().__repr__(), self.__str__()])
 
     def __str__(self):
         """Human readable information."""
-        return str(self.group) + f' = {self.match_str}'
+        return str(self.group) + f" = {self.match_str}"
 
     def get_match(self, parse: bool = True) -> str | Any:
         """Get match string or value.
@@ -68,8 +68,10 @@ class Match:
         """
         if parse:
             if self.match_parsed is None:
-                raise ValueError(f"Failed to parse value '{self.match_str}' "
-                                 f"for group '{self.group!s}'.")
+                raise ValueError(
+                    f"Failed to parse value '{self.match_str}' "
+                    f"for group '{self.group!s}'."
+                )
             return self.match_parsed
         return self.match_str
 
@@ -95,9 +97,7 @@ class Matches:
         Not as many matches as groups.
     """
 
-    def __init__(self, groups: list[Group],
-                 filename: str,
-                 pattern: re.Pattern):
+    def __init__(self, groups: list[Group], filename: str, pattern: re.Pattern):
         self.matches: list[Match] = []
         """Matches for a single filename."""
         self.groups = groups
@@ -105,20 +105,20 @@ class Matches:
 
         m = pattern.fullmatch(filename)
         if m is None:
-            raise ValueError('Filename did not match pattern.')
+            raise ValueError("Filename did not match pattern.")
         if len(m.groups()) != len(groups):
-            raise IndexError('Not as many matches as groups.')
+            raise IndexError("Not as many matches as groups.")
 
         for i in range(len(groups)):
             self.matches.append(Match(groups[i], m, i))
 
     def __repr__(self) -> str:
         """Human readable information."""
-        return '\n'.join([super().__repr__(), self.__str__()])
+        return "\n".join([super().__repr__(), self.__str__()])
 
     def __str__(self) -> str:
         """Human readable information."""
-        return '\n'.join([str(m) for m in self.matches])
+        return "\n".join([str(m) for m in self.matches])
 
     def __getitem__(self, key: GroupKey) -> Any:
         """Get parsed values corresponding to key.
@@ -135,9 +135,9 @@ class Matches:
         """Return number of matches."""
         return len(self.matches)
 
-    def get_values(self, key: GroupKey,
-                   parse: bool = True,
-                   discard: bool = True) -> list[str | Any]:
+    def get_values(
+        self, key: GroupKey, parse: bool = True, discard: bool = True
+    ) -> list[str | Any]:
         """Get matched values corresponding to key.
 
         Return a list of values, even if only one group is selected.
@@ -156,9 +156,9 @@ class Matches:
         values = [m.get_match(parse=parse) for m in matches]
         return values
 
-    def get_value(self, key: GroupKey,
-                  parse: bool = True,
-                  discard: bool = True) -> str | Any:
+    def get_value(
+        self, key: GroupKey, parse: bool = True, discard: bool = True
+    ) -> str | Any:
         """Get matched value corresponding to key.
 
         Return a single value. If multiple groups correspond to ``key``,
@@ -181,8 +181,9 @@ class Matches:
         """
         values = self.get_values(key, parse, discard)
         if len(values) == 0:
-            raise KeyError("No group without a 'discard' option was found "
-                           f"(key: {key})")
+            raise KeyError(
+                "No group without a 'discard' option was found " f"(key: {key})"
+            )
         return values[0]
 
     def get_matches(self, key: GroupKey, discard: bool = True) -> list[Match]:
@@ -206,8 +207,7 @@ class Matches:
         return matches
 
 
-def get_groups_indices(groups: list[Group],
-                       key: GroupKey) -> list[int]:
+def get_groups_indices(groups: list[Group], key: GroupKey) -> list[int]:
     """Get sorted list of groups indices corresponding to key.
 
     Key can be an integer index, or a string of a group name. Since multiple
@@ -223,11 +223,10 @@ def get_groups_indices(groups: list[Group],
     if isinstance(key, int):
         return [key]
     if isinstance(key, str):
-        selected = [i for i, group in enumerate(groups)
-                    if group.name == key]
+        selected = [i for i, group in enumerate(groups) if group.name == key]
 
         if len(selected) == 0:
             raise IndexError(f"No group found for key '{key}'")
         return selected
 
-    raise TypeError('Key must be int or str.')
+    raise TypeError("Key must be int or str.")

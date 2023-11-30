@@ -19,9 +19,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def get_date(matches: Matches,
-             default_date: dict | None = None,
-             groups: list[str] | None = None) -> datetime:
+def get_date(
+    matches: Matches, default_date: dict | None = None, groups: list[str] | None = None
+) -> datetime:
     """Retrieve date from matched elements.
 
     If a matcher is *not* found in the filename, it will be replaced by the
@@ -42,7 +42,8 @@ def get_date(matches: Matches,
         and second. Defaults to 1970-01-01 00:00:00
     """
     name_to_datetime = dict(
-        Y='year', m='month', d='day', H='hour', M='minute', S='second')
+        Y="year", m="month", d="day", H="hour", M="minute", S="second"
+    )
 
     def get_elts(elts: dict[str, str], names: str, callback: Callable):
         for name in names:
@@ -57,55 +58,56 @@ def get_date(matches: Matches,
         return dict(month=_find_month_number(elt))
 
     def process_doy(elt: str, name: str) -> dict[str, int]:
-        d = datetime(date['year'], 1, 1) + timedelta(days=int(elt)-1)
+        d = datetime(date["year"], 1, 1) + timedelta(days=int(elt) - 1)
         return dict(month=d.month, day=d.day)
 
-    date = {'year': 1970, 'month': 1, 'day': 1,
-            'hour': 0, 'minute': 0, 'second': 0}
+    date = {"year": 1970, "month": 1, "day": 1, "hour": 0, "minute": 0, "second": 0}
 
     if default_date is None:
         default_date = {}
     date.update(default_date)
 
-    elts = {m.group.name: m.get_match(parse=False)
-            for m in matches
-            if (not m.group.discard
-                and (groups is None or m.group.name in groups))}
+    elts = {
+        m.group.name: m.get_match(parse=False)
+        for m in matches
+        if (not m.group.discard and (groups is None or m.group.name in groups))
+    }
 
-    elts_needed = set('xXYmdBjHMSF')
+    elts_needed = set("xXYmdBjHMSF")
     if len(set(elts.keys()) & elts_needed) == 0:
-        logger.warning('No matchers to retrieve a date from.'
-                       ' Returning default date.')
+        logger.warning(
+            "No matchers to retrieve a date from." " Returning default date."
+        )
 
     # Process month name first to keep element priorities simples
-    get_elts(elts, 'B', process_month_name)
+    get_elts(elts, "B", process_month_name)
 
     # Decompose elements
-    elt = elts.pop('F', None)
+    elt = elts.pop("F", None)
     if elt is not None:
-        elts['Y'] = elt[:4]
-        elts['m'] = elt[5:7]
-        elts['d'] = elt[8:10]
+        elts["Y"] = elt[:4]
+        elts["m"] = elt[5:7]
+        elts["d"] = elt[8:10]
 
-    elt = elts.pop('x', None)
+    elt = elts.pop("x", None)
     if elt is not None:
-        elts['Y'] = elt[:4]
-        elts['m'] = elt[4:6]
-        elts['d'] = elt[6:8]
+        elts["Y"] = elt[:4]
+        elts["m"] = elt[4:6]
+        elts["d"] = elt[6:8]
 
-    elt = elts.pop('X', None)
+    elt = elts.pop("X", None)
     if elt is not None:
-        elts['H'] = elt[:2]
-        elts['M'] = elt[2:4]
+        elts["H"] = elt[:2]
+        elts["M"] = elt[2:4]
         if len(elt) > 4:  # noqa: PLR2004
-            elts['S'] = elt[4:6]
+            elts["S"] = elt[4:6]
 
     # Process elements
-    get_elts(elts, 'Ymd', process_int)
-    get_elts(elts, 'j', process_doy)
-    get_elts(elts, 'HMS', process_int)
+    get_elts(elts, "Ymd", process_int)
+    get_elts(elts, "j", process_doy)
+    get_elts(elts, "HMS", process_int)
 
-    return datetime(**date) # type: ignore
+    return datetime(**date)  # type: ignore
 
 
 def _find_month_number(name: str) -> int:
@@ -114,9 +116,20 @@ def _find_month_number(name: str) -> int:
     Name can be the full name (January) or its three letter abbreviation (jan).
     The casing does not matter.
     """
-    names = ['january', 'february', 'march', 'april',
-             'may', 'june', 'july', 'august', 'september',
-             'october', 'november', 'december']
+    names = [
+        "january",
+        "february",
+        "march",
+        "april",
+        "may",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+        "december",
+    ]
     names_abbr = [c[:3] for c in names]
 
     name = name.lower()
@@ -129,10 +142,12 @@ def _find_month_number(name: str) -> int:
 
 
 def get_func_process_filename(
-        finder: Finder,
-        func: Callable[..., 'xarray.Dataset'],
-        relative: bool = True,
-        *args, **kwargs) -> Callable[['xarray.Dataset'], 'xarray.Dataset']:
+    finder: Finder,
+    func: Callable[..., "xarray.Dataset"],
+    relative: bool = True,
+    *args,
+    **kwargs,
+) -> Callable[["xarray.Dataset"], "xarray.Dataset"]:
     r"""Get a function that can preprocess a dataset.
 
     Written to be used as the 'process' argument of
@@ -175,9 +190,11 @@ def get_func_process_filename(
     ...     preprocess=get_func_process_filename(
     ...         finder, process, default_date={'hour': 12}))
     """
+
     def f(ds):
-        filename = ds.encoding['source']
+        filename = ds.encoding["source"]
         if relative:
             filename = finder.get_relative(filename)
         return func(ds, filename, finder, *args, **kwargs)
+
     return f

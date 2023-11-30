@@ -1,0 +1,20 @@
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python = 3.11
+
+  - ipython
+  - ipykernel
+
+  - ruff
+  - mypy>=1.5
+  - pytest>=7.4
+  - pyfakefs
+
+  - sphinx == 6.2.1
+  - sphinx-book-theme == 1.0.1
+
+  - pip
+  - pip:
+      - --no-deps -e .

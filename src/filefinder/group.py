@@ -23,7 +23,7 @@ class GroupParseError(Exception):
 
     def __init__(self, definition: str, message: str):
         self.definition = definition
-        self.message = message + f' ({definition})'
+        self.message = message + f" ({definition})"
 
 
 class Group:
@@ -45,29 +45,29 @@ class Group:
     """
 
     DEFAULT_GROUPS = {
-        'I': [r'\d+', 'd'],
-        'Y': [r'\d{4}', '04d'],
-        'm': [r'\d\d', '02d'],
-        'd': [r'\d\d', '02d'],
-        'j': [r'\d{3}', '03d'],
-        'H': [r'\d\d', '02d'],
-        'M': [r'\d\d', '02d'],
-        'S': [r'\d\d', '02d'],
-        'x': [r'%Y%m%d', '08d'],
-        'X': [r'%H%M%S', '06d'],
-        'F': [r'%Y-%m-%d', 's'],
-        'B': [r'[a-zA-Z]*', 's'],
-        'text': [r'\w', 's'],
-        'char': [r'\S*', 's']
+        "I": [r"\d+", "d"],
+        "Y": [r"\d{4}", "04d"],
+        "m": [r"\d\d", "02d"],
+        "d": [r"\d\d", "02d"],
+        "j": [r"\d{3}", "03d"],
+        "H": [r"\d\d", "02d"],
+        "M": [r"\d\d", "02d"],
+        "S": [r"\d\d", "02d"],
+        "x": [r"%Y%m%d", "08d"],
+        "X": [r"%H%M%S", "06d"],
+        "F": [r"%Y-%m-%d", "s"],
+        "B": [r"[a-zA-Z]*", "s"],
+        "text": [r"\w", "s"],
+        "char": [r"\S*", "s"],
     }
     """Regex str for each type of element."""
 
     GROUP_REGEX = (
-        r'(?P<name>\w*)'
-        r'(:fmt=(?P<fmt>.*?))?'
-        r'(?P<opt>:opt(?:=(?P<optA>.*?):(?P<optB>.*?))?)?'
-        r'(:rgx=(?P<rgx>.*?))?'
-        r'(?P<discard>:discard)?'
+        r"(?P<name>\w*)"
+        r"(:fmt=(?P<fmt>.*?))?"
+        r"(?P<opt>:opt(?:=(?P<optA>.*?):(?P<optB>.*?))?)?"
+        r"(:rgx=(?P<rgx>.*?))?"
+        r"(?P<discard>:discard)?"
     )
     """Regex to find group properties from string definition."""
 
@@ -81,7 +81,7 @@ class Group:
         """Group name."""
         self.rgx: str
         """Regex."""
-        self.fmt: Format = Format('s')
+        self.fmt: Format = Format("s")
         """Format string object."""
         self.discard: bool = False
         """If the group should not be used when retrieving values from matches."""
@@ -101,27 +101,27 @@ class Group:
         """Parse group definition against a regex to retrieve specs."""
         m = re.fullmatch(self.GROUP_REGEX, self.definition)
         if m is None:
-            raise ValueError(f'Unable to parse group definition ({self.definition})')
+            raise ValueError(f"Unable to parse group definition ({self.definition})")
 
-        self.name = m.group('name')
-        self.discard = m.group('discard') is not None
+        self.name = m.group("name")
+        self.discard = m.group("discard") is not None
 
-        rgx = m.group('rgx')
-        fmt = m.group('fmt')
+        rgx = m.group("rgx")
+        fmt = m.group("fmt")
 
         if self.name is None:
             raise GroupParseError(
-                self.definition, 'No name was found in group definition.'
+                self.definition, "No name was found in group definition."
             )
-        if rgx is not None and rgx == '':
+        if rgx is not None and rgx == "":
             raise GroupParseError(
                 self.definition,
-                'Regex specification in group definition cannot be empty.'
+                "Regex specification in group definition cannot be empty.",
             )
-        if fmt is not None and fmt == '':
+        if fmt is not None and fmt == "":
             raise GroupParseError(
                 self.definition,
-                'Format specification in group definition cannot be empty.'
+                "Format specification in group definition cannot be empty.",
             )
 
         # Set to defaults if name is known
@@ -136,23 +136,22 @@ class Group:
             if not rgx:  # No need to generate rgx if it is provided
                 self.rgx = self.fmt.generate_expression()
 
-        if m.group('opt') is not None:
-            opt_a, opt_b = m.group('optA'), m.group('optB')
+        if m.group("opt") is not None:
+            opt_a, opt_b = m.group("optA"), m.group("optB")
             if opt_a is None and opt_b is None:
                 self.optional = True
             else:
-                opt_a = '' if opt_a is None else opt_a
-                opt_b = '' if opt_b is None else opt_b
+                opt_a = "" if opt_a is None else opt_a
+                opt_b = "" if opt_b is None else opt_b
                 self.options = (opt_a, opt_b)
-                self.rgx = f'{opt_a}|{opt_b}'
+                self.rgx = f"{opt_a}|{opt_b}"
 
         # Override regex
         if rgx:
             self.rgx = rgx
 
         if self.rgx is None:
-            raise GroupParseError(
-                self.definition, 'No regex has been produced.')
+            raise GroupParseError(self.definition, "No regex has been produced.")
 
         self.rgx = self._replace_regex_defaults(self.rgx)
 
@@ -168,32 +167,33 @@ class Group:
         KeyError
             Unknown replacement.
         """
+
         def replace(match: re.Match):
             group = match.group(1)
-            if group == '%':
-                return '%'
+            if group == "%":
+                return "%"
             if group in self.DEFAULT_GROUPS:
                 replacement = self.DEFAULT_GROUPS[group][0]
-                if '%' in replacement: # need to go recursive
+                if "%" in replacement:  # need to go recursive
                     return self._replace_regex_defaults(replacement)
                 return replacement
             raise KeyError(f"Unknown replacement '{match.group(0)}'.")
 
-        return re.sub('%([a-zA-Z%])', replace, self.rgx)
+        return re.sub("%([a-zA-Z%])", replace, self.rgx)
 
     def __repr__(self) -> str:
         """Human readable information."""
-        return '\n'.join([super().__repr__(), self.__str__()])
+        return "\n".join([super().__repr__(), self.__str__()])
 
     def __str__(self) -> str:
         """Human readable information."""
-        return f'{self.name}:{self.idx:d}'
+        return f"{self.name}:{self.idx:d}"
 
     def format(self, value: Any) -> str:
         """Return formatted string from value."""
         return self.fmt.format(value)
 
-    def fix_value(self, fix: Any | bool | str, for_regex: bool=True):
+    def fix_value(self, fix: Any | bool | str, for_regex: bool = True):
         """Fix the group regex to a specific value.
 
         Parameters
@@ -213,15 +213,17 @@ class Group:
             if self.options is not None:
                 fix = self.options[fix]
             else:
-                raise ValueError(f'{self.name} group has no A|B options, '
-                                 'cannot fix value with a boolean.')
+                raise ValueError(
+                    f"{self.name} group has no A|B options, "
+                    "cannot fix value with a boolean."
+                )
 
         if not isinstance(fix, (list, tuple)):
             fix = [fix]
 
         fixes = []
         for f in fix:
-            if isinstance(f, str): # if a string, leave it as is
+            if isinstance(f, str):  # if a string, leave it as is
                 out = f
             else:
                 out = self.format(f)
@@ -233,7 +235,7 @@ class Group:
         if not for_regex:
             fixes = fixes[0:]
 
-        self.fixed_string = '|'.join(fixes)
+        self.fixed_string = "|".join(fixes)
 
     def unfix(self):
         """Unfix value."""
@@ -253,9 +255,9 @@ class Group:
             rgx = self.rgx
 
         # Make it matching
-        rgx = f'({rgx})'
+        rgx = f"({rgx})"
 
         if self.optional is True:
-            rgx += '?'
+            rgx += "?"
 
         return rgx

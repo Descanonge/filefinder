@@ -3,8 +3,8 @@
 
 .. automodule:: {{ fullname }}
    :members:
-   :special-members: __len__, __getitme__, __iter__
-   :member-order: groupwise
+   :private-members:
+   :member-order: bysource
 
    {% block attributes %}
    {% if attributes %}

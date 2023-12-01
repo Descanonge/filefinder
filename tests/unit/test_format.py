@@ -95,3 +95,12 @@ def test_format_e(align, sign, width, precision, number):
     fmt = Format(align + sign + width + precision + "e")
     s = fmt.format(number)
     assert_format(s, fmt)
+
+
+@pytest.mark.parametrize("align", ["", "<", "%<", ">", " >", "x^"])
+@pytest.mark.parametrize("width", ["", "0", "3", "12"])
+@pytest.mark.parametrize("value", ["a", "Dorothy", "zx3000", "w[ponpon]"])
+def test_format_s(align, width, value):
+    fmt = Format(align + width + "s")
+    s = fmt.format(value)
+    assert_format(s, fmt)

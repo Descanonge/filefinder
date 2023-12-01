@@ -17,6 +17,7 @@ Major overhaul, mainly streamlining.
 - Refactor format module.
   - Use subclasses for different format types, avoiding frequent dispatching
   - Add 'z' option to format (just allow it in format string, nothing else) (added in 3.11)
+  - Add alignment/fill support for string formats
 
 ## v0.5.0
 

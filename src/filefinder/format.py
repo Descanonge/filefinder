@@ -28,12 +28,18 @@ from typing import Any
 
 FORMAT_REGEX = (
     r"((?P<fill>.)?(?P<align>[<>=^]))?"
-    r"(?P<sign>[-+ ])?(?P<alternate>#)?"
-    r"(?P<zero>0)?(?P<width>\d+?)?"
+    r"(?P<sign>[-+ ])?"
+    r"(?P<z>z)?(?P<alternate>#)?(?P<zero>0)?"
+    r"(?P<width>\d+?)?"
     r"(?P<grouping>[,_])?"
     r"(?P<precision>\.\d+?)?"
     r"(?P<type>[a-zA-Z])"
 )
+"""The regular expression used to parse a format string.
+
+Follows the Format Specification Mini-Language.
+``[[fill]align][sign]["z"]["#"]["0"][width][grouping_option]["." precision][type]``
+"""
 FORMAT_PATTERN = re.compile(FORMAT_REGEX)
 
 

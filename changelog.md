@@ -13,6 +13,10 @@ Major overhaul, mainly streamlining.
 - Better API to retrieve values with `Matches.get_values` and `Matches.get_value`.
   They now take into account the 'discard' option.
 - `Matches.__getitem__` now wraps `Match.get_value`. I think this is the most useful function.
+- Make package typed.
+- Refactor format module.
+  - Use subclasses for different format types, avoiding frequent dispatching
+  - Add 'z' option to format (just allow it in format string, nothing else) (added in 3.11)
 
 ## v0.5.0
 

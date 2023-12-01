@@ -9,7 +9,7 @@ import logging
 import re
 from typing import Any
 
-from .format import Format
+from .format import FormatAbstract, get_format
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ class Group:
         """Group name."""
         self.rgx: str
         """Regex."""
-        self.fmt: Format = Format("s")
+        self.fmt: FormatAbstract = get_format("s")
         """Format string object."""
         self.discard: bool = False
         """If the group should not be used when retrieving values from matches."""
@@ -128,11 +128,11 @@ class Group:
         default = self.DEFAULT_GROUPS.get(self.name)
         if default is not None:
             self.rgx, fmt_def = default
-            self.fmt = Format(fmt_def)
+            self.fmt = get_format(fmt_def)
 
         # Override default format
         if fmt:
-            self.fmt = Format(fmt)
+            self.fmt = get_format(fmt)
             if not rgx:  # No need to generate rgx if it is provided
                 self.rgx = self.fmt.generate_expression()
 

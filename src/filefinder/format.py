@@ -81,17 +81,66 @@ class FormatAbstract:
         """Return formatted string."""
         return f"{{:{self.fmt}}}".format(value)
 
+    def parse(self, s: str) -> Any:
+        """Parse string generated with this format into an appropriate value."""
+        raise NotImplementedError()
+
+    def generate_expression(self) -> str:
+        """Generate a regular expression matching strings created with this format."""
+        raise NotImplementedError()
+
 
 class FormatString(FormatAbstract):
+    """Represent a format string for strings (type s)."""
+
     ALLOWED_TYPES = "s"
 
     type = "s"
 
     def parse(self, s: str) -> str:
+        """Parse string generated with this format into an appropriate value.
+
+        Only return string here.
+        """
         return s
 
+    def insert_alignement(self, rgx: str) -> str:
+        """Add necessary regex for alignement characters.
+
+        If width is not specified, does nothing.
+        """
+        if self.width == 0:
+            return rgx
+
+        if self.align == '=':
+            raise ValueError("'=' align not supported for 's' format.")
+
+        # Fill: the fill character any number of time, greedy
+        fill_rgx = f"{re.escape(self.fill)}*"
+
+        out_rgx = ""
+
+        # value is right-aligned or center
+        if self.align in ">^":
+            out_rgx += fill_rgx
+
+        out_rgx += rgx
+
+        # value is left-aligned or center
+        if self.align in "<^":
+            out_rgx += fill_rgx
+
+        return out_rgx
+
+
     def generate_expression(self) -> str:
-        return ".*?"
+        """Generate a regular expression matching strings created with this format.
+
+        Will match any character, non-greedily.
+        """
+        rgx = ".*?"
+        rgx = self.insert_alignement(rgx)
+        return rgx
 
 
 class FormatNumber(FormatAbstract):

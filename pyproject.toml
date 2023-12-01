@@ -50,7 +50,7 @@ dev = [
 'Documentation' = 'https://filefinder.readthedocs.io'
 
 [tool.mypy]
-# disable_error_code = ['annotation-unchecked']
+disable_error_code = ['annotation-unchecked']
 # allow_untyped_defs = true
 ignore_missing_imports = true
 

@@ -37,7 +37,7 @@ FORMAT_REGEX = (
 FORMAT_PATTERN = re.compile(FORMAT_REGEX)
 
 
-class Format:
+class FormatAbstract:
     """Parse a format string.
 
     Out of found parameters:
@@ -51,130 +51,81 @@ class Format:
         Format string.
     """
 
-    ALLOWED_TYPES = "fdeEs"
+    ALLOWED_TYPES = "sdfeE"
 
-    def __init__(self, fmt: str):
+    def __init__(self, fmt: str, params: dict[str, Any]):
         self.fmt: str = fmt
 
-        self.type: str
-        self.align: str
-        self.fill: str
-        self.sign: str
-        self.alternate: bool
-        self.zero: bool
-        self.width: int
-        self.grouping: str | None
-        self.precision: int
+        self.type: str = params["type"]
+        self.fill: str = params["fill"]
+        self.align: str = params["align"]
+        self.sign: str = params["sign"]
+        self.alternate: bool = params["alternate"]
+        self.zero: bool = params["zero"]
+        self.width: int = params["width"]
+        self.grouping: str = params["grouping"]
+        self.precision: int = params["precision"]
 
-        self.parse_params(fmt)
-
-    def parse_params(self, format: str):
-        """Parse format parameters."""
-        m = FORMAT_PATTERN.fullmatch(format)
-        if m is None:
-            raise ValueError("Format spec not valid.")
-        params = m.groupdict()
-
-        t = params["type"]
-        if not t or t not in self.ALLOWED_TYPES:
+        if self.type not in self.ALLOWED_TYPES:
             raise KeyError(
-                f"Invalid format type '{t}', expected one of {self.ALLOWED_TYPES}."
+                f"Invalid format type '{type}', expected one of {self.ALLOWED_TYPES}."
             )
-        self.type = t
-
-        # nothing else to do for string
-        if self.type == "s":
-            return
-
-        # fill boolean parameters
-        self.alternate = params.pop("alternate") == "#"
-        self.zero = params.pop("zero") == "0"
-
-        # special case
-        if params["align"] is None and self.zero:
-            params["fill"] = "0"
-            params["align"] = "="
-
-        # defaults values for remaining parameters
-        defaults = dict(
-            align=">", fill=" ", sign="-", width="0", precision=".6", grouping=None
-        )
-        for k, v in defaults.items():
-            if params.get(k, None) is None:
-                params[k] = v
-
-        # convert to correct type
-        self.width = int(params.pop("width"))
-        self.precision = int(params.pop("precision").removeprefix("."))
-
-        # fill the rest
-        for k, v in params.items():
-            setattr(self, k, v)
 
     def format(self, value: Any) -> str:
         """Return formatted string."""
         return f"{{:{self.fmt}}}".format(value)
 
+
+class FormatString(FormatAbstract):
+    ALLOWED_TYPES = "s"
+
+    type = "s"
+
+    def parse(self, s: str) -> str:
+        return s
+
     def generate_expression(self) -> str:
-        """Generate regex from format string."""
-        if self.type == "f":
-            return self.generate_expression_f()
-        if self.type == "d":
-            return self.generate_expression_d()
-        if self.type == "s":
-            return self.generate_expression_s()
-        if self.type in "eE":
-            return self.generate_expression_e()
-
-        raise KeyError(
-            f"Invalid format type '{type}', expected one of {self.ALLOWED_TYPES}."
-        )
-
-    def parse(self, s: str) -> str | int | float:
-        """Parse string generated with format.
-
-        This simply use int() and float() to parse strings. Those are thrown
-        off when using fill characters (other than 0), or thousands groupings,
-        so we remove these from the string.
-
-        Parsing will fail when using the '-' fill character on a negative
-        number, or when padding with numbers. If you use such formats, please
-        contact me to explain me why in the hell you do.
-        """
-        if self.type == "s":
-            return s
-
-        # Remove special characters (fill or groupings)
-        s = self.remove_special(s)
-
-        if self.type == "d":
-            return int(s)
-        if self.type in "feE":
-            return float(s)
-
-        raise KeyError(
-            f"Invalid format type '{type}', expected one of {self.ALLOWED_TYPES}."
-        )
-
-    def generate_expression_s(self) -> str:
         return ".*?"
 
-    def generate_expression_d(self) -> str:
-        rgx = self.get_left_point()
-        return self.insert_in_alignement(rgx)
 
-    def generate_expression_f(self) -> str:
-        rgx = self.get_left_point()
-        rgx += self.get_right_point()
-        return self.insert_in_alignement(rgx)
+class FormatNumber(FormatAbstract):
+    ALLOWED_TYPES = "dfeE"
 
-    def generate_expression_e(self) -> str:
-        rgx = r"\d"
-        rgx += self.get_right_point()
-        rgx += rf"{self.type}[+-]\d+"
-        return self.insert_in_alignement(rgx)
+    def remove_special(self, s: str) -> str:
+        """Remove special characters.
 
-    def insert_in_alignement(self, rgx: str) -> str:
+        Remove characters that throw off int() and float() parsing.
+        Namely fill and grouping characters.
+        Will remove fill, except when fill is zero (parsing functions are
+        okay with that).
+        """
+        to_remove = [",", "_"]  # Any grouping char
+        if self.fill != "0":
+            to_remove.append(re.escape(self.fill))
+        pattern = "[{}]".format("".join(to_remove))
+        return re.sub(pattern, "", s)
+
+    def get_left_of_decimal(self) -> str:
+        """Get regex for numbers left of decimal point."""
+        if self.grouping is not None:
+            rgx = rf"\d?\d?\d(?:{self.grouping}\d{{3}})*"
+        else:
+            rgx = r"\d+"
+        return rgx
+
+    def get_sign(self) -> str:
+        """Get sign regex."""
+        if self.sign == "-":
+            rgx = "-?"
+        elif self.sign == "+":
+            rgx = r"[+-]"
+        elif self.sign == " ":
+            rgx = r"[\s-]"
+        else:
+            raise KeyError("Sign not in {+- }")
+        return rgx
+
+    def insert_alignement(self, rgx: str) -> str:
         fill_rgx = ""
         if self.width > 0:
             fill_rgx += f"{re.escape(self.fill)}*"
@@ -195,27 +146,25 @@ class Format:
 
         return out_rgx
 
-    def get_sign(self) -> str:
-        """Get sign regex."""
-        if self.sign == "-":
-            rgx = "-?"
-        elif self.sign == "+":
-            rgx = r"[+-]"
-        elif self.sign == " ":
-            rgx = r"[\s-]"
-        else:
-            raise KeyError("Sign not in {+- }")
+
+class FormatInteger(FormatNumber):
+    ALLOWED_TYPES = "d"
+
+    def parse(self, s: str) -> int:
+        s = self.remove_special(s)
+        return int(s)
+
+    def generate_expression(self) -> str:
+        """Generate regex from format string."""
+        rgx = self.get_left_of_decimal()
+        rgx = self.insert_alignement(rgx)
         return rgx
 
-    def get_left_point(self) -> str:
-        """Get regex for numbers left of decimal point."""
-        if self.grouping is not None:
-            rgx = rf"\d?\d?\d(?:{self.grouping}\d{{3}})*"
-        else:
-            rgx = r"\d+"
-        return rgx
 
-    def get_right_point(self) -> str:
+class FormatFloat(FormatNumber):
+    ALLOWED_TYPES = "feE"
+
+    def get_right_of_decimal(self) -> str:
         rgx = ""
         if self.precision != 0 or self.alternate:
             rgx += r"\."
@@ -223,24 +172,80 @@ class Format:
             rgx += rf"\d{{{self.precision:d}}}"
         return rgx
 
-    def parse_d(self, s: str) -> int:
-        """Parse integer from formatted string."""
-        return int(self.remove_special(s))
+    def parse(self, s: str) -> float:
+        """Parse string generated with format.
 
-    def parse_f(self, s: str) -> float:
-        """Parse float from formatted string."""
-        return float(self.remove_special(s))
+        This simply use int() and float() to parse strings. Those are thrown
+        off when using fill characters (other than 0), or thousands groupings,
+        so we remove these from the string.
 
-    def remove_special(self, s: str) -> str:
-        """Remove special characters.
-
-        Remove characters that throw off int() and float() parsing.
-        Namely fill and grouping characters.
-        Will remove fill, except when fill is zero (parsing functions are
-        okay with that).
+        Parsing will fail when using the '-' fill character on a negative
+        number, or when padding with numbers. If you use such formats, please
+        contact me to explain me why in the hell you do.
         """
-        to_remove = [",", "_"]  # Any grouping char
-        if self.fill != "0":
-            to_remove.append(re.escape(self.fill))
-        pattern = "[{}]".format("".join(to_remove))
-        return re.sub(pattern, "", s)
+        # Remove special characters (fill or groupings)
+        s = self.remove_special(s)
+        return float(s)
+
+    def generate_expression(self) -> str:
+        if self.type == "f":
+            rgx = self.get_left_of_decimal()
+            rgx += self.get_right_of_decimal()
+            rgx = self.insert_alignement(rgx)
+            return rgx
+
+        assert self.type in "eE"
+        rgx = r"\d"
+        rgx += self.get_right_of_decimal()
+        rgx += rf"{self.type}[+-]\d+"
+        rgx = self.insert_alignement(rgx)
+        return rgx
+
+
+FORMAT_CLASSES: dict[str, type[FormatAbstract]] = dict(
+    s=FormatString,
+    d=FormatInteger,
+    f=FormatFloat,
+    e=FormatFloat,
+    E=FormatFloat,
+)
+
+
+def get_format(format: str) -> FormatAbstract:
+    """Parse format parameters and return appropriate Format object."""
+    m = FORMAT_PATTERN.fullmatch(format)
+    if m is None:
+        raise ValueError("Format spec not valid.")
+    params = m.groupdict()
+
+    # fill boolean parameters
+    params["alternate"] = params["alternate"] == "#"
+    params["zero"] = params["zero"] == "0"
+
+    # special case
+    if params["align"] is None and params["zero"]:
+        params["fill"] = "0"
+        params["align"] = "="
+
+    # defaults values for unset remaining parameters
+    defaults = dict(
+        align=">", fill=" ", sign="-", width="0", precision=".6", grouping=None
+    )
+    for k, v in defaults.items():
+        if params[k] is None:
+            params[k] = v
+
+    # convert to correct type
+    params["width"] = int(params["width"])
+    params["precision"] = int(params["precision"].removeprefix("."))
+
+    type = params["type"]
+    if type not in FORMAT_CLASSES:
+        raise KeyError(
+            f"Invalid format type '{type}', "
+            f"expected one of '{list(FORMAT_CLASSES.keys())}'."
+        )
+    return FORMAT_CLASSES[type](format, params)
+
+# Retrocompatible alias
+Format = get_format

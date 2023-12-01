@@ -25,6 +25,16 @@ class GroupParseError(Exception):
         self.definition = definition
         self.message = message + f" ({definition})"
 
+GROUP_REGEX = (
+    r"(?P<name>\w*)"
+    r"(:fmt=(?P<fmt>.*?))?"
+    r"(?P<opt>:opt(?:=(?P<optA>.*?):(?P<optB>.*?))?)?"
+    r"(:rgx=(?P<rgx>.*?))?"
+    r"(?P<discard>:discard)?"
+)
+"""Regex to find group properties from string definition."""
+GROUP_PATTERN = re.compile(GROUP_REGEX)
+
 
 class Group:
     """Manage a group inside the filename pattern.
@@ -62,15 +72,6 @@ class Group:
     }
     """Regex str for each type of element."""
 
-    GROUP_REGEX = (
-        r"(?P<name>\w*)"
-        r"(:fmt=(?P<fmt>.*?))?"
-        r"(?P<opt>:opt(?:=(?P<optA>.*?):(?P<optB>.*?))?)?"
-        r"(:rgx=(?P<rgx>.*?))?"
-        r"(?P<discard>:discard)?"
-    )
-    """Regex to find group properties from string definition."""
-
     def __init__(self, definition: str, idx: int):
         self.definition = definition
         """The string that created the group ``%(definition)``."""
@@ -99,7 +100,7 @@ class Group:
 
     def _parse_group_definition(self):
         """Parse group definition against a regex to retrieve specs."""
-        m = re.fullmatch(self.GROUP_REGEX, self.definition)
+        m = GROUP_PATTERN.fullmatch(self.definition)
         if m is None:
             raise ValueError(f"Unable to parse group definition ({self.definition})")
 

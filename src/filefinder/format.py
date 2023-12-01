@@ -107,7 +107,7 @@ class FormatNumber(FormatAbstract):
 
     def get_left_of_decimal(self) -> str:
         """Get regex for numbers left of decimal point."""
-        if self.grouping is not None:
+        if self.grouping:
             rgx = rf"\d?\d?\d(?:{self.grouping}\d{{3}})*"
         else:
             rgx = r"\d+"
@@ -229,7 +229,7 @@ def get_format(format: str) -> FormatAbstract:
 
     # defaults values for unset remaining parameters
     defaults = dict(
-        align=">", fill=" ", sign="-", width="0", precision=".6", grouping=None
+        align=">", fill=" ", sign="-", width="0", precision=".6", grouping=''
     )
     for k, v in defaults.items():
         if params[k] is None:

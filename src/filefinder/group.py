@@ -71,7 +71,10 @@ class Group:
         "text": [r"\w", "s"],
         "char": [r"\S*", "s"],
     }
-    """Regex str for each type of element."""
+    """Regex and format strings for various default groups.
+
+    See the :ref:`pattern-name` section of documentation for details.
+    """
 
     def __init__(self, definition: str, idx: int):
         self.definition = definition

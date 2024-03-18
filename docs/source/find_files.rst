@@ -53,13 +53,15 @@ The full syntax is as follows::
    unexpected behaviour can occur.
 
 
+.. _pattern-name:
+
 Name
 ####
 
 The name of the group will dictate the regex and format string used for that
-group (unless overriden the 'fmt' and 'rgx' properties).
+group (unless overridden the 'fmt' and 'rgx' properties).
 The :attr:`Group.DEFAULT_GROUPS<filefinder.group.Group.DEFAULT_GROUPS>`
-class attribute will make the correspondance between name and regex:
+class attribute will make the correspondence between name and regex:
 
 +------+-------------------+-----------+--------+
 | Name |                   | Regex     | Format |
@@ -163,7 +165,7 @@ between the two options ``(A|B)``. The group can now be fixed using a boolean,
 that will fix the option B if true, A if false.
 Either options can be left blank.
 
-See thoses examples::
+See those examples::
 
   >>> Finder('', "foo_%(bar:fmt=d:opt).txt").get_regex()
   'foo_(-?\d+)?.txt'
@@ -218,13 +220,15 @@ To use regular expressions outside of groups, it is necessary to activate the
    work.
 
 
+.. _obtaining-files:
+
 Obtaining files
 ===============
 
 Files can be retrieved with the :func:`Finder.get_files` function, or
 the :attr:`Finder.files` attribute. Both will scan the directory for files
 if it has not been done yet.
-The 'files' attribute also stores the matches. See :ref:`Retrieve information`
+The 'files' attribute also stores the matches. See :doc:`/retrieve_values`
 for details on how matches are stored.
 
 :func:`Finder.get_files` can also return nested lists of filenames.
@@ -234,4 +238,4 @@ which will merge files in a specific order when supplied a nested list of files.
 To this end, one must specify group names to the `nested` argument of the same
 function. The rightmost group will correspond to the innermost level.
 
-An example is available in the :ref:`examples<Nested files>`.
+An example is available in the :ref:`examples<nested-files>`.

@@ -31,7 +31,7 @@ class Finder:
     root:
         The root directory of the filetree where all files can be found.
     pattern:
-        A regular expression with added 'groups'. See :ref:`Pattern` for
+        A regular expression with the addition of 'groups'. See :doc:`/find_files` for
         details.
     use_regex:
         If True, characters outside of groups are considered as valid regex (and

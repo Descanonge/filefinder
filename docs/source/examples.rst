@@ -62,6 +62,8 @@ the 'preprocess' argument of :func:`xarray.open_mfdataset`::
   )
 
 
+.. _nested-files:
+
 Nested files
 ============
 
@@ -78,7 +80,7 @@ We now have two variables setup in a similar layout::
          └── ...
 
 We can scan both variables at the same time and retrieve the files as a
-:ref:`nested list<Obtaining files>`.
+:ref:`nested list<obtaining-files>`.
 Group names in the pattern will define what groups will be grouped together::
 
   pattern = '%(char)/%(char:discard)_%(x).nc'

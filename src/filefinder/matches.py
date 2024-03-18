@@ -50,7 +50,7 @@ class Match:
 
     def __str__(self):
         """Human readable information."""
-        return str(self.group) + f" = {self.match_str}"
+        return f"{self.group!s} = {self.match_str}"
 
     def get_match(self, parse: bool = True) -> str | Any:
         """Get match string or value.

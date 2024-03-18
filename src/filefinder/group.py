@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 GroupKey = int | str
-# Can be used to select one or more groups in a pattern.
+"""Can be used to select one or more groups in a pattern."""
 
 
 class GroupParseError(Exception):
@@ -24,6 +24,7 @@ class GroupParseError(Exception):
     def __init__(self, definition: str, message: str):
         self.definition = definition
         self.message = message + f" ({definition})"
+
 
 GROUP_REGEX = (
     r"(?P<name>\w*)"
@@ -55,18 +56,18 @@ class Group:
     """
 
     DEFAULT_GROUPS = {
-        "I": [r"\d+", "d"],
-        "Y": [r"\d{4}", "04d"],
-        "m": [r"\d\d", "02d"],
-        "d": [r"\d\d", "02d"],
-        "j": [r"\d{3}", "03d"],
-        "H": [r"\d\d", "02d"],
-        "M": [r"\d\d", "02d"],
-        "S": [r"\d\d", "02d"],
-        "x": [r"%Y%m%d", "08d"],
-        "X": [r"%H%M%S", "06d"],
-        "F": [r"%Y-%m-%d", "s"],
-        "B": [r"[a-zA-Z]*", "s"],
+        "I": [r"\d+", "d"],  # index
+        "Y": [r"\d{4}", "04d"],  # year
+        "m": [r"\d\d", "02d"],  # month
+        "d": [r"\d\d", "02d"],  # day
+        "j": [r"\d{3}", "03d"],  # dayofyear
+        "H": [r"\d\d", "02d"],  # hour
+        "M": [r"\d\d", "02d"],  # minute
+        "S": [r"\d\d", "02d"],  # second
+        "x": [r"%Y%m%d", "08d"],  # date
+        "X": [r"%H%M%S", "06d"],  # time
+        "F": [r"%Y-%m-%d", "s"],  # formated date
+        "B": [r"[a-zA-Z]*", "s"],  # month / month abbreviation
         "text": [r"\w", "s"],
         "char": [r"\S*", "s"],
     }

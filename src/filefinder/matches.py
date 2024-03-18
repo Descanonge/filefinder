@@ -121,7 +121,7 @@ class Matches:
         return "\n".join([str(m) for m in self.matches])
 
     def __getitem__(self, key: GroupKey) -> Any:
-        """Get parsed values corresponding to key.
+        """Get first parsed value corresponding to key.
 
         Ignore groups with the 'discard' option.
         """
@@ -184,6 +184,11 @@ class Matches:
             raise KeyError(
                 "No group without a 'discard' option was found " f"(key: {key})"
             )
+        if len(values) > 1:
+            if any(v != values[0] for v in values[1:]):
+                logger.warning(
+                    "Different parsed values for key %s (%s)", str(key), repr(values)
+                )
         return values[0]
 
     def get_matches(self, key: GroupKey, discard: bool = True) -> list[Match]:

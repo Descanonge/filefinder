@@ -282,7 +282,7 @@ class Finder:
 
     def make_filename(
         self,
-        fixes: dict[GroupKey, str | Any] | None = None,
+        fixes: dict | None = None,
         relative: bool = False,
         **kw_fixes: Any,
     ) -> str:
@@ -442,7 +442,7 @@ class Finder:
         files.sort()
         logger.debug("Found %s non-matching files in directories", len(files))
 
-        pattern = re.compile(regex)  # because we are goint to use it a bunch of times
+        pattern = re.compile(regex)
         files_matched: list[tuple[Matches, str]] = []
         for f in files:
             try:

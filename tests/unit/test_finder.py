@@ -44,20 +44,21 @@ def test_format_regex():
 def test_name_group():
     def assert_group_name(pattern, names):
         finder = Finder("", pattern)
-        for m, (group, name) in zip(finder.groups, names):
-            assert m.group == group
+        for m, name in zip(finder.groups, names):
             assert m.name == name
 
-    assert_group_name("test_%(foo:bar:fmt=.2f)", [("foo", "bar")])
-    assert_group_name(r"test_%(foo:bar:fmt=.2f:rgx=\d)", [("foo", "bar")])
-    assert_group_name(
-        "test_%(foo:bar:fmt=d)_%(foo2:bar2:fmt=s)", [("foo", "bar"), ("foo2", "bar2")]
-    )
+    assert_group_name("test_%(foo:fmt=.2f)", ["foo"])
+    assert_group_name("test_%(foo:fmt=d)_%(bar:fmt=s)", ["foo", "bar"])
 
 
 def test_optional():
     assert_pattern("test_%(m:opt)", r"test_(\d\d)?")
-    assert_pattern("test_%(lol:opt=A:B)", "test_(A|B)")
+
+
+def test_boolean():
+    assert_pattern("test_%(bar:bool=A:B)", "test_(A|B)")
+    assert_pattern("test_%(bar:bool=A:)", "test_(A|)")
+    assert_pattern("test_%(bar:bool=A)", "test_(A|)")
 
 
 def test_fix_group_string():
@@ -68,11 +69,11 @@ def test_fix_group_string():
 
 
 def test_fix_group_value():
-    finder = Finder("", "test_%(m)_%(c:fmt=.1f)_%(b:opt=A:B)")
+    finder = Finder("", "test_%(m)_%(c:fmt=.1f)_%(b:bool=A:B)")
     finder.fix_group(0, 1)
     finder.fix_group(1, 11)
     finder.fix_group(2, True)
-    assert finder.get_regex() == r"test_(01)_(11\.0)_(B)"
+    assert finder.get_regex() == r"test_(01)_(11\.0)_(A)"
 
 
 def test_get_groups():
@@ -89,7 +90,7 @@ def test_make_filename():
     root = path.join("data", "root")
     filename_rel = "test_01_5.00_yes"
     filename_abs = path.join(root, filename_rel)
-    finder = Finder(root, "test_%(m)_%(c:fmt=.2f)_%(b:opt=:yes)")
+    finder = Finder(root, "test_%(m)_%(c:fmt=.2f)_%(b:bool=yes)")
 
     # Without fix
     assert finder.make_filename(m=1, c=5, b=True) == filename_abs
@@ -131,7 +132,7 @@ def test_file_scan(fs):
         datadir,
         (
             f"%(Y){path.sep}test_%(Y)-%(m)-%(d)_"
-            "%(param:fmt=.1f)%(option:opt=:_yes).ext"
+            "%(param:fmt=.1f)%(option:bool=_yes).ext"
         ),
     )
     assert len(finder.files) == len(files)

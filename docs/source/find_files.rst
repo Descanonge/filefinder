@@ -6,15 +6,15 @@ Finding files
 
 The main entry point of this package is the :class:`Finder` class. An instance
 is created using the root directory containing the files, and a pattern
-specifying the filename structure which will be transformed into a proper regex
-later.
+specifying the filename structure which will be transformed into a proper
+regular expression later.
 
-When asking to find files, the finder will first create a regular-expression
+When asking to find files, the finder will first create a regular expression
 out of the pattern.
-It will then recursively find files in the root directory and its subfolders.
-Only the subfolders matching (part of) the regex will be looked into.
-Subfolders can simply be indicated in the pattern with the standard OS
-separator. The finder only keeps files that match the full regex.
+It will then recursively find files in the root directory and its sub-folders.
+Only the sub-folders matching the regular expression will be looked into.
+Sub-folders can simply be indicated in the pattern with the standard OS
+separator.
 
 
 Pattern
@@ -22,35 +22,53 @@ Pattern
 
 The pattern specifies the structure of the filenames relative to the root
 directory. Parts that vary from file to file are indicated by *groups*,
-enclosed by parenthesis and preceded by '%'. It is represented by the
-:class:`Group<filefinder.group.Group>` class.
+enclosed by parenthesis and preceded by '%'. They are represented by the
+:class:`~filefinder.group.Group` class.
 
-Inside the groups parenthesis can be indicated multiple properties, separated by
-colons:
+Each group definition starts with a **name**, and is then followed by multiple
+optional properties, separated by colons:
 
-- a **name** (does not need to be unique)
-- a **format** string (optional)
-- an **option** switch (optional)
-- a custom **regex** (optional)
-- a **discard** keyword that will ignore that group when retrieving information from a
-  filename (optional)
++---------------+--------------------------+--------------------------------+
+|Property       |Format                    |Description                     |
++===============+==========================+================================+
+|Format string  |``:fmt=<format string>``  |Use a python format string to   |
+|               |                          |match this group in filenames.  |
++---------------+--------------------------+--------------------------------+
+|Boolean format |``:bool=<true>[:<false>]``|Choose between two alternatives.|
+|               |                          |The second option (false) can be|
+|               |                          |left empty.                     |
++---------------+--------------------------+--------------------------------+
+|Custom regex   |``:rgx=<custom regex>``   |Specify a custom regular        |
+|               |                          |expression directly.            |
+|               |                          |                                |
++---------------+--------------------------+--------------------------------+
+|Optional flag  |``:opt``                  |Mark the group as optional.     |
++---------------+--------------------------+--------------------------------+
+|Discard flag   |``:discard``              |Discard the value parsed from   |
+|               |                          |this group when retrieving      |
+|               |                          |information.                    |
++---------------+--------------------------+--------------------------------+
 
-The full syntax is as follows::
+So for instance, we can specify a filename pattern that will match an integer
+padded with zeros, followed by two possible options::
 
-    %(name[:fmt=format string][:opt[=A:B]][:rgx=custom regex][:discard])
+   parameter_%(param:fmt=04d)_type_%(type:bool=good:bad).txt
+    -> parameter_0012_type_good.txt
+    -> parameter_2020_type_bad.txt
+
 
 .. note::
 
-   The groups are uniquely identified by their index in the pattern
-   (starting at 0).
-   Some functions (see :func:`Finder.find_matches` or :func:`Finder.fix_group`)
-   can use a name to find one or more groups.
+   Groups are uniquely identified by their index in the pattern (starting at 0)
+   and can share the same name. When using a name rather than an index, some
+   functions may return more than one result if they are multiple groups with
+   that name.
 
 .. warning::
 
    Groups are first found in the pattern by looking at matching
    parentheses. The pattern should thus have balanced parentheses or
-   unexpected behaviour can occur.
+   unexpected behavior can occur.
 
 
 .. _pattern-name:

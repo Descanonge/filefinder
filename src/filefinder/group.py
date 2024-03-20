@@ -5,6 +5,8 @@
 # to the MIT License as defined in the file 'LICENSE',
 # at the root of this project. © 2021 Clément Haëck
 
+from __future__ import annotations
+
 import logging
 import re
 from typing import Any
@@ -21,20 +23,9 @@ GroupKey = int | str
 class GroupParseError(Exception):
     """Custom errors when parsing group definition."""
 
-    def __init__(self, definition: str, message: str):
-        self.definition = definition
-        self.message = message + f" ({definition})"
-
-
-GROUP_REGEX = (
-    r"(?P<name>\w*)"
-    r"(:fmt=(?P<fmt>.*?))?"
-    r"(?P<opt>:opt(?:=(?P<optA>.*?):(?P<optB>.*?))?)?"
-    r"(:rgx=(?P<rgx>.*?))?"
-    r"(?P<discard>:discard)?"
-)
-"""Regex to find group properties from string definition."""
-GROUP_PATTERN = re.compile(GROUP_REGEX)
+    def __init__(self, group: Group, message: str):
+        self.group = group
+        self.message = f"{message} ({group.definition})"
 
 
 class Group:
@@ -49,11 +40,12 @@ class Group:
 
     Raises
     ------
-    ValueError:
-        Unable to parse the definition string into specifications.
     GroupParseError:
-        Invalid definition.
+        Invalid group definition.
     """
+
+    SPLIT_PATTERN = re.compile(":(fmt|rgx|bool|opt|discard)=?")
+    """Pattern used to find properties in group definition."""
 
     DEFAULT_GROUPS = {
         "I": [r"\d+", "d"],  # index
@@ -82,17 +74,17 @@ class Group:
         self.idx: int = idx
         """Index inside the pre-regex."""
 
-        self.name: str
+        self.name: str = ""
         """Group name."""
-        self.rgx: str
+        self.rgx: str = ""
         """Regex."""
         self.fmt: FormatAbstract = get_format("s")
         """Format string object."""
         self.discard: bool = False
         """If the group should not be used when retrieving values from matches."""
-        self.options: tuple[str] | None = None
-        """Tuple of the two possibilities indicated by the full ':opt'
-        specification."""
+        self.options: tuple[str, ...] | None = None
+        """Tuple of the two possibilities indicated by the full ':bool'
+        specification, in order (False, True), so that a simple getitem works."""
         self.optional: bool = False
         """If True, the whole group is marked as optional (``()?``).
         Is set to False unless specification ':opt' is indicated."""
@@ -102,32 +94,29 @@ class Group:
 
         self._parse_group_definition()
 
-    def _parse_group_definition(self):
+    def _parse_group_definition(self) -> None:
         """Parse group definition against a regex to retrieve specs."""
-        m = GROUP_PATTERN.fullmatch(self.definition)
-        if m is None:
-            raise ValueError(f"Unable to parse group definition ({self.definition})")
+        split = self.SPLIT_PATTERN.split(self.definition)
 
-        self.name = m.group("name")
-        self.discard = m.group("discard") is not None
+        self.name = split[0]
+        if not self.name:
+            raise GroupParseError(self, "Group name is empty.")
 
-        rgx = m.group("rgx")
-        fmt = m.group("fmt")
+        props: dict[str, str] = {}
+        for prop, value in zip(split[1::2], split[2::2]):
+            if prop in props:
+                raise GroupParseError(
+                    self, f"Property {prop} was specified more than once"
+                )
 
-        if self.name is None:
-            raise GroupParseError(
-                self.definition, "No name was found in group definition."
-            )
-        if rgx is not None and rgx == "":
-            raise GroupParseError(
-                self.definition,
-                "Regex specification in group definition cannot be empty.",
-            )
-        if fmt is not None and fmt == "":
-            raise GroupParseError(
-                self.definition,
-                "Format specification in group definition cannot be empty.",
-            )
+            if prop in ["rgx", "fmt", "bool"] and not value:
+                raise GroupParseError(self, f"Property {prop} cannot be empty.")
+            elif prop in ["discard", "opt"] and value:
+                raise GroupParseError(
+                    self, f"Property {prop} should not receive any value."
+                )
+
+            props[prop] = value
 
         # Set to defaults if name is known
         default = self.DEFAULT_GROUPS.get(self.name)
@@ -135,28 +124,35 @@ class Group:
             self.rgx, fmt_def = default
             self.fmt = get_format(fmt_def)
 
+        # Extract rgx and fmt
+        rgx = props.get("rgx", None)
+        fmt = props.get("fmt", None)
+
         # Override default format
         if fmt:
             self.fmt = get_format(fmt)
             if not rgx:  # No need to generate rgx if it is provided
                 self.rgx = self.fmt.generate_expression()
 
-        if m.group("opt") is not None:
-            opt_a, opt_b = m.group("optA"), m.group("optB")
-            if opt_a is None and opt_b is None:
-                self.optional = True
-            else:
-                opt_a = "" if opt_a is None else opt_a
-                opt_b = "" if opt_b is None else opt_b
-                self.options = (opt_a, opt_b)
-                self.rgx = f"{opt_a}|{opt_b}"
+        # Boolean format
+        self.options = None
+        if "bool" in props:
+            options = props["bool"].split(":", maxsplit=1)
+            if len(options) == 1:
+                options.append("")
+            self.options = tuple(options[::-1])
+            self.rgx = "|".join(options)
 
         # Override regex
         if rgx:
             self.rgx = rgx
 
+        # Flags
+        self.discard = "discard" in props
+        self.optional = "opt" in props
+
         if self.rgx is None:
-            raise GroupParseError(self.definition, "No regex has been produced.")
+            raise GroupParseError(self, "No regex has been produced.")
 
         self.rgx = self._replace_regex_defaults(self.rgx)
 

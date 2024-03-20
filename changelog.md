@@ -4,15 +4,18 @@
 Major overhaul, mainly streamlining.
 - Renamed 'matchers' to 'groups' to be consistent with regex tools.
 - Removed the 'group' spec (no more 'group:name' stuff, there is only a name now).
+- Group definition is now orderless.
+  - `:opt` is now only a flag for specifying the group as optional
+  - new `:bool=true[:false]` property. Note the order from old `:opt` is reversed.
 - Removed caching of regex and its resulting complications.
-- Moved fixing to the Group object, not the Finder.
 - Renamed `Finder.get_matches` to `find_matches`.
 - Renamed `Finder.get_filename` to `make_filename`.
-- `make_filename` now re-use the value-fixing done by groups, instead of having its own (nearly duplicate) logic.
-- Make some Finder attribute public.
 - Better API to retrieve values with `Matches.get_values` and `Matches.get_value`.
   They now take into account the 'discard' option.
 - `Matches.__getitem__` now wraps `Match.get_value`. I think this is the most useful function.
+- Moved fixing to the Group object, not the Finder.
+- `make_filename` now re-use the value-fixing done by groups, instead of having its own (nearly duplicate) logic.
+- Make some Finder attributes public.
 - Make package typed.
 - Refactor format module.
   - Use subclasses for different format types, avoiding frequent dispatching

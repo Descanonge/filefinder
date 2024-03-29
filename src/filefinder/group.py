@@ -247,7 +247,7 @@ class Group:
         """Get group regex.
 
         Returns the fixed value if previously specified.
-        Insert the regex into a matching group, and make it optional if
+        Insert the regex into a capturing group, and make it optional if
         the ``:opt`` was indicated
         """
         if self.fixed_string is not None:

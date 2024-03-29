@@ -36,9 +36,22 @@ class Finder:
     use_regex:
         If True, characters outside of groups are considered as valid regex (and
         not escaped). Default is False.
+    scan_everything
+        If true, look into all sub-directories up to a depth of :attr:`max_scan_depth` .
+        This is appropriate if the pattern contains optional sub-directories. If false
+        (default), check that every sub-directory matches its part of the regular
+        expression, thus avoiding some work.
     """
 
-    def __init__(self, root: str, pattern: str, use_regex: bool = False):
+    max_scan_depth: int = 32
+
+    def __init__(
+        self,
+        root: str,
+        pattern: str,
+        use_regex: bool = False,
+        scan_everything: bool = False,
+    ):
         if isinstance(root, (list, tuple)):
             root = os.path.join(*root)
         self.root: str = root
@@ -46,6 +59,9 @@ class Finder:
         self.use_regex: bool = use_regex
         """If True, characters outside of groups are considered as valid regex
         (and not escaped). Default is False."""
+
+        self.scan_everything: bool = scan_everything
+        """Whether to scan all subdirectories."""
 
         self._pattern: str
 
@@ -395,35 +411,73 @@ class Finder:
     def find_files(self):
         """Find files to scan and store them.
 
-        Is automatically called when accessing :attr:`files` or
-        :func:`get_files`.
-        Sort files alphabetically.
+        Is automatically called when accessing :attr:`files` or :func:`get_files`. Sort
+        files alphabetically.
+        """
+        if self.scan_everything:
+            self._find_files_scan_everything()
+        else:
+            self._find_files_subdirectories()
 
-        Raises
-        ------
-        IndexError
-            If no files are found in the filetree.
+        self._files.sort(key=lambda x: x[0])
+
+    def _find_files_scan_everything(self):
+        """Find files checking every sub-directory.
+
+        Because having to check if a sub-directory matches the pattern is difficult,
+        this allows for more exotic patterns where a folder separator can appear in a
+        capturing group, by example for optional sub-directories.
+
+        This will the whole filetree under :attr:`root_directory` and check every file
+        found, which can be significant work in some cases.
+        """
+        pattern = re.compile(self.get_regex())
+        files_matched: list[tuple[Matches, str]] = []
+
+        for dirpath, dirnames, filenames in os.walk(self.root):
+            depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
+                os.sep
+            ).count(os.sep)
+            if depth > self.max_scan_depth:
+                dirnames.clear()
+
+            for f in filenames:
+                to_root = self.get_relative(os.path.join(dirpath, f))
+                try:
+                    matches = Matches(self.groups, to_root, pattern)
+                    files_matched.append((to_root, matches))
+                except ValueError:
+                    pass
+
+        self.scanned = True
+        self._files = files_matched
+
+    def _find_files_subdirectories(self):
+        """Find files checking sub-directories along the way.
+
+        Each sub-directory must match against its corresponding part of the generated
+        regular expression. This is ill suited if any group contains a folder
+        separator. But it will limit the number of sub-directories to explore and
+        thus the number of files to check.
         """
         max_log_lines = 3
 
-        regex = self.get_regex()
-
         # patterns for each filetree depth
+        regex = self.get_regex()
         subpatterns = [re.compile(rgx) for rgx in regex.split(os.path.sep)]
         files = []
         for dirpath, dirnames, filenames in os.walk(self.root):
-            # Feels hacky, better way ?
             depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
                 os.sep
             ).count(os.sep)
             pattern = subpatterns[depth]
 
             if depth == len(subpatterns) - 1:
-                dirnames.clear()  # Look no deeper
+                dirnames.clear()  # look no deeper
                 files += [
                     self.get_relative(os.path.join(dirpath, f)) for f in filenames
                 ]
-            else:
+            elif logger.isEnabledFor(logging.DEBUG):
                 dirlogs = dirnames[:max_log_lines]
                 if len(dirnames) > max_log_lines:
                     dirlogs += ["..."]
@@ -439,9 +493,9 @@ class Finder:
             for d in to_remove:
                 dirnames.remove(d)
 
-        files.sort()
-        logger.debug("Found %s non-matching files in directories", len(files))
+        logger.debug("Found %s files in sub-directories", len(files))
 
+        # Now only retain files that match the full pattern
         pattern = re.compile(regex)
         files_matched: list[tuple[Matches, str]] = []
         for f in files:
@@ -452,11 +506,12 @@ class Finder:
             else:
                 files_matched.append((f, matches))
 
-        filelogs = files[:max_log_lines]
-        if len(files) > max_log_lines:
-            filelogs += ["..."]
-        logger.debug("regex: %s, files:\n\t%s", regex, "\n\t".join(filelogs))
-        logger.debug("Found %s matching files in %s", len(files_matched), self.root)
+        if logger.isEnabledFor(logging.DEBUG):
+            filelogs = files[:max_log_lines]
+            if len(files) > max_log_lines:
+                filelogs += ["..."]
+            logger.debug("regex: %s, files:\n\t%s", regex, "\n\t".join(filelogs))
+            logger.debug("Found %s matching files in %s", len(files_matched), self.root)
 
         self.scanned = True
         self._files = files_matched

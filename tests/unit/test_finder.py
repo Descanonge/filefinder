@@ -1,6 +1,7 @@
 """Test main features."""
 
 import itertools
+import os
 from datetime import datetime, timedelta
 from os import path
 
@@ -136,5 +137,32 @@ def test_file_scan(fs):
         ),
     )
     assert len(finder.files) == len(files)
+    for f, f_ref in zip(finder.get_files(relative=True), files):
+        assert f == f_ref
+
+
+def test_opt_directory(fs):
+    datadir = path.sep + "alpha"
+    fs.create_dir(datadir)
+
+    files = [
+        "0.txt",
+        f"a{os.sep}1.txt",
+        f"b{os.sep}2.txt",
+        f"a{os.sep}c{os.sep}3.txt",
+        f"b{os.sep}d{os.sep}4.txt",
+    ]
+    files.sort()
+    for f in files:
+        fs.create_file(path.join(datadir, f))
+
+    finder = Finder(
+        datadir,
+        f"%(folder:rgx=[a-z]{path.sep}:opt)"
+        f"%(folder:rgx=[a-z]{path.sep}:opt)"
+        "%(param:fmt=d).txt",
+        scan_everything=True,
+    )
+    assert len(finder.get_files()) == len(files)
     for f, f_ref in zip(finder.get_files(relative=True), files):
         assert f == f_ref

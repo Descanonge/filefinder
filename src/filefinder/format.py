@@ -44,6 +44,26 @@ Follows the Format Specification Mini-Language.
 FORMAT_PATTERN = re.compile(FORMAT_REGEX)
 
 
+class FormatError(Exception):
+    """Error related to Format object."""
+
+
+class FormatParsingError(FormatError):
+    """Could not parse a format-string."""
+
+
+class DangerousFormatError(FormatError):
+    """Dangerous format-string leading to ambiguities."""
+
+
+class InvalidFormatTypeError(FormatError):
+    """Unsupported type of format-string."""
+
+
+class FormatValueParsingError(FormatError):
+    """Could not parse value."""
+
+
 class FormatAbstract:
     """Represent a format string.
 
@@ -80,7 +100,7 @@ class FormatAbstract:
         self.precision: int = params["precision"]
 
         if self.type not in self.ALLOWED_TYPES:
-            raise KeyError(
+            raise InvalidFormatTypeError(
                 f"Invalid format type '{type}', expected one of {self.ALLOWED_TYPES}."
             )
 
@@ -302,7 +322,7 @@ def get_format(format: str) -> FormatAbstract:
     """Parse format parameters and return appropriate Format object."""
     m = FORMAT_PATTERN.fullmatch(format)
     if m is None:
-        raise ValueError("Format spec not valid.")
+        raise FormatParsingError(f"Format-string '{format}' not valid.")
     params = m.groupdict()
 
     # fill boolean parameters
@@ -328,7 +348,7 @@ def get_format(format: str) -> FormatAbstract:
 
     type = params["type"]
     if type not in FORMAT_CLASSES:
-        raise KeyError(
+        raise InvalidFormatTypeError(
             f"Invalid format type '{type}', "
             f"expected one of '{list(FORMAT_CLASSES.keys())}'."
         )

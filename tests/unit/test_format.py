@@ -1,14 +1,6 @@
 """Test regex generation from format string.
 
 Systematically generate formats, and test some number.
-To see what formats are tested, see the global variables:
-`signs`, `zeros`, `alts`, `aligns`, `grouping`, `widths`, `precisions`.
-To see what numbers are tested, see the global variables:
-`numbers_d`, `numbers_f`. (For float formats, both numbers list are tested)
-
-For each combination, generate expression from format, and string
-from number and format. Check that the regex match.
-Check that we parse correctly the number.
 
 'e' formats are not tested for parsing, since it needs to account for the
 number of significant digits (and the testing code would be more prone to
@@ -16,6 +8,7 @@ failure than the actual parsing code...).
 """
 
 import re
+import typing as t
 
 import pytest
 from filefinder.format import (
@@ -29,7 +22,9 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 
-def assert_format(string: str, fmt: FormatAbstract):
+def assert_format(value: t.Any, fmt: FormatAbstract):
+    """Check if a value formatted by Format is parsed by Format."""
+    string = fmt.format(value)
     pattern = fmt.generate_expression()
     m = re.fullmatch(pattern, string)
     assert (
@@ -37,23 +32,27 @@ def assert_format(string: str, fmt: FormatAbstract):
     ), f"No match. Format '{fmt.fmt}'. Pattern '{pattern}'. String '{string}'"
 
 
-def assert_parse_int(number: int, string: str, fmt: FormatInteger):
+def assert_parse_int(number: int, fmt: FormatInteger):
+    """Assert Format parse correctly a value it has formatted."""
+    string = fmt.format(number)
     parsed = fmt.parse(string)
     assert (
         number == parsed
     ), f"Not parsed. Format '{fmt.fmt}'. Number '{number}'. Parsed '{parsed}'"
 
 
-def assert_parse_float(number: float, string: str, fmt: FormatFloat, precision: str):
-    if precision == "":
-        decimals = 6
-    else:
-        decimals = int(precision[-1])
-    number = round(number, decimals)
+def assert_parse_float(number: float, fmt: FormatFloat, precision: str, kind="f"):
+    """Assert Format parse correctly a float value it has formatted.
 
+    Has to deal with precision here,
+    """
+    string_ref = f"{{:{'.6' if precision == '' else precision}{kind}}}".format(number)
+    parsed_ref = float(string_ref)
+
+    string = fmt.format(number)
     parsed = fmt.parse(string)
     assert (
-        float(number) == parsed
+        parsed_ref == parsed
     ), f"Not parsed. Format '{fmt.fmt}'. Number '{number}'. Parsed '{parsed}'"
 
 
@@ -82,6 +81,7 @@ precision = st.one_of(
 @pytest.mark.parametrize("grouping", grouping)
 @given(fill=fill, width=width, number=st.integers())
 def test_format_d(fill, align, sign, alt, zero, width, grouping, number):
+    """Test integer formats (type d)."""
     format_string = fill + align if align else ""
     format_string += sign + alt + zero + width + grouping + "d"
 
@@ -89,10 +89,8 @@ def test_format_d(fill, align, sign, alt, zero, width, grouping, number):
         fmt = Format(format_string)
     except DangerousFormatError:
         return
-    s = fmt.format(number)
-    assert_format(s, fmt)
-
-    assert_parse_int(number, s, fmt)
+    assert_format(number, fmt)
+    assert_parse_int(number, fmt)
 
 
 @pytest.mark.parametrize("align", align)
@@ -104,9 +102,10 @@ def test_format_d(fill, align, sign, alt, zero, width, grouping, number):
     fill=fill,
     width=width,
     precision=precision,
-    number=st.integers(),
+    number=st.floats(allow_nan=False, allow_infinity=False),
 )
 def test_format_f(fill, align, sign, alt, zero, grouping, width, precision, number):
+    """Test floating point formats (type f)."""
     format_string = fill + align if align else ""
     format_string += sign + alt + zero + width + grouping + precision + "f"
 
@@ -114,9 +113,8 @@ def test_format_f(fill, align, sign, alt, zero, grouping, width, precision, numb
         fmt = Format(format_string)
     except DangerousFormatError:
         return
-    s = fmt.format(number)
-    assert_format(s, fmt)
-    assert_parse_float(number, s, fmt, precision)
+    assert_format(number, fmt)
+    assert_parse_float(number, fmt, precision)
 
 
 @pytest.mark.parametrize("align", align)
@@ -128,9 +126,10 @@ def test_format_f(fill, align, sign, alt, zero, grouping, width, precision, numb
     fill=fill,
     width=width,
     precision=precision,
-    number=st.floats(),
+    number=st.floats(allow_nan=False, allow_infinity=False),
 )
 def test_format_e(fill, align, sign, alt, zero, width, grouping, precision, number):
+    """Test exponant formats (type e)."""
     format_string = fill + align if align else ""
     format_string += sign + alt + zero + width + grouping + precision + "e"
 
@@ -138,9 +137,8 @@ def test_format_e(fill, align, sign, alt, zero, width, grouping, precision, numb
         fmt = Format(format_string)
     except DangerousFormatError:
         return
-    s = fmt.format(number)
-    assert_format(s, fmt)
-    assert_parse_float(number, s, fmt, precision)
+    assert_format(number, fmt)
+    assert_parse_float(number, fmt, precision, kind="e")
 
 
 # def test_format_s(align, width, value):

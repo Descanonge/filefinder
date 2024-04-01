@@ -308,10 +308,22 @@ class FormatFloat(FormatNumberAbstract):
         s = self.prepare_parse(s)
         return float(s)
 
+    def get_left_of_decimal(self) -> str:
+        """Get regex for the numbers left of decimal point.
+
+        Will deal with grouping if present. Some simplifications for eE formats.
+        Only use groupings for '0=' alignment and enforce single digits grouping.
+        """
+        if self.type == "f":
+            return super().get_left_of_decimal()
+        if self.grouping and self.fill == "0" and self.align == "=":
+            return rf"0?0?\d(?:{self.grouping}00\d)*"
+        return r"\d"
+
     def generate_expression(self, capture=False) -> str:
         """Generate a regular expression matching strings created with this format."""
         if self.type == "f":
-            rgx = self.get_sign_regex(capture=True)
+            rgx = self.get_sign_regex(capture=capture)
             number = self.get_left_of_decimal() + self.get_right_of_decimal()
             if capture:
                 number = f"({number})"
@@ -321,12 +333,15 @@ class FormatFloat(FormatNumberAbstract):
             return rgx
 
         assert self.type in "eE"
-        rgx = (
-            self.get_sign_regex()
-            + r"\d"
+        rgx = self.get_sign_regex(capture=capture)
+        number = (
+            self.get_left_of_decimal()
             + self.get_right_of_decimal()
             + rf"{self.type}[+-]\d+"
         )
+        if capture:
+            number = f"({number})"
+        rgx += number
         rgx = self.add_outer_alignement(rgx)
         return rgx
 

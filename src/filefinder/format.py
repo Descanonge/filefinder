@@ -352,9 +352,11 @@ def get_format(format: str) -> FormatAbstract:
     params["zero"] = params["zero"] == "0"
 
     # special case
-    if params["align"] is None and params["zero"]:
-        params["fill"] = "0"
-        params["align"] = "="
+    if params["zero"]:
+        if params["fill"] is None:
+            params["fill"] = "0"
+        if params["align"] is None:
+            params["align"] = "="
 
     # defaults values for unset remaining parameters
     defaults = dict(

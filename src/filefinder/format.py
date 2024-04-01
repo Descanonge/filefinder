@@ -152,6 +152,23 @@ class FormatNumberAbstract(FormatAbstract):
     ALLOWED_TYPES = "dfeE"
 
     def remove_special(self, s: str) -> str:
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        # Reject dubious formats
+        digits = list(map(str, range(10)))
+        if self.width > 0 and (
+            (self.fill in digits and self.align in "<^")
+            or (self.fill in digits[1:] and self.align in "=")
+            or (self.fill in digits and self.align == ">" and self.sign == "-")
+            or (self.fill == "-" and self.align in ">^=" and self.sign == "-")
+        ):
+            raise DangerousFormatError(
+                f"Dangerous combination of fill character ({self.fill}), "
+                f"alignement ({self.align}) and sign ({self.sign}) for "
+                f"format ({self.fmt})"
+            )
+
         """Remove special characters.
 
         Remove characters that throw off int() and float() parsing.

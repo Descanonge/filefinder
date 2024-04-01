@@ -137,7 +137,7 @@ class FormatAbstract:
         """Parse string generated with this format into an appropriate value."""
         raise NotImplementedError()
 
-    def generate_expression(self) -> str:
+    def generate_expression(self, capture=False) -> str:
         """Generate a regular expression matching strings created with this format."""
         raise NotImplementedError()
 
@@ -154,14 +154,22 @@ class FormatString(FormatAbstract):
 
         Only return string here.
         """
-        return s
+        pattern = self.generate_expression(capture=True)
+        m = re.fullmatch(pattern, s)
+        if m is None:
+            raise FormatValueParsingError(
+                f"Error parsing '{s}' with pattern '{pattern}'"
+            )
+        return m.group(1)
 
-    def generate_expression(self) -> str:
+    def generate_expression(self, capture=False) -> str:
         """Generate a regular expression matching strings created with this format.
 
         Will match any character, non-greedily.
         """
         rgx = ".*?"
+        if capture:
+            rgx = f"({rgx})"
         rgx = self.add_outer_alignement(rgx)
         return rgx
 
@@ -171,7 +179,6 @@ class FormatNumberAbstract(FormatAbstract):
 
     ALLOWED_TYPES = "dfeE"
 
-    def remove_special(self, s: str) -> str:
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
@@ -189,6 +196,7 @@ class FormatNumberAbstract(FormatAbstract):
                 f"format ({self.fmt})"
             )
 
+    def prepare_parse(self, s: str) -> str:
         """Remove special characters.
 
         Remove characters that throw off int() and float() parsing.
@@ -196,11 +204,17 @@ class FormatNumberAbstract(FormatAbstract):
         Will remove fill, except when fill is zero (parsing functions are
         okay with that).
         """
-        to_remove = [",", "_"]  # Any grouping char
-        if self.fill != "0":
-            to_remove.append(re.escape(self.fill))
-        pattern = "[{}]".format("".join(to_remove))
-        return re.sub(pattern, "", s)
+        pattern = self.generate_expression(capture=True)
+        m = re.fullmatch(pattern, s)
+        if m is None:
+            raise FormatValueParsingError(
+                f"Error parsing '{s}' with pattern '{pattern}'"
+            )
+        # join all capturing groups (sign, number)
+        s = "".join(m.groups(""))
+        # remove grouping characters
+        s = re.sub("[,_]", "", s)
+        return s
 
     def get_left_of_decimal(self) -> str:
         """Get regex for the numbers left of decimal point.
@@ -213,7 +227,7 @@ class FormatNumberAbstract(FormatAbstract):
             rgx = r"\d+"
         return rgx
 
-    def get_sign_regex(self) -> str:
+    def get_sign_regex(self, capture=False) -> str:
         """Get sign regex with approprite zero padding."""
         if self.sign == "-":
             rgx = "-?"
@@ -222,7 +236,10 @@ class FormatNumberAbstract(FormatAbstract):
         elif self.sign == " ":
             rgx = r"[\s-]"
         else:
-            raise KeyError("Sign not in {+- }")
+            raise KeyError("Sign not in {+- }") from FormatError
+
+        if capture:
+            rgx = f"({rgx})"
 
         # padding is added between sign and numbers
         if self.width > 0 and self.align == "=":
@@ -245,12 +262,16 @@ class FormatInteger(FormatNumberAbstract):
         Parsing will fail for some deviously chaotic formats such as using the '-' fill
         character on a negative number, or when padding with numbers.
         """
-        s = self.remove_special(s)
+        s = self.prepare_parse(s)
         return int(s)
 
-    def generate_expression(self) -> str:
+    def generate_expression(self, capture=False) -> str:
         """Generate regex from format string."""
-        rgx = self.get_sign_regex() + self.get_left_of_decimal()
+        rgx = self.get_sign_regex(capture=capture)
+        number = self.get_left_of_decimal()
+        if capture:
+            number = f"({number})"
+        rgx += number
         rgx = self.add_outer_alignement(rgx)
         return rgx
 
@@ -284,17 +305,18 @@ class FormatFloat(FormatNumberAbstract):
         character on a negative number, or when padding with numbers.
         """
         # Remove special characters (fill or groupings)
-        s = self.remove_special(s)
+        s = self.prepare_parse(s)
         return float(s)
 
-    def generate_expression(self) -> str:
+    def generate_expression(self, capture=False) -> str:
         """Generate a regular expression matching strings created with this format."""
         if self.type == "f":
-            rgx = (
-                self.get_sign_regex()
-                + self.get_left_of_decimal()
-                + self.get_right_of_decimal()
-            )
+            rgx = self.get_sign_regex(capture=True)
+            number = self.get_left_of_decimal() + self.get_right_of_decimal()
+            if capture:
+                number = f"({number})"
+            rgx += number
+
             rgx = self.add_outer_alignement(rgx)
             return rgx
 

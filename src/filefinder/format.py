@@ -149,6 +149,12 @@ class FormatString(FormatAbstract):
 
     type = "s"
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        if self.align == "=":
+            raise FormatError("'=' alignement not allowed for string format.")
+
     def parse(self, s: str) -> str:
         """Parse string generated with this format into an appropriate value.
 
@@ -362,12 +368,14 @@ def get_format(format: str) -> FormatAbstract:
         raise FormatParsingError(f"Format-string '{format}' not valid.")
     params = m.groupdict()
 
+    type = params["type"]
+
     # fill boolean parameters
     params["alternate"] = params["alternate"] == "#"
     params["zero"] = params["zero"] == "0"
 
     # special case
-    if params["zero"]:
+    if params["zero"] and type in "dfeE":
         if params["fill"] is None:
             params["fill"] = "0"
         if params["align"] is None:
@@ -385,7 +393,6 @@ def get_format(format: str) -> FormatAbstract:
     params["width"] = int(params["width"])
     params["precision"] = int(params["precision"].removeprefix("."))
 
-    type = params["type"]
     if type not in FORMAT_CLASSES:
         raise InvalidFormatTypeError(
             f"Invalid format type '{type}', "

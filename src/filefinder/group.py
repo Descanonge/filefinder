@@ -44,7 +44,11 @@ class Group:
         Invalid group definition.
     """
 
-    SPLIT_PATTERN = re.compile(":(fmt|rgx|bool|opt|discard)=?")
+    PATTERN = re.compile(
+        "(?P<name>[^:]+?)(?:(?P<fmt>:fmt=.+?)|(?P<rgx>:rgx=.*?)"
+        "|(?P<bool>:bool=.*?(?::.*?)??)"
+        "|(?P<opt>:opt)|(?P<discard>:discard)){,5}"
+    )
     """Pattern used to find properties in group definition."""
 
     DEFAULT_GROUPS = {
@@ -96,27 +100,15 @@ class Group:
 
     def _parse_group_definition(self) -> None:
         """Parse group definition against a regex to retrieve specs."""
-        split = self.SPLIT_PATTERN.split(self.definition)
+        m = self.PATTERN.fullmatch(self.definition)
+        if m is None:
+            raise GroupParseError(
+                self, "Could not parse the definition according to the regex pattern."
+            )
+        self._check_duplicates(m)
+        specs = m.groupdict()
 
-        self.name = split[0]
-        if not self.name:
-            raise GroupParseError(self, "Group name is empty.")
-
-        props: dict[str, str] = {}
-        for prop, value in zip(split[1::2], split[2::2]):
-            if prop in props:
-                raise GroupParseError(
-                    self, f"Property {prop} was specified more than once"
-                )
-
-            if prop in ["rgx", "fmt", "bool"] and not value:
-                raise GroupParseError(self, f"Property {prop} cannot be empty.")
-            elif prop in ["discard", "opt"] and value:
-                raise GroupParseError(
-                    self, f"Property {prop} should not receive any value."
-                )
-
-            props[prop] = value
+        self.name = specs["name"]
 
         # Set to defaults if name is known
         default = self.DEFAULT_GROUPS.get(self.name)
@@ -124,9 +116,17 @@ class Group:
             self.rgx, fmt_def = default
             self.fmt = get_format(fmt_def)
 
-        # Extract rgx and fmt
-        rgx = props.get("rgx", None)
-        fmt = props.get("fmt", None)
+        # Extract specs
+        for k in ["rgx", "fmt", "bool"]:
+            if specs[k] is not None:
+                specs[k] = specs[k].removeprefix(f":{k}=")
+        rgx = specs["rgx"]
+        fmt = specs["fmt"]
+        bol = specs["bool"]
+
+        # Flags
+        self.discard = specs["discard"] is not None
+        self.optional = specs["opt"] is not None
 
         # Override default format
         if fmt:
@@ -136,8 +136,8 @@ class Group:
 
         # Boolean format
         self.options = None
-        if "bool" in props:
-            options = props["bool"].split(":", maxsplit=1)
+        if bol is not None:
+            options = bol.split(":", maxsplit=1)
             if len(options) == 1:
                 options.append("")
             self.options = tuple(options[::-1])
@@ -147,14 +147,49 @@ class Group:
         if rgx:
             self.rgx = rgx
 
-        # Flags
-        self.discard = "discard" in props
-        self.optional = "opt" in props
-
         if self.rgx is None:
             raise GroupParseError(self, "No regex has been produced.")
 
         self.rgx = self._replace_regex_defaults(self.rgx)
+
+    def _check_duplicates(self, m: re.Match):
+        """Check if the definition does not contain duplicates.
+
+        The matching pattern (:attr:`PATTERN`) is written so that specs (rgx, fmt, ...)
+        can be given in any order, while still matching the full string.
+        Other alternatives require more hand checking for every spec than just matching
+        the whole thing.
+
+        The pattern is made of every possible spec in a OR list, which can be repeated
+        up to 5 times. Regex only keep the last captured group. We must be a bit sly
+        to check duplicates. For that I check that the groups we have account for
+        the whole string. If part of the string is not in our match, something has
+        been overwritten.
+        """
+        accounted_for: list[tuple[int, int]] = []
+
+        for k, v in m.groupdict().items():
+            if v is not None:
+                accounted_for.append((m.start(k), m.end(k)))
+
+        accounted_for.sort(key=lambda x: x[0])
+
+        # to make sure we get to the end
+        n = len(self.definition)
+        accounted_for.append((n, n))
+
+        pos = 0
+        for span in accounted_for:
+            if pos == span[0]:
+                pos = span[1]
+            else:
+                raise GroupParseError(
+                    self,
+                    (
+                        "The specs found do not account for the full definition. "
+                        "There is most likely a duplicate spec."
+                    ),
+                )
 
     def _replace_regex_defaults(self, regex: str):
         """Recursively replace defaults regexes of the form ``%[a-zA-Z]``.
@@ -221,6 +256,9 @@ class Group:
 
         if not isinstance(fix, (list, tuple)):
             fix = [fix]
+
+        if len(fix) == 0:
+            raise ValueError("A list of fixes must contain at least one element.")
 
         fixes = []
         for f in fix:

@@ -191,7 +191,7 @@ class Group:
                     ),
                 )
 
-    def _replace_regex_defaults(self, regex: str):
+    def _replace_regex_defaults(self, regex: str) -> str:
         """Recursively replace defaults regexes of the form ``%[a-zA-Z]``.
 
         Replacements are taken from :attr:`Group.DEFAULT_GROUPS`.
@@ -215,7 +215,7 @@ class Group:
                 return replacement
             raise KeyError(f"Unknown replacement '{match.group(0)}'.")
 
-        return re.sub("%([a-zA-Z%])", replace, self.rgx)
+        return re.sub("%([a-zA-Z%])", replace, regex)
 
     def __repr__(self) -> str:
         """Human readable information."""

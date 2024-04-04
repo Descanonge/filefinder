@@ -12,7 +12,7 @@ from test_format import format_d, format_float, no_dangerous
 
 def assert_grp(spec: str, expected_rgx: str, expected_fmt: str):
     grp = Group(spec, 0)
-    assert grp.rgx == expected_rgx
+    assert grp.get_regex() == expected_rgx
     assert grp.fmt.fmt == expected_fmt
 
 
@@ -25,16 +25,19 @@ def del_pct(s: str) -> bool:
 
 
 st_name = st.text(alphabet=alphabet, min_size=1)
-st_rgx = (
-    st.text(alphabet=alphabet, min_size=1).filter(del_pct).map(lambda s: f":rgx={s}")
+st_rgx_text = (
+    st.text(alphabet=alphabet, min_size=1)
+    .filter(lambda s: re.search("%[a-zA-Z]", s) is None)
+    .map(lambda s: s.replace("%%", "%"))
 )
+st_rgx = st_rgx_text.map(lambda s: f":rgx={s}")
 st_fmt = format_float.filter(no_dangerous).map(lambda s: f":fmt={s}")
 
 
 @st.composite
 def st_bool_elts(draw) -> tuple[str, str]:
-    a = draw(st.text(alphabet=alphabet, min_size=1).filter(del_pct))
-    b = draw(st.text(alphabet=alphabet).filter(del_pct))
+    a = draw(st_rgx_text.filter(lambda s: len(s) > 0))
+    b = draw(st_rgx_text)
     return a, b
 
 
@@ -79,7 +82,14 @@ def test_random_definitions(input: tuple[str, dict]):
 
     # Test rgx, format, and bool
     if "rgx" in specs:
-        assert f":rgx={g.rgx}" == specs["rgx"]
+        rgx = specs["rgx"].removeprefix(":rgx=")
+        assert g.rgx == rgx
+
+        rgx = f"({rgx})"
+        if "opt" in specs:
+            rgx += "?"
+        assert g.get_regex() == rgx
+
     if "fmt" in specs:
         assert f":fmt={g.fmt.fmt}" == specs["fmt"]
 
@@ -111,6 +121,7 @@ def test_bool(ab):
         # properties specified twice
         "a:opt:fmt=02d:opt",
         "a:rgx=foo:rgx=bar",
+        "a:opt:rgx=bar:opt:opt",
         # wrong
         "a:optional",
         "a:fmt",
@@ -125,12 +136,12 @@ def test_bad_definition(spec: str):
 @pytest.mark.parametrize(
     "name,expected_rgx,expected_fmt",
     [
-        ("I", r"\d+", "d"),
-        ("Y", r"\d{4}", "04d"),
-        ("m", r"\d\d", "02d"),
-        ("x", r"\d{4}\d\d\d\d", "08d"),
-        ("X", r"\d\d\d\d\d\d", "06d"),
-        ("F", r"\d{4}-\d\d-\d\d", "s"),
+        ("I", r"(\d+)", "d"),
+        ("Y", r"(\d{4})", "04d"),
+        ("m", r"(\d\d)", "02d"),
+        ("x", r"(\d{4}\d\d\d\d)", "08d"),
+        ("X", r"(\d\d\d\d\d\d)", "06d"),
+        ("F", r"(\d{4}-\d\d-\d\d)", "s"),
     ],
 )
 def test_some_default_names(name, expected_rgx, expected_fmt):
@@ -140,18 +151,21 @@ def test_some_default_names(name, expected_rgx, expected_fmt):
 
 def test_default_overwrite():
     """Test if rgx and fmt overwrite correctly the defaults."""
-    assert_grp("Y:rgx=foo", "foo", "04d")
-    assert_grp("Y:rgx=foo:fmt=s", "foo", "s")
-    assert_grp("Y:rgx=foo:fmt=s:opt:discard", "foo", "s")
-    assert_grp("Y:fmt=08d", Format("08d").generate_expression(), "08d")
-    assert_grp("Y:bool=true:false:fmt=s", "true|false", "s")
+    assert_grp("Y:rgx=foo", "(foo)", "04d")
+    assert_grp("Y:rgx=foo:fmt=s", "(foo)", "s")
+    assert_grp("Y:rgx=foo:fmt=s:opt:discard", "(foo)?", "s")
+    assert_grp("Y:fmt=08d", "({})".format(Format("08d").generate_expression()), "08d")
+    assert_grp("Y:bool=true:false:fmt=s", "(true|false)", "s")
 
 
 def test_percent_rgx():
-    assert_grp("foo:rgx=a-%x", r"a-\d{4}\d\d\d\d", "s")
-    assert_grp("foo:rgx=%Y.%m.%d", r"\d{4}.\d\d.\d\d", "s")
+    assert_grp("foo:rgx=a-%x", r"(a-\d{4}\d\d\d\d)", "s")
+    assert_grp("foo:rgx=%Y.%m.%d", r"(\d{4}.\d\d.\d\d)", "s")
     # escape the percent
-    assert_grp("foo:rgx=%Y-100%%", r"\d{4}-100%", "s")
+    assert_grp("foo:rgx=%Y-100%%", r"(\d{4}-100%)", "s")
+
+    with pytest.raises(KeyError):
+        Group("foo:rgx=%e", 0)
 
 
 @given(number=st.integers(), fmt=format_d().filter(no_dangerous))
@@ -160,6 +174,17 @@ def test_fix_value_int(number: int, fmt: str):
     g.fix_value(number)
     assert g.fixed_value == number
     assert g.fixed_string == re.escape(f"{{:{fmt}}}".format(number))
+
+
+@given(a=st.integers(), b=st.integers())
+def test_fix_value_consecutive(a: int, b: int):
+    g = Group("foo:fmt=d", 0)
+    g.fix_value(a)
+    assert g.fixed_value == a
+    g.unfix()
+    assert g.fixed_value is None
+    g.fix_value(b)
+    assert g.fixed_value == b
 
 
 @given(
@@ -179,6 +204,7 @@ def test_fix_value_string(s: str, fmt: str):
     g.fix_value(s)
     assert g.fixed_value == s
     assert g.fixed_string == s
+    assert g.get_regex() == f"({s})"
 
 
 def test_fix_value_bool():
@@ -188,15 +214,22 @@ def test_fix_value_bool():
     g.fix_value(False)
     assert g.fixed_string == "opt2"
 
+    with pytest.raises(ValueError):
+        g = Group("Y", 0)
+        g.fix_value(True)
+
 
 @given(
-    elements=st.lists(st.integers(), min_size=1), fmt=format_float.filter(no_dangerous)
+    elements=st.lists(st.integers(), min_size=1), fmt=format_d().filter(no_dangerous)
 )
 def test_fix_value_list(elements: list[int], fmt: str):
     g = Group(f"foo:fmt={fmt}", 0)
     g.fix_value(elements)
     formatted_elts = [f"{{:{fmt}}}".format(e) for e in elements]
     assert g.fixed_string == ("|".join(re.escape(e) for e in formatted_elts))
+
+    g.fix_value(elements, for_regex=False)
+    assert g.fixed_string == formatted_elts[0]
 
     with pytest.raises(ValueError):
         g.fix_value([])

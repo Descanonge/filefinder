@@ -1,60 +1,45 @@
 
-.. currentmodule:: filefinder.finder
-
-Finding files
--------------
-
-The main entry point of this package is the :class:`Finder` class. An instance
-is created using the root directory containing the files, and a pattern
-specifying the filename structure which will be transformed into a proper
-regular expression later.
-
-When asking to find files, the finder will first create a regular expression
-out of the pattern.
-It will then recursively find files in the root directory and its sub-folders.
-Only the sub-folders matching the regular expression will be looked into.
-Sub-folders can simply be indicated in the pattern with the standard OS
-separator.
-
+.. currentmodule:: filefinder
 
 Pattern
-=======
+-------
 
 The pattern specifies the structure of the filenames relative to the root
-directory. Parts that vary from file to file are indicated by *groups*,
+directory. Parts that vary from file to file are indicated by **groups**,
 enclosed by parenthesis and preceded by '%'. They are represented by the
-:class:`~filefinder.group.Group` class.
+:class:`~group.Group` class.
 
-Each group definition starts with a **name**, and is then followed by multiple
-optional properties, separated by colons:
+Each group definition starts with a :ref:`name<name>`, and is then followed by
+multiple optional properties, separated by colons (in no particular order):
 
 +---------------+--------------------------+--------------------------------+
 |Property       |Format                    |Description                     |
 +===============+==========================+================================+
-|Format string  |``:fmt=<format string>``  |Use a python format string to   |
-|               |                          |match this group in filenames.  |
+|:ref:`Format   |``:fmt=<format string>``  |Use a python format string to   |
+|string<fmt>`   |                          |match this group in filenames.  |
 +---------------+--------------------------+--------------------------------+
-|Boolean format |``:bool=<true>[:<false>]``|Choose between two alternatives.|
-|               |                          |The second option (false) can be|
-|               |                          |left empty.                     |
+|:ref:`Boolean  |``:bool=<true>[:<false>]``|Choose between two alternatives.|
+|format<bool>`  |                          |The second option (false) can be|
+|               |                          |omitted.                        |
 +---------------+--------------------------+--------------------------------+
-|Custom regex   |``:rgx=<custom regex>``   |Specify a custom regular        |
-|               |                          |expression directly.            |
+|:ref:`Custom   |``:rgx=<custom regex>``   |Specify a custom regular        |
+|regex<rgx>`    |                          |expression directly.            |
 |               |                          |                                |
 +---------------+--------------------------+--------------------------------+
-|Optional flag  |``:opt``                  |Mark the group as optional.     |
+|:ref:`Optional |``:opt``                  |Mark the group as optional.     |
+|flag<opt>`     |                          |                                |
 +---------------+--------------------------+--------------------------------+
-|Discard flag   |``:discard``              |Discard the value parsed from   |
-|               |                          |this group when retrieving      |
+|:ref:`Discard  |``:discard``              |Discard the value parsed from   |
+|flag<discard>` |                          |this group when retrieving      |
 |               |                          |information.                    |
 +---------------+--------------------------+--------------------------------+
 
 So for instance, we can specify a filename pattern that will match an integer
 padded with zeros, followed by two possible options::
 
-   parameter_%(param:fmt=04d)_type_%(type:bool=good:bad).txt
-    -> parameter_0012_type_good.txt
-    -> parameter_2020_type_bad.txt
+   parameter_%(param:fmt=04d)_type_%(type:bool=foo:bar).txt
+    -> parameter_0012_type_foo.txt
+    -> parameter_2020_type_bar.txt
 
 
 .. note::
@@ -71,14 +56,14 @@ padded with zeros, followed by two possible options::
    unexpected behavior can occur.
 
 
-.. _pattern-name:
+.. _name:
 
 Name
-####
+====
 
 The name of the group will dictate the regex and format string used for that
 group (unless overridden the 'fmt' and 'rgx' properties).
-The :attr:`Group.DEFAULT_GROUPS<filefinder.group.Group.DEFAULT_GROUPS>`
+The :attr:`Group.DEFAULT_GROUPS<group.Group.DEFAULT_GROUPS>`
 class attribute will make the correspondence between name and regex:
 
 +------+-------------------+-----------+--------+
@@ -113,22 +98,22 @@ class attribute will make the correspondence between name and regex:
 | char | Character         | \\S*      |      s |
 +------+-------------------+-----------+--------+
 
-Those are mainly related to datetime. This table *mostly* follows the `strftime
-<https://linux.die.net/man/3/strftime>`__ format specifications.
-Groups with corresponding names will be used by :func:`library.get_date()<filefinder.library.get_date>` to find the date from
-the filename.
+Most of them are related to dates and follow the specification of
+:ref:`strftime-strptime-behavior` and `strftime
+<https://linux.die.net/man/3/strftime>`__.
 
 A letter preceded by a percent sign '%' in the regex will be recursively
 replaced by the corresponding name in the table. This can be used in the
 custom regex. This still counts as a single group and its name will not
 be changed, only the regex.
-So ``%x`` will be replaced by ``%Y%m%d``, in turn replaced by
-``\d{4}\d\d\d\d``.
+So ``%x`` will be replaced by ``%Y%m%d``, in turn replaced by ``\d{4}\d\d\d\d``.
 A percentage character in the regex is escaped by another percentage ('%%').
 
 
-Custom format
-#############
+.. _fmt:
+
+Format string
+=============
 
 All the possible use cases are not covered in the table above. A simple way to
 specify a group is by using a format string following the
@@ -138,16 +123,12 @@ This will automatically be transformed into a regular expression.
 
 Having a format specified has other benefits: it can be used to convert values
 into strings to generate a filename from parameters values (using
-:func:`Finder.make_filename`), or vice-versa to parse filenames matches into
-parameters values.
+:func:`Finder.make_filename<finder.Finder.make_filename>`), or vice-versa to
+parse filenames matches into parameters values.
 
-It's easy as::
-
-  scale_%(scale:fmt=.1f)
-
-This will find files such as ``scale_15.0`` or ``scale_-5.6``.
-Because we know how to transform a value into a string we can fix the group
-directly with a value::
+It's easy as ``scale_%(scale:fmt=.1f)`` which will find files such as
+``scale_15.0`` or ``scale_-5.6``. Because we know how to transform a value into
+a string we can fix the group directly with a value::
 
   finder.fix_group('scale', 15.)
 
@@ -168,36 +149,55 @@ If the format is never specified, it defaults to a ``s`` format.
 
    Only s, d, f, e, and E format types are supported.
 
-   Parsing will fail in some unrealistic cases described in
-   :func:`format.Format.parse()<filefinder.format.Format.parse>`.
+   Parsing of numbers will fail in some ambiguous (and quite unrealistic) cases
+   that involves alignment padding with numbers or the minus signs. Creating a
+   format object where we can't unambiguously remove the padding character is
+   not allowed and will raise a :class:`~format.DangerousFormatError`.
+
+   Similarly, for a string format (s) it can be impossible to separate correctly
+   the alignment padding character (the "fill") from the actual value. Here the
+   user is entrusted with making sure that the fill character does not appear
+   in the value (or not at its beginning or end at least).
 
 
-Optional property
-#################
+.. _bool:
 
-The option property can achieve two different features. If the flag ``:opt`` is
-present, this will append a '*?*' to the group regex, making it 'optional'.
+Boolean format
+==============
 
-If two options are indicated as ``:opt=A:B``, the regex will be set as an OR
-between the two options ``(A|B)``. The group can now be fixed using a boolean,
-that will fix the option B if true, A if false.
-Either options can be left blank.
+The boolean format allows to easily select between two options. It is specified
+as ``:bool=<true>[:<false>]``. The second option (false), can be omitted.
 
-See those examples::
+Both ``<true>`` and ``<false>`` here refer to regular expressions. Don't forget
+to escape any special characters!
 
-  >>> Finder('', "foo_%(bar:fmt=d:opt).txt").get_regex()
-  'foo_(-?\d+)?.txt'
+Here are a couple of examples. ``my_file%(special:bool=_special).txt`` would
+match both ``my_file.txt`` and ``my_file_special.txt``. We could select only
+'special' files using ``finder.fix_groups(special=True)``.
 
-  >>> f = Finder('', "foo%(bar:opt=:_yes).txt")
-  >>> f.get_regex()
-  'foo(|_yes)'
-  >>> f.fix_groups(bar=True)
-  ... f.get_regex()
-  'foo_yes'
+We can also specify both options with ``my_file_%(good:bool=good:bad).txt``, and
+select either like so ::
 
+    >>> finder.make_filename(kind=True)
+    my_file_good.txt
+    >>> finder.make_filename(kind=False)
+    my_file_bad.txt
+
+
+.. _opt:
+
+Optional flag
+=============
+
+The optional flag ``:opt`` mark the group as an optional part of the pattern. In
+effect, it appends a ``?`` to the group regular expression. It does not affect
+the group in other ways.
+
+
+.. _rgx:
 
 Custom regex
-############
+============
 
 Finally, one can directly use a regular expression. This will supersede
 the default regex, or the one generated from the format string if specified.
@@ -206,8 +206,10 @@ It can be done like so::
 
   idx_%(idx:rgx=\d+?)
 
+.. _discard:
+
 Discard keyword
-###############
+===============
 
 :doc:`Information can be retrieved<retrieve_values>` from the matches in the
 filename, but one might discard a group so that it is not used.
@@ -229,31 +231,10 @@ Regex outside groups
 
 By default, special characters (``()[]{}?*+-|^$\\.&~# \t\n\r\v\f``) outside of
 groups are escaped, and thus not interpreted as a regular expression.
-To use regular expressions outside of groups, it is necessary to activate the
-``use_regex`` argument when creating the Finder object.
+To use regular expressions outside of groups, it is necessary
+to pass ``use_regex=True`` when creating the Finder object.
 
 .. note::
 
-   When using regex outside groups, :func:`Finder.make_filename` won't
-   work.
-
-
-.. _obtaining-files:
-
-Obtaining files
-===============
-
-Files can be retrieved with the :func:`Finder.get_files` function, or
-the :attr:`Finder.files` attribute. Both will scan the directory for files
-if it has not been done yet.
-The 'files' attribute also stores the matches. See :doc:`/retrieve_values`
-for details on how matches are stored.
-
-:func:`Finder.get_files` can also return nested lists of filenames.
-This is aimed to work with :func:`xarray.open_mfdataset`,
-which will merge files in a specific order when supplied a nested list of files.
-
-To this end, one must specify group names to the `nested` argument of the same
-function. The rightmost group will correspond to the innermost level.
-
-An example is available in the :ref:`examples<nested-files>`.
+   When using regex outside groups,
+   :func:`Finder.make_filename<finder.Finder.make_filename>` won't work.

@@ -105,7 +105,7 @@ def test_format_d_quick(fmt: str, number: int):
 
 
 @st.composite
-def format_float(draw) -> tuple[str, ...]:
+def format_float_specs(draw) -> tuple[str, ...]:
     """Return float format, and the precision and type components."""
     align_ = draw(st.sampled_from(align))
     sign_ = draw(st.sampled_from(sign))
@@ -121,7 +121,19 @@ def format_float(draw) -> tuple[str, ...]:
     return (fmt, precision_, kind_)
 
 
-@given(input=format_float(), number=st.integers())
+format_float = format_float_specs().map(lambda x: x[0])
+
+
+def no_dangerous(fmt: str) -> bool:
+    """Filter out dangerous format strings."""
+    try:
+        Format(fmt)
+    except DangerousFormatError:
+        return False
+    return True
+
+
+@given(input=format_float_specs(), number=st.integers())
 def test_format_float_quick(input: tuple[str, ...], number: int):
     """Test float format."""
     fmt, precision, kind = input

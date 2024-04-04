@@ -115,6 +115,7 @@ options = [False, True]
 
 # TODO add files than do not match
 # TODO test nested
+# TODO test if create finder, change use_regex, and use it
 
 
 def test_file_scan(fs):

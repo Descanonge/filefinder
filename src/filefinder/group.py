@@ -272,7 +272,7 @@ class Group:
 
         # only keep the first value for filenames
         if not for_regex:
-            fixes = fixes[0:]
+            fixes = fixes[:1]
 
         self.fixed_string = "|".join(fixes)
 

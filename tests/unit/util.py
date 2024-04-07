@@ -1,14 +1,17 @@
 """Generation of parameters."""
 
 import itertools
+import re
 from collections import abc
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from filefinder.format import DangerousFormatError, Format
+from filefinder.format import Format, FormatError
 from hypothesis import strategies as st
 
 
 class FormatChoices:
+    """List of possible values for format specs."""
+
     align = ["", "<", ">", "=", "^"]
     sign = ["" "+", "-", " "]
     alt = ["", "#"]
@@ -18,6 +21,8 @@ class FormatChoices:
 
 @dataclass
 class StructFormat:
+    """Store formt specs and generate format string."""
+
     align: str = ""
     fill: str = ""
     sign: str = ""
@@ -58,6 +63,8 @@ class StructFormat:
 
 
 class StFormat:
+    """Store format-related strategies."""
+
     @classmethod
     def align(cls) -> st.SearchStrategy[str]:
         return st.sampled_from(FormatChoices.align)
@@ -99,7 +106,7 @@ class StFormat:
         """Filter out dangerous format strings."""
         try:
             Format(fmt.fmt)
-        except DangerousFormatError:
+        except FormatError:
             return False
         return True
 
@@ -107,6 +114,8 @@ class StFormat:
     def format(
         cls, kind: str = "sdfeE", safe: bool = False
     ) -> st.SearchStrategy[StructFormat]:
+        """Generate a format."""
+
         @st.composite
         def comp(draw) -> StructFormat:
             if len(kind) > 1:
@@ -136,6 +145,15 @@ class StFormat:
     def loop_over(
         cls, ignore: abc.Sequence[str] | None = None, **kwargs
     ) -> abc.Iterator[StructFormat]:
+        """Generate formats with every possible specs.
+
+        Parameters
+        ----------
+        ignore
+            Sequence of specs to not loop over.
+        kwargs
+            Passed to StructFormat init.
+        """
         to_loop = ["align", "sign", "alt", "zero", "grouping"]
         if ignore is None:
             ignore = []
@@ -146,3 +164,89 @@ class StFormat:
         for specs in itertools.product(*iterables):
             kw = kwargs | dict(zip(to_loop, specs))
             yield StructFormat(**kw)
+
+
+@dataclass
+class StructGroup:
+    """Store group specs and generate a definition."""
+
+    name: str = ""
+    fmt: str | None = None
+    rgx: str | None = None
+    bool_elts: tuple[str, str] | None = None
+    opt: bool = False
+    discard: bool = False
+    ordered_specs: list[str] = field(default_factory=lambda: [])
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.ordered_specs
+
+    @property
+    def definition(self) -> str:
+        out = self.name
+        for spec in self.ordered_specs:
+            value = getattr(self, spec)
+            if spec in ["fmt", "rgx"]:
+                out += f":{spec}={value}"
+            elif spec in ["opt", "discard"]:
+                out += f":{spec}"
+            elif spec == "bool_elts":
+                a, b = value
+                out += f":bool={a}:{b}"
+            else:
+                raise ValueError(f"Unknown spec '{spec}'")
+
+        return out
+
+
+class StGroup:
+    """Store group related strategies."""
+
+    alphabet = st.characters(exclude_characters=["(", ")", ":", "\n"])
+
+    @classmethod
+    def name(cls) -> st.SearchStrategy[str]:
+        return st.text(alphabet=cls.alphabet, min_size=1)
+
+    @classmethod
+    def rgx(cls) -> st.SearchStrategy[str]:
+        return (
+            st.text(alphabet=cls.alphabet, min_size=1)
+            .filter(lambda s: re.search("%[a-zA-Z]", s) is None)
+            .map(lambda s: s.replace("%%", "%"))
+        )
+
+    @classmethod
+    def fmt(cls) -> st.SearchStrategy[str]:
+        return StFormat.format(safe=True).map(lambda s: s.fmt)
+
+    @classmethod
+    def bool_elts(cls) -> st.SearchStrategy[tuple[str, str]]:
+        @st.composite
+        def comp(draw) -> tuple[str, str]:
+            a = draw(cls.rgx().filter(lambda s: len(s) > 0))
+            b = draw(cls.rgx())
+            return a, b
+
+        return comp()
+
+    @classmethod
+    def opt(cls) -> st.SearchStrategy[bool]:
+        return st.just(True)
+
+    @classmethod
+    def discard(cls) -> st.SearchStrategy[bool]:
+        return st.just(True)
+
+    @classmethod
+    def group(cls) -> st.SearchStrategy[StructGroup]:
+        @st.composite
+        def comp(draw):
+            specs = ["fmt", "rgx", "bool_elts", "opt", "discard"]
+            # select the specs to use
+            chosen = draw(st.lists(st.sampled_from(specs), unique=True, max_size=5))
+            values = {spec: draw(getattr(cls, spec)()) for spec in chosen}
+            values["name"] = draw(cls.name())
+            return StructGroup(**values, ordered_specs=chosen)
+
+        return comp()

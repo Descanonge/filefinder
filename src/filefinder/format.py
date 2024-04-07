@@ -392,16 +392,18 @@ def get_format(format: str) -> FormatAbstract:
         raise FormatError("Precision parameter is currently not supported.")
 
     # defaults values for unset remaining parameters
-    defaults = dict(
-        align=">", fill=" ", sign="-", width="0", precision=".6", grouping=""
-    )
+    defaults = dict(align=">", fill=" ")
+    if kind in "dfeE":
+        defaults |= dict(sign="-", width="0", precision=".6", grouping="")
+
     for k, v in defaults.items():
         if params[k] is None:
             params[k] = v
 
-    # convert to correct kind
-    params["width"] = int(params["width"])
-    params["precision"] = int(params["precision"].removeprefix("."))
+    if kind in "dfeE":
+        # convert to correct kind
+        params["width"] = int(params["width"])
+        params["precision"] = int(params["precision"].removeprefix("."))
 
     if kind not in FORMAT_CLASSES:
         raise InvalidFormatTypeError(

@@ -154,6 +154,12 @@ class FormatString(FormatAbstract):
 
         if self.align == "=":
             raise FormatError("'=' alignement not allowed for string format.")
+        if self.alternate:
+            raise FormatError("Alternate form (#) not allowed for string format.")
+        if self.grouping:
+            raise FormatError("Grouping not allowed for string format.")
+        if self.sign:
+            raise FormatError("Sign not allowed for string format.")
 
     def parse(self, s: str) -> str:
         """Parse string generated with this format into an appropriate value.
@@ -368,18 +374,22 @@ def get_format(format: str) -> FormatAbstract:
         raise FormatParsingError(f"Format-string '{format}' not valid.")
     params = m.groupdict()
 
-    type = params["type"]
+    kind = params["type"]
 
     # fill boolean parameters
     params["alternate"] = params["alternate"] == "#"
     params["zero"] = params["zero"] == "0"
 
     # special case
-    if params["zero"] and type in "dfeE":
+    if params["zero"] and kind in "dfeE":
         if params["fill"] is None:
             params["fill"] = "0"
         if params["align"] is None:
             params["align"] = "="
+
+    # TODO Precision not supported in s kind (it truncates the value)
+    if kind == "s" and params["precision"]:
+        raise FormatError("Precision parameter is currently not supported.")
 
     # defaults values for unset remaining parameters
     defaults = dict(
@@ -389,16 +399,16 @@ def get_format(format: str) -> FormatAbstract:
         if params[k] is None:
             params[k] = v
 
-    # convert to correct type
+    # convert to correct kind
     params["width"] = int(params["width"])
     params["precision"] = int(params["precision"].removeprefix("."))
 
-    if type not in FORMAT_CLASSES:
+    if kind not in FORMAT_CLASSES:
         raise InvalidFormatTypeError(
-            f"Invalid format type '{type}', "
+            f"Invalid format kind '{kind}', "
             f"expected one of '{list(FORMAT_CLASSES.keys())}'."
         )
-    return FORMAT_CLASSES[type](format, params)
+    return FORMAT_CLASSES[kind](format, params)
 
 
 # Retrocompatible alias

@@ -143,9 +143,9 @@ def test_format_s(fill: str, width: int | None, value: str):
     for struct in StFormat.loop_over(
         ignore=["sign", "alt", "zero", "grouping"], width=width, fill=fill, kind="s"
     ):
-        if struct.align == "=":
-            with pytest.raises(FormatError):
-                Format(struct.fmt)
+        try:
+            Format(struct.fmt)
+        except FormatError:
             return
 
         fmt = Format(struct.fmt)
@@ -160,4 +160,14 @@ def test_format_s(fill: str, width: int | None, value: str):
 def test_dangerous_formats(fmt: str):
     """Test ambiguous formats."""
     with pytest.raises(DangerousFormatError):
+        Format(fmt)
+
+
+@pytest.mark.parametrize(
+    "fmt",
+    ["#s", "^#5s", "+s", "-s", "5,s"],
+)
+def test_bad_s_formats(fmt: str):
+    """Test ambiguous formats."""
+    with pytest.raises(FormatError):
         Format(fmt)

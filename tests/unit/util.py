@@ -2,10 +2,12 @@
 
 import itertools
 import re
+import typing as t
 from collections import abc
 from dataclasses import dataclass, field
 
 from filefinder.format import Format, FormatError
+from filefinder.group import Group
 from hypothesis import strategies as st
 
 
@@ -294,5 +296,75 @@ class StGroup:
                 values[spec] = draw(getattr(cls, spec)())
 
             return StructGroup(**values, ordered_specs=chosen)
+
+        return comp()
+
+
+@dataclass
+class StructPattern:
+    segments: list[str] = field(default_factory=lambda: [])
+    groups: list[StructGroup] = field(default_factory=lambda: [])
+    values: list[t.Any | None] = field(default_factory=lambda: [])
+    values_str: list[str] = field(default_factory=lambda: [])
+
+    @property
+    def pattern(self) -> str:
+        return "".join(self.segments)
+
+    @property
+    def filename(self) -> str:
+        segments = self.segments.copy()
+        for i, seg in enumerate(self.values_str):
+            segments[2 * i + 1] = seg
+        return "".join(segments)
+
+
+class StPattern:
+    @classmethod
+    def pattern(cls) -> st.SearchStrategy[StructPattern]:
+        @st.composite
+        def comp(draw) -> StructPattern:
+            st_group = StGroup.group(ignore=["rgx"], fmt_kind="dfeE").filter(
+                lambda g: g.name not in Group.DEFAULT_GROUPS
+            )
+            groups = draw(st.lists(st_group, max_size=4))
+
+            text = st.text(
+                alphabet=st.characters(max_codepoint=2048, exclude_categories=["C"]),
+                max_size=64,
+                min_size=1,
+            )
+            segments = ["" for _ in range(2 * len(groups) + 1)]
+            segments[1::2] = [f"%({g.definition})" for g in groups]
+            segments[::2] = [draw(text) for _ in range(len(groups) + 1)]
+
+            values: list[t.Any] = []
+            values_str: list[str] = []
+            for grp in groups:
+                if "bool_elts" in grp:
+                    val = draw(st.booleans())
+                    val_s = grp.bool_elts[not val]
+                elif "fmt" in grp:
+                    kind = grp.fmt[-1]
+                    if kind == "s":
+                        val = draw(text)
+                        val = form(grp.fmt, val)
+                    elif kind == "d":
+                        val = draw(st.integers())
+                    elif kind in "feE":
+                        val = draw(st.floats(allow_infinity=False, allow_nan=False))
+                        fmt = grp.fmt_struct
+                        precision = "" if fmt.precision is None else f".{fmt.precision}"
+                        val = float(form(f"{precision}{fmt.kind}", val))
+                    val_s = form(grp.fmt, val)
+                else:
+                    val = None
+                    val_s = ""
+                values.append(val)
+                values_str.append(val_s)
+
+            return StructPattern(
+                segments=segments, groups=groups, values=values, values_str=values_str
+            )
 
         return comp()

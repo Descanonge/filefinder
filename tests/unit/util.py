@@ -112,8 +112,8 @@ class StFormat:
         return st.text(alphabet=alph, min_size=0, max_size=1)
 
     @staticmethod
-    def filter_dangerous(fmt: StructFormat) -> bool:
-        """Filter out dangerous format strings."""
+    def filter_bad(fmt: StructFormat) -> bool:
+        """Filter out erroneous or dangerous format strings."""
         try:
             Format(fmt.fmt)
         except FormatError:
@@ -124,7 +124,16 @@ class StFormat:
     def format(
         cls, kind: str = "sdfeE", safe: bool = False
     ) -> st.SearchStrategy[StructFormat]:
-        """Generate a format."""
+        """Generate a format.
+
+        Parameters
+        ----------
+        kind
+            Type of format is chosen from those listed in this parameter.
+        safe
+            Exclude any format that generate a format error when a Format object is
+            created.
+        """
 
         @st.composite
         def comp(draw) -> StructFormat:
@@ -147,7 +156,7 @@ class StFormat:
         strat = comp()
 
         if safe:
-            strat = strat.filter(cls.filter_dangerous)
+            strat = strat.filter(cls.filter_bad)
 
         return strat
 
@@ -182,6 +191,7 @@ class StructGroup:
 
     name: str = ""
     fmt: str | None = None
+    fmt_struct: StructFormat | None = None
     rgx: str | None = None
     bool_elts: tuple[str, str] | None = None
     opt: bool = False
@@ -212,7 +222,9 @@ class StructGroup:
 class StGroup:
     """Store group related strategies."""
 
-    alphabet = st.characters(exclude_characters=["(", ")", ":", "\n"])
+    alphabet = st.characters(
+        exclude_characters=["(", ")", ":", "%"], exclude_categories=["C"]
+    )
 
     @classmethod
     def name(cls) -> st.SearchStrategy[str]:
@@ -220,25 +232,30 @@ class StGroup:
 
     @classmethod
     def rgx(cls) -> st.SearchStrategy[str]:
-        return (
-            st.text(alphabet=cls.alphabet, min_size=1)
-            .filter(lambda s: re.search("%[a-zA-Z]", s) is None)
-            .map(lambda s: s.replace("%%", "%"))
-        )
+        """Choose a valid regex.
+
+        Some special characters are excluded: `():%`
+        Replacement syntax with percent is avoided to simplify things and is tested
+        separately.
+        """
+        return st.text(alphabet=cls.alphabet, min_size=1)
 
     @classmethod
-    def fmt(cls) -> st.SearchStrategy[str]:
-        return StFormat.format(safe=True).map(lambda s: s.fmt)
+    def fmt(cls, kind: str = "sdfeE") -> st.SearchStrategy[StructFormat]:
+        """Choose a valid format."""
+        return StFormat.format(safe=True, kind=kind)
 
     @classmethod
     def bool_elts(cls) -> st.SearchStrategy[tuple[str, str]]:
+        """Choose two valid regexes. The first one is not empty."""
+
         @st.composite
         def comp(draw) -> tuple[str, str]:
             a = draw(cls.rgx().filter(lambda s: len(s) > 0))
             b = draw(cls.rgx())
             return a, b
 
-        return comp()
+        return comp().filter(lambda ab: ab[0] != ab[1])
 
     @classmethod
     def opt(cls) -> st.SearchStrategy[bool]:
@@ -249,14 +266,33 @@ class StGroup:
         return st.just(True)
 
     @classmethod
-    def group(cls) -> st.SearchStrategy[StructGroup]:
+    def group(
+        cls, ignore: list[str] | None = None, fmt_kind: str = "sdfeE"
+    ) -> st.SearchStrategy[StructGroup]:
+        """Generate group structure.
+
+        Specs (fmt, rgx, bool, opt, discard) are put in any order, and not necessarily
+        drawn.
+        """
+        if ignore is None:
+            ignore = []
+        specs = ["fmt", "rgx", "bool_elts", "opt", "discard"]
+        specs = [s for s in specs if s not in ignore]
+
         @st.composite
         def comp(draw):
-            specs = ["fmt", "rgx", "bool_elts", "opt", "discard"]
             # select the specs to use
             chosen = draw(st.lists(st.sampled_from(specs), unique=True, max_size=5))
-            values = {spec: draw(getattr(cls, spec)()) for spec in chosen}
+            values = {}
             values["name"] = draw(cls.name())
+            if "fmt" in chosen:
+                values["fmt_struct"] = draw(cls.fmt(kind=fmt_kind))
+                values["fmt"] = values["fmt_struct"].fmt
+            for spec in chosen:
+                if spec == "fmt":
+                    continue
+                values[spec] = draw(getattr(cls, spec)())
+
             return StructGroup(**values, ordered_specs=chosen)
 
         return comp()

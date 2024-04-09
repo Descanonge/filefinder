@@ -6,7 +6,7 @@ Major overhaul, mainly streamlining.
 - Removed the 'group' spec (no more 'group:name' stuff, there is only a name now).
 - Group definition is now orderless.
   - `:opt` is now only a flag for specifying the group as optional
-  - new `:bool=true[:false]` property. Note the order from old `:opt` is reversed.
+  - new `:bool=true[:false]` property. Note the order from old `:opt` is reversed. Options are strings (not regex).
 - Removed caching of regex and its resulting complications.
 - Renamed `Finder.get_matches` to `find_matches`.
 - Renamed `Finder.get_filename` to `make_filename`.

@@ -141,7 +141,7 @@ class Group:
             if len(options) == 1:
                 options.append("")
             self.options = tuple(options[::-1])
-            self.rgx = "|".join(options)
+            self.rgx = "|".join(re.escape(s) for s in options)
 
         # Override regex
         if rgx:
@@ -263,6 +263,8 @@ class Group:
         if isinstance(fix, bool):
             if self.options is not None:
                 fix = self.options[fix]
+                if for_regex:
+                    fix = re.escape(fix)
             else:
                 raise ValueError(
                     f"{self.name} group has no A|B options, "

@@ -4,7 +4,7 @@
 Major overhaul, mainly streamlining.
 - Renamed 'matchers' to 'groups' to be consistent with regex tools.
 - Removed the 'group' spec (no more 'group:name' stuff, there is only a name now).
-- Group definition is now orderless.
+- Group definition is now orderless (rgx, fmt, etc can be specified in any order).
   - `:opt` is now only a flag for specifying the group as optional
   - new `:bool=true[:false]` property. Note the order from old `:opt` is reversed. Options are strings (not regex).
 - Removed caching of regex and its resulting complications.
@@ -12,15 +12,17 @@ Major overhaul, mainly streamlining.
 - Renamed `Finder.get_filename` to `make_filename`.
 - Better API to retrieve values with `Matches.get_values` and `Matches.get_value`.
   They now take into account the 'discard' option.
-- `Matches.__getitem__` now wraps `Match.get_value`. I think this is the most useful function.
+- `Matches.__getitem__` now wraps `Match.get_value`.
 - Moved fixing to the Group object, not the Finder.
 - `make_filename` now re-use the value-fixing done by groups, instead of having its own (nearly duplicate) logic.
 - Make some Finder attributes public.
 - Make package typed.
 - Refactor format module.
-  - Use subclasses for different format types, avoiding frequent dispatching
-  - Add 'z' option to format (just allow it in format string, nothing else) (added in 3.11)
-  - Add alignment/fill support for string formats
+  - Use sub-classes for different format types, avoiding frequent dispatching.
+  - Add 'z' option to format (just allow it in format string, nothing else) (added in 3.11).
+  - Add alignment/fill support for string formats.
+- Fixed many minor bugs.
+- Better test suite relying heavily on hypothesis.
 
 ## v0.5.0
 

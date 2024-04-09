@@ -8,7 +8,6 @@ For each generated format object, and any number (using hypothesis):
 * check that we can parse the number back
 """
 
-import itertools
 import re
 import typing as t
 

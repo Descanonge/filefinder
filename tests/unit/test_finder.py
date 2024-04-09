@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from os import path
 
 from filefinder import Finder
+from hypothesis import given
+from util import StPattern, StructPattern
 
 
 def assert_pattern(pattern, regex):
@@ -13,17 +15,13 @@ def assert_pattern(pattern, regex):
     assert finder.get_regex() == regex
 
 
-def test_date_groups():
-    assert_pattern("test_%(x).ext", r"test_(\d{4}\d\d\d\d)\.ext")
-    assert_pattern("test_%(Y).ext", r"test_(\d{4})\.ext")
-    assert_pattern("test_%(Y)-%(m)-%(d).ext", r"test_(\d{4})\-(\d\d)\-(\d\d)\.ext")
+@given(struct=StPattern.pattern())
+def test_random_pattern(struct: StructPattern):
+    f = Finder("", struct.pattern)
+    assert f.n_groups == len(f.groups) == len(struct.groups)
 
-
-def test_multiple_groups():
-    finder = Finder("", "test_%(m)_%(d)")
-    assert finder.n_groups == 2
-    assert finder.groups[0].name == "m"
-    assert finder.groups[1].name == "d"
+    for i in range(f.n_groups):
+        assert f.groups[i].name == struct.groups[i].name
 
 
 def test_custom_regex():
@@ -40,41 +38,6 @@ def test_format_regex():
     assert_pattern("test_%(Y:fmt=+05.3f)", r"test_([+-]0*\d+\.\d{3})")
     assert_pattern("test_%(Y:fmt=.2e)", r"test_(-?\d\.\d{2}e[+-]\d+)")
     assert_pattern("test_%(Y:fmt=.2E)", r"test_(-?\d\.\d{2}E[+-]\d+)")
-
-
-def test_name_group():
-    def assert_group_name(pattern, names):
-        finder = Finder("", pattern)
-        for m, name in zip(finder.groups, names):
-            assert m.name == name
-
-    assert_group_name("test_%(foo:fmt=.2f)", ["foo"])
-    assert_group_name("test_%(foo:fmt=d)_%(bar:fmt=s)", ["foo", "bar"])
-
-
-def test_optional():
-    assert_pattern("test_%(m:opt)", r"test_(\d\d)?")
-
-
-def test_boolean():
-    assert_pattern("test_%(bar:bool=A:B)", "test_(A|B)")
-    assert_pattern("test_%(bar:bool=A:)", "test_(A|)")
-    assert_pattern("test_%(bar:bool=A)", "test_(A|)")
-
-
-def test_fix_group_string():
-    finder = Finder("", "test_%(m)_%(c:fmt=.1f)")
-    finder.fix_group(0, "01")
-    finder.fix_group(1, r"11\.1")
-    assert finder.get_regex() == r"test_(01)_(11\.1)"
-
-
-def test_fix_group_value():
-    finder = Finder("", "test_%(m)_%(c:fmt=.1f)_%(b:bool=A:B)")
-    finder.fix_group(0, 1)
-    finder.fix_group(1, 11)
-    finder.fix_group(2, True)
-    assert finder.get_regex() == r"test_(01)_(11\.0)_(A)"
 
 
 def test_get_groups():

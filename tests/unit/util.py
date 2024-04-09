@@ -1,7 +1,6 @@
 """Generation of parameters."""
 
 import itertools
-import re
 import typing as t
 from collections import abc
 from dataclasses import dataclass, field
@@ -275,6 +274,13 @@ class StGroup:
 
         Specs (fmt, rgx, bool, opt, discard) are put in any order, and not necessarily
         drawn.
+
+        Parameters
+        ----------
+        ignore
+            List of specs to not draw
+        fmt_kind
+            Kinds of format to generate.
         """
         if ignore is None:
             ignore = []
@@ -302,17 +308,25 @@ class StGroup:
 
 @dataclass
 class StructPattern:
+    """Store information for Finder pattern."""
+
     segments: list[str] = field(default_factory=lambda: [])
+    """Groups definitions interlaced with fixed filename parts."""
     groups: list[StructGroup] = field(default_factory=lambda: [])
+    """List of groups structures in the pattern."""
     values: list[t.Any | None] = field(default_factory=lambda: [])
+    """Values of appropriate type for each group."""
     values_str: list[str] = field(default_factory=lambda: [])
+    """Formatted value for each group."""
 
     @property
     def pattern(self) -> str:
+        """Return the pattern string."""
         return "".join(self.segments)
 
     @property
     def filename(self) -> str:
+        """Return a filename using the formatted value."""
         segments = self.segments.copy()
         for i, seg in enumerate(self.values_str):
             segments[2 * i + 1] = seg
@@ -320,8 +334,28 @@ class StructPattern:
 
 
 class StPattern:
+    """Strategies related to pattern."""
+
     @classmethod
     def pattern(cls) -> st.SearchStrategy[StructPattern]:
+        """Generate a pattern structure.
+
+        Each pattern comes with fixing values and strings for each group. (should be
+        moved in a composite function with a pattern argument).
+        Values are passed through the format to avoid issues with precision.
+
+        There are some limitations:
+
+        * The name is not one of the default groups.
+        * `rgx` spec is not included. Its presence cannot guarantee to be able to
+          generate parsable values.
+        * `fmt` kinds are limited to number. string formats are difficult to parse
+          without limitations
+        * groups are separated by at least one character, not realistic but avoids
+          confusion in some general cases.
+
+        """
+
         @st.composite
         def comp(draw) -> StructPattern:
             st_group = StGroup.group(ignore=["rgx"], fmt_kind="dfeE").filter(

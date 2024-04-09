@@ -100,9 +100,14 @@ class StFormat:
 
     @classmethod
     def fill(cls) -> st.SearchStrategy[str]:
+        """Fill characters.
+
+        {} are excluded to avoid messing with format calls.
+        () are exclude to avoid messing with group definitions.
+        """
         alph = st.characters(
             exclude_categories=["Cc", "Cs"],
-            exclude_characters=["{", "}"],
+            exclude_characters=["{", "}", "(", ")"],
         )
         return st.text(alphabet=alph, min_size=0, max_size=1)
 

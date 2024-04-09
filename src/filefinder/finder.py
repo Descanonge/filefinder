@@ -310,7 +310,7 @@ class Finder:
         Parameters
         ----------
         fixes:
-            Dictionnary of fixes (group key: value). For details, see
+            Dictionnary of fixes (group name or index: value). For details, see
             :func:`fix_group`. Will (temporarily) supplant group fixed
             prior. If prior fix is a list, first item will be used.
         relative:
@@ -340,6 +340,8 @@ class Finder:
         for i, g in enumerate(groups):
             if g.name in fixes:
                 g.fix_value(fixes[g.name], for_regex=False)
+            if i in fixes:
+                g.fix_value(fixes[i], for_regex=False)
 
             if g.fixed_string is not None:
                 segments[2 * i + 1] = g.fixed_string

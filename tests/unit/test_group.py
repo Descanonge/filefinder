@@ -7,7 +7,7 @@ from filefinder.format import Format
 from filefinder.group import Group, GroupParseError
 from hypothesis import example, given
 from hypothesis import strategies as st
-from util import StFormat, StGroup, StructGroup
+from util import StFormat, StGroup, StructGroup, form
 
 
 def assert_grp(spec: str, expected_rgx: str, expected_fmt: str):
@@ -134,7 +134,7 @@ def test_fix_value_int(number: int, fmt: str):
     g = Group(f"foo:fmt={fmt}", 0)
     g.fix_value(number)
     assert g.fixed_value == number
-    assert g.fixed_string == re.escape(f"{{:{fmt}}}".format(number))
+    assert g.fixed_string == re.escape(form(fmt, number))
 
 
 @given(a=st.integers(), b=st.integers())
@@ -153,7 +153,7 @@ def test_fix_value_float(number: float, fmt: str):
     g = Group(f"foo:fmt={fmt}", 0)
     g.fix_value(number)
     assert g.fixed_value == number
-    assert g.fixed_string == re.escape(f"{{:{fmt}}}".format(number))
+    assert g.fixed_string == re.escape(form(fmt, number))
 
 
 @given(s=st.text(), fmt=st_format_s)
@@ -181,7 +181,7 @@ def test_fix_value_bool():
 def test_fix_value_list(elements: list[int], fmt: str):
     g = Group(f"foo:fmt={fmt}", 0)
     g.fix_value(elements)
-    formatted_elts = [f"{{:{fmt}}}".format(e) for e in elements]
+    formatted_elts = [form(fmt, e) for e in elements]
     assert g.fixed_string == ("|".join(re.escape(e) for e in formatted_elts))
 
     g.fix_value(elements, for_regex=False)

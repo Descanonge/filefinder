@@ -9,6 +9,10 @@ from filefinder.format import Format, FormatError
 from hypothesis import strategies as st
 
 
+def form(fmt: str, value: t.Any) -> str:
+    return f"{{:{fmt}}}".format(value)
+
+
 class FormatChoices:
     """List of possible values for format specs."""
 
@@ -46,6 +50,7 @@ class StructFormat:
 
     @property
     def fmt(self) -> str:
+        """Generate a format string from instance parameters."""
         fmt = ""
         if self.align:
             fmt += self.fill + self.align

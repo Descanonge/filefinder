@@ -23,7 +23,7 @@ from filefinder.format import (
 )
 from hypothesis import given
 from hypothesis import strategies as st
-from util import FormatChoices, StFormat, StructFormat
+from util import StFormat, StructFormat, form
 
 
 def assert_regex_match(value: t.Any, fmt: FormatAbstract):
@@ -50,7 +50,7 @@ def assert_parse_float(number: float, fmt: FormatFloat, precision: str, kind="f"
 
     Has to deal with precision here,
     """
-    string_ref = f"{{:{precision}{kind}}}".format(number)
+    string_ref = form(f"{precision}{kind}", number)
     parsed_ref = float(string_ref)
 
     string = fmt.format(number)

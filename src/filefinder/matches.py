@@ -7,8 +7,8 @@
 
 import logging
 import re
-from collections.abc import Iterator
-from typing import Any
+import typing as t
+from collections import abc
 
 from .group import Group, GroupKey
 
@@ -17,6 +17,15 @@ logger = logging.getLogger(__name__)
 
 class Match:
     """Match extract from a filename.
+
+    Parameters
+    ----------
+    group
+        Group used to get this match.
+    match
+        Match object for the complete filename.
+    idx
+        Index of the group in the match object.
 
     Attributes
     ----------
@@ -33,12 +42,12 @@ class Match:
     """
 
     def __init__(self, group: Group, match: re.Match, idx: int):
-        self.group = group
-        self.match_str = match.group(idx + 1)
-        self.start = match.start(idx + 1)
-        self.end = match.end(idx + 1)
+        self.group: Group = group
+        self.match_str: str = match.group(idx + 1)
+        self.start: int = match.start(idx + 1)
+        self.end: int = match.end(idx + 1)
 
-        self.match_parsed = None
+        self.match_parsed: t.Any = None
         try:
             self.match_parsed = group.parse(self.match_str)
         except Exception:
@@ -52,7 +61,7 @@ class Match:
         """Human readable information."""
         return f"{self.group!s} = {self.match_str}"
 
-    def get_match(self, parse: bool = True) -> str | Any:
+    def get_match(self, parse: bool = True) -> str | t.Any:
         """Get match string or value.
 
         Parameters
@@ -106,8 +115,7 @@ class Matches:
         m = pattern.fullmatch(filename)
         if m is None:
             raise ValueError("Filename did not match pattern.")
-        if len(m.groups()) != len(groups):
-            raise IndexError("Not as many matches as groups.")
+        assert len(m.groups()) == len(groups), "Not as many matches as groups."
 
         for i in range(len(groups)):
             self.matches.append(Match(groups[i], m, i))
@@ -120,14 +128,14 @@ class Matches:
         """Human readable information."""
         return "\n".join([str(m) for m in self.matches])
 
-    def __getitem__(self, key: GroupKey) -> Any:
+    def __getitem__(self, key: GroupKey) -> t.Any:
         """Get first parsed value corresponding to key.
 
         Ignore groups with the 'discard' option.
         """
         return self.get_value(key, parse=True, discard=True)
 
-    def __iter__(self) -> Iterator[Match]:
+    def __iter__(self) -> abc.Iterator[Match]:
         """Iterate over matches."""
         return iter(self.matches)
 
@@ -137,7 +145,7 @@ class Matches:
 
     def get_values(
         self, key: GroupKey, parse: bool = True, discard: bool = True
-    ) -> list[str | Any]:
+    ) -> list[str | t.Any]:
         """Get matched values corresponding to key.
 
         Return a list of values, even if only one group is selected.
@@ -158,7 +166,7 @@ class Matches:
 
     def get_value(
         self, key: GroupKey, parse: bool = True, discard: bool = True
-    ) -> str | Any:
+    ) -> str | t.Any:
         """Get matched value corresponding to key.
 
         Return a single value. If multiple groups correspond to ``key``,

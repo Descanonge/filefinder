@@ -40,7 +40,7 @@ class Match:
 
         self.match_parsed = None
         try:
-            self.match_parsed = group.fmt.parse(self.match_str)
+            self.match_parsed = group.parse(self.match_str)
         except Exception:
             logger.warning("Failed to parse for group %s", str(group))
 

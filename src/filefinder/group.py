@@ -229,6 +229,21 @@ class Group:
         """Return formatted string from value."""
         return self.fmt.format(value)
 
+    def parse(self, string: str) -> Any:
+        """Return parsed value from string."""
+        # parsing boolean
+        if self.options is not None:
+            if string == self.options[0]:
+                return False
+            elif string == self.options[1]:
+                return True
+            else:
+                raise ValueError(
+                    f"Cannot parse '{string}' into boolean from options {self.options}"
+                )
+
+        return self.fmt.parse(string)
+
     def fix_value(self, fix: Any | bool | str, for_regex: bool = True):
         """Fix the group regex to a specific value.
 

@@ -42,9 +42,8 @@ Contents
 .. toctree::
    :maxdepth: 2
 
-   quickstart
+   usage
    pattern
-   retrieve_values
    examples
 
 .. toctree::

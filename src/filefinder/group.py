@@ -19,6 +19,11 @@ logger = logging.getLogger(__name__)
 GroupKey = int | str
 """Can be used to select one or more groups in a pattern."""
 
+"""On Group parsing:
+
+explain reasoning behind PATTERN, and alternatives explored
+"""
+
 
 class GroupParseError(Exception):
     """Custom errors when parsing group definition."""
@@ -69,7 +74,7 @@ class Group:
     }
     """Regex and format strings for various default groups.
 
-    See the :ref:`pattern-name` section of documentation for details.
+    See the :ref:`name` section of documentation for details.
     """
 
     def __init__(self, definition: str, idx: int):
@@ -86,8 +91,8 @@ class Group:
         """Format string object."""
         self.discard: bool = False
         """If the group should not be used when retrieving values from matches."""
-        self.options: tuple[str, ...] | None = None
-        """Tuple of the two possibilities indicated by the full ':bool'
+        self.options: tuple[str, str] | None = None
+        """Tuple of the two possibilities indicated by the full ``:bool``
         specification, in order (False, True), so that a simple getitem works."""
         self.optional: bool = False
         """If True, the whole group is marked as optional (``()?``).
@@ -157,8 +162,6 @@ class Group:
 
         The matching pattern (:attr:`PATTERN`) is written so that specs (rgx, fmt, ...)
         can be given in any order, while still matching the full string.
-        Other alternatives require more hand checking for every spec than just matching
-        the whole thing.
 
         The pattern is made of every possible spec in a OR list, which can be repeated
         up to 5 times. Regex only keep the last captured group. We must be a bit sly

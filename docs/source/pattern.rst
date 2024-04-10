@@ -37,9 +37,9 @@ multiple optional properties, separated by colons (in no particular order):
 So for instance, we can specify a filename pattern that will match an integer
 padded with zeros, followed by two possible options::
 
-   parameter_%(param:fmt=04d)_type_%(type:bool=foo:bar).txt
-    -> parameter_0012_type_foo.txt
-    -> parameter_2020_type_bar.txt
+   >>> "parameter_%(param:fmt=04d)_type_%(type:bool=foo:bar).txt"
+   parameter_0012_type_foo.txt
+   parameter_2020_type_bar.txt
 
 
 .. note::
@@ -156,8 +156,8 @@ If the format is never specified, it defaults to a ``s`` format.
 
    Similarly, for a string format (s) it can be impossible to separate correctly
    the alignment padding character (the "fill") from the actual value. Here the
-   user is entrusted with making sure that the fill character does not appear
-   in the value (or not at its beginning or end at least).
+   user is entrusted with making sure the format fill character is adapted to
+   the expected values to parse.
 
 
 .. _bool:
@@ -211,17 +211,17 @@ It can be done like so::
 Discard keyword
 ===============
 
-:doc:`Information can be retrieved<retrieve_values>` from the matches in the
-filename, but one might discard a group so that it is not used.
-For example for a file of weekly averages with a filename indicating the start
-and end dates of the average, we might want to only recover the starting date::
+:ref:`Information can be retrieved<retrieve-information>` from the matches in
+the filename, but one might discard a group so that it is not used. For example
+for a file of weekly averages with a filename indicating the start and end dates
+of the average, we might want to only recover the starting date::
 
   sst_%(x)-%(x:discard)
 
 
 .. note::
 
-   By default, when :doc:`fixing a group to a value<fix_groups>`, discarded
+   By default, when :ref:`fixing a group to a value<fix-groups>`, discarded
    groups will not be fixed. This can be deactivated with the ``fix_discard``
    keyword.
 

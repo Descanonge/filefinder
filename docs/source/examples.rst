@@ -36,8 +36,8 @@ We can retrieve information on the date as well::
   ...
 
 To be a little bit clearer we could convert this information into a
-:class:`datetime<datetime.datetime>` object instead. The library provides a
-function to do that::
+:class:`~datetime.datetime` object instead. The library provides a function to
+do that::
 
   from filefinder import library
   dates = [(file, library.get_date(matches))
@@ -80,7 +80,7 @@ We now have two variables setup in a similar layout::
          └── ...
 
 We can scan both variables at the same time and retrieve the files as a
-:ref:`nested list<obtaining-files>`.
+:ref:`nested list<retrieve-files>`.
 Group names in the pattern will define what groups will be grouped together::
 
   pattern = '%(char)/%(char:discard)_%(x).nc'

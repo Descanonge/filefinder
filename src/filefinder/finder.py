@@ -31,7 +31,7 @@ class Finder:
     root:
         The root directory of the filetree where all files can be found.
     pattern:
-        A regular expression with the addition of 'groups'. See :doc:`/find_files` for
+        A regular expression with the addition of 'groups'. See :ref:`find-files` for
         details.
     use_regex:
         If True, characters outside of groups are considered as valid regex (and
@@ -44,6 +44,7 @@ class Finder:
     """
 
     max_scan_depth: int = 32
+    """Maximum sub-directory depth to scan when :attr:`scan_everything` is True."""
 
     def __init__(
         self,
@@ -75,6 +76,9 @@ class Finder:
         self.scanned: bool = False
 
         self.set_pattern(pattern)
+
+    # TODO: add setter for scan_everything and use_regex
+    # scan everything should void cache
 
     @property
     def n_groups(self) -> int:

@@ -252,7 +252,7 @@ class StructGroup:
                 strat = st.floats(allow_infinity=False, allow_nan=False)
                 strat = strat.map(lambda x: float(form(f"{precision}{fmt.kind}", x)))
                 # sometimes a truncation can push a very high number above float limit
-                strat.filter(lambda x: math.isfinite(x))
+                strat = strat.filter(lambda x: math.isfinite(x))
                 return strat
         return st.none()
 

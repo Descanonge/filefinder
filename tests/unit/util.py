@@ -1,6 +1,7 @@
 """Generation of parameters."""
 
 import itertools
+import math
 import typing as t
 from collections import abc
 from dataclasses import dataclass, field
@@ -8,6 +9,8 @@ from dataclasses import dataclass, field
 from filefinder.format import Format, FormatError
 from filefinder.group import Group
 from hypothesis import strategies as st
+
+MAX_CODEPOINT = 1024
 
 
 def form(fmt: str, value: t.Any) -> str:
@@ -103,12 +106,15 @@ class StFormat:
     def fill(cls) -> st.SearchStrategy[str]:
         """Fill characters.
 
-        {} are excluded to avoid messing with format calls.
-        () are exclude to avoid messing with group definitions.
+        Some characters are excluded to avoid problems:
+
+        * {} for format calls
+        * () for group definitions
+        * /  for file scanning.
         """
         alph = st.characters(
             exclude_categories=["Cc", "Cs"],
-            exclude_characters=["{", "}", "(", ")"],
+            exclude_characters=["{", "}", "(", ")", "/"],
         )
         return st.text(alphabet=alph, min_size=0, max_size=1)
 
@@ -191,13 +197,19 @@ class StructGroup:
     """Store group specs and generate a definition."""
 
     name: str = ""
-    fmt: str | None = None
+    fmt: str = ""
     fmt_struct: StructFormat | None = None
-    rgx: str | None = None
-    bool_elts: tuple[str, str] | None = None
+    rgx: str = ""
+    bool_elts: tuple[str, str] = ("", "")
     opt: bool = False
     discard: bool = False
     ordered_specs: list[str] = field(default_factory=lambda: [])
+
+    def __str__(self) -> str:
+        try:
+            return self.definition
+        except Exception:
+            return super().__str__()
 
     def __contains__(self, key: str) -> bool:
         return key in self.ordered_specs
@@ -219,12 +231,46 @@ class StructGroup:
 
         return out
 
+    @property
+    def strategy_value(self) -> st.SearchStrategy:
+        if "bool_elts" in self:
+            return st.booleans()
+        if "fmt" in self and self.fmt_struct is not None:
+            fmt = self.fmt_struct
+            if fmt.kind == "s":
+                return st.text(
+                    alphabet=st.characters(
+                        max_codepoint=MAX_CODEPOINT,
+                        exclude_categories=["C"],
+                        exclude_characters=["/", "(", ")"],
+                    )
+                ).map(lambda s: form(self.fmt, s))
+            if fmt.kind == "d":
+                return st.integers()
+            if fmt.kind in "feE":
+                precision = "" if fmt.precision is None else f".{fmt.precision}"
+                strat = st.floats(allow_infinity=False, allow_nan=False)
+                strat = strat.map(lambda x: float(form(f"{precision}{fmt.kind}", x)))
+                # sometimes a truncation can push a very high number above float limit
+                strat.filter(lambda x: math.isfinite(x))
+                return strat
+        return st.none()
+
+    def get_value_str(self, value: t.Any) -> str:
+        if "bool_elts" in self:
+            return self.bool_elts[not value]
+        if "fmt" in self:
+            return form(self.fmt, value)
+        return ""
+
 
 class StGroup:
     """Store group related strategies."""
 
     alphabet = st.characters(
-        exclude_characters=["(", ")", ":", "%"], exclude_categories=["C"]
+        exclude_characters=["(", ")", ":", "%", "/"],
+        exclude_categories=["C"],
+        max_codepoint=MAX_CODEPOINT,
     )
 
     @classmethod
@@ -314,10 +360,21 @@ class StructPattern:
     """Groups definitions interlaced with fixed filename parts."""
     groups: list[StructGroup] = field(default_factory=lambda: [])
     """List of groups structures in the pattern."""
-    values: list[t.Any | None] = field(default_factory=lambda: [])
+    values: list[t.Any] = field(default_factory=lambda: [])
     """Values of appropriate type for each group."""
     values_str: list[str] = field(default_factory=lambda: [])
     """Formatted value for each group."""
+
+    multiple_values: list[list[t.Any]] = field(default_factory=lambda: [])
+    """Values of appropriate type for each group."""
+    multiple_values_str: list[list[str]] = field(default_factory=lambda: [])
+    """Formatted value for each group."""
+
+    # def __repr__(self) -> str:
+    #     try:
+    #         return self.pattern
+    #     except Exception:
+    #         return super().__repr__()
 
     @property
     def pattern(self) -> str:
@@ -332,12 +389,23 @@ class StructPattern:
             segments[2 * i + 1] = seg
         return "".join(segments)
 
+    @property
+    def filenames(self) -> abc.Iterator[str]:
+        """Return a list of filenames using the formatted values."""
+        segments = self.segments.copy()
+        for values_str in itertools.product(*self.multiple_values_str):
+            for i, seg in enumerate(values_str):
+                segments[2 * i + 1] = seg
+            yield "".join(segments)
+
 
 class StPattern:
     """Strategies related to pattern."""
 
     @classmethod
-    def pattern(cls) -> st.SearchStrategy[StructPattern]:
+    def pattern(
+        cls, min_group: int = 0, separate: bool = True
+    ) -> st.SearchStrategy[StructPattern]:
         """Generate a pattern structure.
 
         Each pattern comes with fixing values and strings for each group. (should be
@@ -351,9 +419,13 @@ class StPattern:
           generate parsable values.
         * `fmt` kinds are limited to number. string formats are difficult to parse
           without limitations
-        * groups are separated by at least one character, not realistic but avoids
-          confusion in some general cases.
+        * If argument `separate` is true, groups are separated by at least one
+          character, not realistic but avoids confusion in some general cases.
 
+        Parameters
+        ----------
+        min_group
+            Minimum number of groups in pattern. Default is zero.
         """
 
         @st.composite
@@ -361,44 +433,58 @@ class StPattern:
             st_group = StGroup.group(ignore=["rgx"], fmt_kind="dfeE").filter(
                 lambda g: g.name not in Group.DEFAULT_GROUPS
             )
-            groups = draw(st.lists(st_group, max_size=4))
+            groups = draw(st.lists(st_group, min_size=min_group, max_size=4))
 
             text = st.text(
-                alphabet=st.characters(max_codepoint=2048, exclude_categories=["C"]),
+                alphabet=st.characters(
+                    max_codepoint=MAX_CODEPOINT, exclude_categories=["C"]
+                ),
                 max_size=64,
-                min_size=1,
+                min_size=1 if separate else 0,
             )
+
             segments = ["" for _ in range(2 * len(groups) + 1)]
             segments[1::2] = [f"%({g.definition})" for g in groups]
             segments[::2] = [draw(text) for _ in range(len(groups) + 1)]
 
+            return StructPattern(segments=segments, groups=groups)
+
+        return comp()
+
+    @classmethod
+    def pattern_with_values(cls, **kwargs) -> st.SearchStrategy[StructPattern]:
+        @st.composite
+        def comp(draw) -> StructPattern:
+            pattern: StructPattern = draw(cls.pattern(**kwargs))
+
             values: list[t.Any] = []
             values_str: list[str] = []
-            for grp in groups:
-                if "bool_elts" in grp:
-                    val = draw(st.booleans())
-                    val_s = grp.bool_elts[not val]
-                elif "fmt" in grp:
-                    kind = grp.fmt[-1]
-                    if kind == "s":
-                        val = draw(text)
-                        val = form(grp.fmt, val)
-                    elif kind == "d":
-                        val = draw(st.integers())
-                    elif kind in "feE":
-                        val = draw(st.floats(allow_infinity=False, allow_nan=False))
-                        fmt = grp.fmt_struct
-                        precision = "" if fmt.precision is None else f".{fmt.precision}"
-                        val = float(form(f"{precision}{fmt.kind}", val))
-                    val_s = form(grp.fmt, val)
-                else:
-                    val = None
-                    val_s = ""
+            for grp in pattern.groups:
+                val = draw(grp.strategy_value)
                 values.append(val)
-                values_str.append(val_s)
+                values_str.append(grp.get_value_str(val))
 
-            return StructPattern(
-                segments=segments, groups=groups, values=values, values_str=values_str
-            )
+            pattern.values = values
+            pattern.values_str = values_str
+            return pattern
+
+        return comp()
+
+    @classmethod
+    def pattern_with_multiple_values(cls, **kwargs) -> st.SearchStrategy[StructPattern]:
+        @st.composite
+        def comp(draw) -> StructPattern:
+            pattern: StructPattern = draw(cls.pattern(**kwargs))
+
+            values: list[list[t.Any]] = []
+            values_str: list[list[str]] = []
+            for grp in pattern.groups:
+                val = draw(st.lists(grp.strategy_value, min_size=1))
+                values.append(val)
+                values_str.append([grp.get_value_str(x) for x in val])
+
+            pattern.multiple_values = values
+            pattern.multiple_values_str = values_str
+            return pattern
 
         return comp()

@@ -77,11 +77,90 @@ def test_match_filename_values(struct: StructPattern):
 
 
 @given(struct=StPattern.pattern_with_values())
-def test_make_filename(struct: StructPattern):
+def test_make_filename_by_str(struct: StructPattern):
     """Test filename creation."""
     f = Finder("/base/", struct.pattern)
-    fixes = {i: s for i, s in enumerate(struct.values_str)}
+    fixes = {i: val_str for i, val_str in enumerate(struct.values_str)}
+    # we won't check the output for those
+    fixes_by_name = {
+        g.name: val_str for g, val_str in zip(struct.groups, struct.values_str)
+    }
     assert f.make_filename(fixes, relative=True) == struct.filename
+    f.make_filename(fixes_by_name)
+
+    if f.n_groups > 0:
+        with pytest.raises(ValueError):
+            f.make_filename()
+
+
+@given(struct=StPattern.pattern_with_values())
+def test_make_filename_by_val(struct: StructPattern):
+    """Test filename creation."""
+    f = Finder("/base/", struct.pattern)
+    fixes = {
+        i: val if val is not None else val_str
+        for i, (val, val_str) in enumerate(zip(struct.values, struct.values_str))
+    }
+    assert f.make_filename(fixes, relative=True) == struct.filename
+
+    if f.n_groups > 0:
+        with pytest.raises(ValueError):
+            f.make_filename()
+
+
+@given(
+    struct=StPattern.pattern_with_values(min_group=1)
+    .filter(lambda p: len(set(g.name for g in p.groups)) == len(p.groups))
+    .filter(lambda p: all(g.name != "relative" for g in p.groups))
+)
+def test_make_filename_by_val_by_name(struct: StructPattern):
+    """Test filename creation.
+
+    Separate test function to make sure all names are differents, otherwise
+    group.fix_value might have different output despite having the same name.
+    Also avoid keyword name relative.
+    """
+    f = Finder("/base/", struct.pattern)
+    fixes_by_name = {
+        g.name: val if val is not None else val_str
+        for g, val, val_str in zip(struct.groups, struct.values, struct.values_str)
+    }
+    f.make_filename(**fixes_by_name)
+
+
+@given(struct=StPattern.pattern_with_values())
+def test_make_filename_by_fix(struct: StructPattern):
+    f = Finder("/base/", struct.pattern)
+    fixes = {i: val_str for i, val_str in enumerate(struct.values_str)}
+    # we won't check the output for those
+    fixes_by_name = {
+        g.name: val_str for g, val_str in zip(struct.groups, struct.values_str)
+    }
+
+    # Fix and check output
+    f.fix_groups(fixes, fix_discard=True)
+    assert f.make_filename(relative=True) == struct.filename
+
+    # Reset, fix by name and check there is no error.
+    f.unfix_groups()
+    f.fix_groups(fixes_by_name, fix_discard=True)
+    f.make_filename()
+
+
+@given(struct=StPattern.pattern_with_values(min_group=2))
+def test_make_filename_half_by_fix(struct: StructPattern):
+    f = Finder("/base/", struct.pattern)
+    n_fix = int(f.n_groups / 2)
+    f.fix_groups({i: struct.values_str[i] for i in range(n_fix)}, fix_discard=True)
+
+    # As is, not everything is fixed
+    with pytest.raises(ValueError):
+        f.make_filename()
+
+    result = f.make_filename(
+        {i: struct.values_str[i] for i in range(n_fix, f.n_groups)}, relative=True
+    )
+    assert result == struct.filename
 
 
 @pytest.mark.parametrize("pattern", ["ab%(foo:fmt=d)", "ab%(foo:rgx=.*)"])

@@ -134,7 +134,8 @@ def test_fix_value_int(number: int, fmt: str):
     g = Group(f"foo:fmt={fmt}", 0)
     g.fix_value(number)
     assert g.fixed_value == number
-    assert g.fixed_string == re.escape(form(fmt, number))
+    assert g.fixed_string == form(fmt, number)
+    assert g.fixed_regex == re.escape(form(fmt, number))
 
 
 @given(a=st.integers(), b=st.integers())
@@ -153,24 +154,24 @@ def test_fix_value_float(number: float, fmt: str):
     g = Group(f"foo:fmt={fmt}", 0)
     g.fix_value(number)
     assert g.fixed_value == number
-    assert g.fixed_string == re.escape(form(fmt, number))
+    assert g.fixed_string == form(fmt, number)
+    assert g.fixed_regex == re.escape(form(fmt, number))
 
 
 @given(s=st.text(), fmt=st_format_s)
 def test_fix_value_string(s: str, fmt: str):
     g = Group(f"foo:fmt={fmt}", 0)
     g.fix_value(s)
-    assert g.fixed_value == s
-    assert g.fixed_string == s
+    assert g.fixed_value == g.fixed_string == g.fixed_regex == s
     assert g.get_regex() == f"({s})"
 
 
 def test_fix_value_bool():
     g = Group("foo:bool=opt1:opt2", 0)
     g.fix_value(True)
-    assert g.fixed_string == "opt1"
+    assert g.fixed_string == g.fixed_regex == "opt1"
     g.fix_value(False)
-    assert g.fixed_string == "opt2"
+    assert g.fixed_string == g.fixed_regex == "opt2"
 
     with pytest.raises(ValueError):
         g = Group("Y", 0)
@@ -182,9 +183,7 @@ def test_fix_value_list(elements: list[int], fmt: str):
     g = Group(f"foo:fmt={fmt}", 0)
     g.fix_value(elements)
     formatted_elts = [form(fmt, e) for e in elements]
-    assert g.fixed_string == ("|".join(re.escape(e) for e in formatted_elts))
-
-    g.fix_value(elements, for_regex=False)
+    assert g.fixed_regex == ("|".join(re.escape(e) for e in formatted_elts))
     assert g.fixed_string == formatted_elts[0]
 
     with pytest.raises(ValueError):

@@ -100,6 +100,7 @@ class Group:
 
         self.fixed_value: Any | None = None
         self.fixed_string: str | None = None
+        self.fixed_regex: str | None = None
 
         self._parse_group_definition()
 
@@ -247,7 +248,7 @@ class Group:
 
         return self.fmt.parse(string)
 
-    def fix_value(self, fix: Any | bool | str, for_regex: bool = True):
+    def fix_value(self, fix: Any | bool | str):
         """Fix the group regex to a specific value.
 
         Parameters
@@ -255,24 +256,8 @@ class Group:
         fix:
             A string is directly used as a regular expression, otherwise the
             value is formatted according to the group 'format' specification.
-        for_regex:
-            If True (default), format the string for a regular expression. If
-            False, format it for a filename generation (ie: if multiple values
-            only take the first one, do not escape characters).
         """
         self.fixed_value = fix
-
-        # if optional A|B choice
-        if isinstance(fix, bool):
-            if self.options is not None:
-                fix = self.options[fix]
-                if for_regex:
-                    fix = re.escape(fix)
-            else:
-                raise ValueError(
-                    f"{self.name} group has no A|B options, "
-                    "cannot fix value with a boolean."
-                )
 
         if not isinstance(fix, (list, tuple)):
             fix = [fix]
@@ -280,26 +265,36 @@ class Group:
         if len(fix) == 0:
             raise ValueError("A list of fixes must contain at least one element.")
 
-        fixes = []
+        strings = []
+        regexes = []
         for f in fix:
-            if isinstance(f, str):  # if a string, leave it as is
+            # if a string, leave it as is
+            if isinstance(f, str):
                 out = f
+                rgx = f
+            # if optional A|B choice
+            elif isinstance(f, bool):
+                if self.options is None:
+                    raise ValueError(
+                        f"{self.name} group has no A|B options, "
+                        "cannot fix value with a boolean."
+                    )
+                out = self.options[f]
+                rgx = re.escape(out)
             else:
                 out = self.format(f)
-                if for_regex:
-                    out = re.escape(out)
-            fixes.append(out)
+                rgx = re.escape(out)
+            strings.append(out)
+            regexes.append(rgx)
 
-        # only keep the first value for filenames
-        if not for_regex:
-            fixes = fixes[:1]
-
-        self.fixed_string = "|".join(fixes)
+        self.fixed_string = strings[0]
+        self.fixed_regex = "|".join(regexes)
 
     def unfix(self):
         """Unfix value."""
         self.fixed_value = None
         self.fixed_string = None
+        self.fixed_regex = None
 
     def get_regex(self) -> str:
         """Get group regex.
@@ -308,8 +303,8 @@ class Group:
         Insert the regex into a capturing group, and make it optional if
         the ``:opt`` was indicated
         """
-        if self.fixed_string is not None:
-            rgx = self.fixed_string
+        if self.fixed_regex is not None:
+            rgx = self.fixed_regex
         else:
             rgx = self.rgx
 

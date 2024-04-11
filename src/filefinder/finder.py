@@ -356,9 +356,9 @@ class Finder:
 
         for i, g in enumerate(groups):
             if g.name in fixes:
-                g.fix_value(fixes[g.name], for_regex=False)
+                g.fix_value(fixes[g.name])
             if i in fixes:
-                g.fix_value(fixes[i], for_regex=False)
+                g.fix_value(fixes[i])
 
             if g.fixed_string is not None:
                 segments[2 * i + 1] = g.fixed_string

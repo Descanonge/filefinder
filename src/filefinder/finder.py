@@ -74,11 +74,13 @@ class Finder:
         """
         self._files: list[tuple[str, Matches]] = []
         self.scanned: bool = False
+        """True if files have been scanned with current parameters.
+
+        Is reset to False if the cache (of scanned files) is voided, for instance by
+        operation like changing fixed values of groups.
+        """
 
         self.set_pattern(pattern)
-
-    # TODO: add setter for scan_everything and use_regex
-    # scan everything should void cache
 
     @property
     def n_groups(self) -> int:
@@ -122,6 +124,19 @@ class Finder:
         else:
             s.append(f"scanned: found {len(self._files)} files")
         return "\n".join(s)
+
+    def set_scan_everything(self, scan_everything: bool, /) -> None:
+        """Set value for attribute :attr:`scan_everything`.
+
+        Void cache if necessary.
+        """
+        if scan_everything != self.scan_everything:
+            self.scan_everything = scan_everything
+            self._void_cache()
+
+    def set_use_regex(self, use_regex: bool, /) -> None:
+        """Set value for attribute :attr:`use_regex`."""
+        self.use_regex = use_regex
 
     def get_files(
         self,
@@ -231,8 +246,7 @@ class Finder:
             if not fix_discard and m.discard:
                 continue
             m.fix_value(value)
-        # invalid the cached files
-        self.scanned = False
+        self._void_cache()
 
     def fix_groups(
         self,
@@ -276,8 +290,7 @@ class Finder:
                 groups = self.get_groups(key)
                 for g in groups:
                     g.unfix()
-        # invalid cached files
-        self.scanned = False
+        self._void_cache()
 
     def find_matches(self, filename: str, relative: bool = True) -> Matches:
         """Find matches for a given filename.
@@ -365,8 +378,7 @@ class Finder:
 
     def set_pattern(self, pattern: str):
         """Set pattern and parse for group objects."""
-        # invalid cached files
-        self.scanned = False
+        self._void_cache()
         self._pattern = pattern
         groups_starts = [m.start() + 1 for m in re.finditer(r"%\(", pattern)]
 
@@ -521,6 +533,10 @@ class Finder:
 
         self.scanned = True
         self._files = files_matched
+
+    def _void_cache(self) -> None:
+        self.scanned = False
+        self._files.clear()
 
     def get_groups(self, key: GroupKey) -> list[Group]:
         """Return list of groups corresponding to key.

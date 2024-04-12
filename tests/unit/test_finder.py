@@ -79,7 +79,11 @@ def test_match_filename_values(struct: StructPattern):
 
 @given(struct=StPattern.pattern_with_values())
 def test_make_filename_by_str(struct: StructPattern):
-    """Test filename creation."""
+    """Test filename creation using string as fixes.
+
+    Check fixing by value is conserved.
+    Check by index. Only run by name (cannot check the expected filename).
+    """
     f = Finder("/base/", struct.pattern)
     fixes = {i: val_str for i, val_str in enumerate(struct.values_str)}
     # we won't check the output for those
@@ -96,7 +100,7 @@ def test_make_filename_by_str(struct: StructPattern):
 
 @given(struct=StPattern.pattern_with_values())
 def test_make_filename_by_val(struct: StructPattern):
-    """Test filename creation."""
+    """Test filename creation using values as fixes."""
     f = Finder("/base/", struct.pattern)
     fixes = {
         i: val if val is not None else val_str
@@ -115,7 +119,7 @@ def test_make_filename_by_val(struct: StructPattern):
     .filter(lambda p: all(g.name != "relative" for g in p.groups))
 )
 def test_make_filename_by_val_by_name(struct: StructPattern):
-    """Test filename creation.
+    """Test filename creation fixing values by group name.
 
     Separate test function to make sure all names are differents, otherwise
     group.fix_value might have different output despite having the same name.
@@ -126,11 +130,17 @@ def test_make_filename_by_val_by_name(struct: StructPattern):
         g.name: val if val is not None else val_str
         for g, val, val_str in zip(struct.groups, struct.values, struct.values_str)
     }
-    f.make_filename(**fixes_by_name)
+    assert f.make_filename(**fixes_by_name, relative=True) == struct.filename
 
 
 @given(struct=StPattern.pattern_with_values())
 def test_make_filename_by_fix(struct: StructPattern):
+    """Test filename creating with prior value fixing.
+
+    All formatted values are fixed by index. Filename is checked against expected value.
+    Groups are unfixed, and refixed by name before testing if filename creation runs
+    (no value check against expected filename).
+    """
     f = Finder("/base/", struct.pattern)
     fixes = {i: val_str for i, val_str in enumerate(struct.values_str)}
     # we won't check the output for those
@@ -150,6 +160,11 @@ def test_make_filename_by_fix(struct: StructPattern):
 
 @given(struct=StPattern.pattern_with_values(min_group=2))
 def test_make_filename_half_by_fix(struct: StructPattern):
+    """Test filename creating with prior value fixing (not all groups).
+
+    Same as previous, but half groups are fixed, and second half is given on
+    make_filename call. Formatted values are fixed by index.
+    """
     f = Finder("/base/", struct.pattern)
     n_fix = int(f.n_groups / 2)
     f.fix_groups({i: struct.values_str[i] for i in range(n_fix)}, fix_discard=True)
@@ -171,8 +186,40 @@ def test_wrong_filename(pattern: str):
     Not sure if there is a way to generate wrong filenames in the most general case.
     """
     f = Finder("", pattern)
-    with pytest.raises(ValueError):
-        f.find_matches("bawhatever")
+    assert f.find_matches("bawhatever") is None
+
+
+def test_group_parenthesis():
+    """Test if parenthesis are correctly matched in group definitions.
+
+    Test if unbalanced parentheses in group def raise.
+    Test if adding a group in regex causes issues.
+    """
+
+    def test(pattern: str):
+        Finder("", pattern)
+
+    test("0_%(normal_defintion)")
+    test("0_%(paren(in_name))")
+    test("0_%(paren(in_name):fmt=0d)")
+    test("0_%(paren_in_bool:bool=(opt1):opt2)")
+    test("0_%(paren_in_rgx:rgx=(?:barr))")  # note non matching to be legal
+
+    for pattern in [
+        "0_%(unbalanced()",
+        "0_%(unbalanced:rgx=(())",
+        "0_%(unbalanced:bool=()",
+    ]:
+        with pytest.raises(ValueError):
+            test(pattern)
+
+    # legal: non-capturing group
+    f = Finder("", "0_%(paren_in_rgx:rgx=(?:barr))")
+    assert f.find_matches("0_barr") is not None
+    # illegal: additional capturing group
+    f = Finder("", "0_%(paren_in_rgx:rgx=(barr))")
+    with pytest.raises(IndexError):
+        f.find_matches("0_barr")
 
 
 # Tested systematically in test_group.test_random_definitions

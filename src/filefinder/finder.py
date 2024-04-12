@@ -53,8 +53,6 @@ class Finder:
         use_regex: bool = False,
         scan_everything: bool = False,
     ):
-        if isinstance(root, (list, tuple)):
-            root = os.path.join(*root)
         self.root: str = root
         """The root directory of the finder."""
         self.use_regex: bool = use_regex

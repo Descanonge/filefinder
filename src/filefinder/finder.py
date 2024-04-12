@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from copy import copy
 from typing import Any
 
-from filefinder.group import Group, GroupKey
+from filefinder.group import Group, GroupKey, GroupParseError
 from filefinder.matches import Matches, get_groups_indices
 
 logger = logging.getLogger(__name__)
@@ -408,11 +408,8 @@ class Finder:
                     substr += "..."
                 raise ValueError(f"No group end found for '{substr}'")
 
-            try:
-                self.groups.append(Group(pattern[start + 1 : end], idx))
-                splits += [start - 1, end + 1]  # -1 removes the %
-            except ValueError:  # unable to parse group
-                pass
+            self.groups.append(Group(pattern[start + 1 : end], idx))
+            splits += [start - 1, end + 1]  # -1 removes the %
 
         self._segments = [pattern[i:j] for i, j in zip(splits, splits[1:] + [None])]
 

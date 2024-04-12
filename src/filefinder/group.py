@@ -28,9 +28,10 @@ explain reasoning behind PATTERN, and alternatives explored
 class GroupParseError(Exception):
     """Custom errors when parsing group definition."""
 
-    def __init__(self, group: Group, message: str):
-        self.group = group
-        self.message = f"{message} ({group.definition})"
+    def __init__(self, message: str, group: Group | None = None):
+        if group is not None:
+            message += f" ({group.definition})"
+        super().__init__(message)
 
 
 class Group:
@@ -108,9 +109,7 @@ class Group:
         """Parse group definition against a regex to retrieve specs."""
         m = self.PATTERN.fullmatch(self.definition)
         if m is None:
-            raise GroupParseError(
-                self, "Could not parse the definition according to the regex pattern."
-            )
+            raise GroupParseError("Could not parse the group definition.", self)
         self._check_duplicates(m)
         specs = m.groupdict()
 
@@ -188,11 +187,11 @@ class Group:
                 pos = span[1]
             else:
                 raise GroupParseError(
-                    self,
                     (
                         "The specs found do not account for the full definition. "
                         "There is most likely a duplicate spec."
                     ),
+                    self,
                 )
 
     def _replace_regex_defaults(self, regex: str) -> str:

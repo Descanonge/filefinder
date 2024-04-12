@@ -248,7 +248,7 @@ class Finder:
 
     def fix_groups(
         self,
-        fixes: dict[GroupKey, str | Any] | None = None,
+        fixes: dict[Any, str | Any] | None = None,
         fix_discard: bool = False,
         **fixes_kw: str | Any,
     ):

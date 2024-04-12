@@ -292,7 +292,9 @@ class Finder:
                     g.unfix()
         self._void_cache()
 
-    def find_matches(self, filename: str, relative: bool = True) -> Matches:
+    def find_matches(
+        self, filename: str, pattern: re.Pattern | None = None, relative: bool = True
+    ) -> Matches | None:
         """Find matches for a given filename.
 
         Apply regex to `filename` and return the results as a :class:`Matches`
@@ -302,16 +304,36 @@ class Finder:
         ----------
         filename:
             Filename to retrieve matches from.
+        pattern
+            Compiled match pattern to use. If left to None, we generate the current
+            regex.
         relative:
             True if the filename is relative to the finder root directory
             (default). If False, the filename is made relative before being
             matched.
+
+        Returns
+        -------
+        matches
+            A :class:`Matches` object, or None if the filename did not match.
         """
         if not relative:
             filename = self.get_relative(filename)
 
-        regex = self.get_regex()
-        return Matches(self.groups, filename, re.compile(regex))
+        if pattern is None:
+            pattern = re.compile(self.get_regex())
+
+        m = pattern.fullmatch(filename)
+        if m is None:
+            return None
+
+        if self.n_groups != len(m.groups()):
+            raise IndexError(
+                "Not as many captured matches as pattern groups. "
+                "Does one of the group regex contains a capturing group ?"
+            )
+
+        return Matches(m, self.groups)
 
     def make_filename(
         self,
@@ -461,11 +483,9 @@ class Finder:
 
             for f in filenames:
                 to_root = self.get_relative(os.path.join(dirpath, f))
-                try:
-                    matches = Matches(self.groups, to_root, pattern)
+                matches = self.find_matches(to_root, pattern=pattern, relative=True)
+                if matches is not None:
                     files_matched.append((to_root, matches))
-                except ValueError:
-                    pass
 
         self.scanned = True
         self._files = files_matched

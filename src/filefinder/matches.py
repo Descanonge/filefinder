@@ -106,19 +106,16 @@ class Matches:
         Not as many matches as groups.
     """
 
-    def __init__(self, groups: list[Group], filename: str, pattern: re.Pattern):
+    def __init__(self, match: re.Match, groups: abc.Sequence[Group]):
         self.matches: list[Match] = []
         """Matches for a single filename."""
-        self.groups = groups
+        self.groups = list(groups)
         """Groups used."""
 
-        m = pattern.fullmatch(filename)
-        if m is None:
-            raise ValueError("Filename did not match pattern.")
-        assert len(m.groups()) == len(groups), "Not as many matches as groups."
+        assert len(match.groups()) == len(groups)
 
         for i in range(len(groups)):
-            self.matches.append(Match(groups[i], m, i))
+            self.matches.append(Match(groups[i], match, i))
 
     def __repr__(self) -> str:
         """Human readable information."""

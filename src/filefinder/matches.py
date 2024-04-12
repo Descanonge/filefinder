@@ -90,21 +90,52 @@ class Matches:
 
     Parameter
     ---------
+    match:
+        Match object obtained from a filename. It should have as much capturing groups
+        as the pattern.
     groups:
-        Groups present in the pattern.
-    filename:
-        Input filename to test.
-    pattern:
-        Regex to test, compiled.
+        Sequence of Groups objects present in the pattern.
 
-
-    Raises
-    ------
-    ValueError
-        Filename did not match pattern.
-    IndexError
-        Not as many matches as groups.
     """
+
+    @classmethod
+    def from_filename(
+        cls, filename: str, pattern: re.Pattern | str, groups: abc.Sequence[Group]
+    ) -> t.Self | None:
+        """Find matches for a given filename.
+
+        Parameters
+        ----------
+        filename:
+            Filename to retrieve matches from.
+        pattern
+            Compiled match pattern to use. If left to None, we generate the current
+            regex.
+
+        Returns
+        -------
+        matches
+            A :class:`Matches` object, or None if the filename did not match.
+
+        Raises
+        ------
+        IndexError
+            Not as many matches as groups. Maybe one of the group regex contains an
+            additional (unwanted) capturing group ?
+        """
+        if isinstance(pattern, str):
+            pattern = re.compile(pattern)
+        m = pattern.fullmatch(filename)
+        if m is None:
+            return None
+
+        if len(groups) != len(m.groups()):
+            raise IndexError(
+                "Not as many captured matches as pattern groups. "
+                "Does one of the group regex contains a capturing group ?"
+            )
+
+        return cls(m, groups)
 
     def __init__(self, match: re.Match, groups: abc.Sequence[Group]):
         self.matches: list[Match] = []

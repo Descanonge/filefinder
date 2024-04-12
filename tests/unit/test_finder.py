@@ -59,6 +59,7 @@ def test_match_filename_values(struct: StructPattern):
 
     f = Finder("", struct.pattern)
     matches = f.find_matches(filename)
+    assert matches is not None
 
     # Correct number of matches
     assert len(matches) == len(struct.groups)

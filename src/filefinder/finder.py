@@ -292,9 +292,7 @@ class Finder:
                     g.unfix()
         self._void_cache()
 
-    def find_matches(
-        self, filename: str, pattern: re.Pattern | None = None, relative: bool = True
-    ) -> Matches | None:
+    def find_matches(self, filename: str, relative: bool = True) -> Matches | None:
         """Find matches for a given filename.
 
         Apply regex to `filename` and return the results as a :class:`Matches`
@@ -304,9 +302,6 @@ class Finder:
         ----------
         filename:
             Filename to retrieve matches from.
-        pattern
-            Compiled match pattern to use. If left to None, we generate the current
-            regex.
         relative:
             True if the filename is relative to the finder root directory
             (default). If False, the filename is made relative before being
@@ -320,20 +315,7 @@ class Finder:
         if not relative:
             filename = self.get_relative(filename)
 
-        if pattern is None:
-            pattern = re.compile(self.get_regex())
-
-        m = pattern.fullmatch(filename)
-        if m is None:
-            return None
-
-        if self.n_groups != len(m.groups()):
-            raise IndexError(
-                "Not as many captured matches as pattern groups. "
-                "Does one of the group regex contains a capturing group ?"
-            )
-
-        return Matches(m, self.groups)
+        return Matches.from_filename(filename, self.get_regex(), self.groups)
 
     def make_filename(
         self,
@@ -461,7 +443,7 @@ class Finder:
 
         self._files.sort(key=lambda x: x[0])
 
-    def _find_files_scan_everything(self):
+    def _find_files_scan_everything(self) -> None:
         """Find files checking every sub-directory.
 
         Because having to check if a sub-directory matches the pattern is difficult,
@@ -472,7 +454,7 @@ class Finder:
         found, which can be significant work in some cases.
         """
         pattern = re.compile(self.get_regex())
-        files_matched: list[tuple[Matches, str]] = []
+        files_matched = []
 
         for dirpath, dirnames, filenames in os.walk(self.root):
             depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
@@ -483,14 +465,14 @@ class Finder:
 
             for f in filenames:
                 to_root = self.get_relative(os.path.join(dirpath, f))
-                matches = self.find_matches(to_root, pattern=pattern, relative=True)
+                matches = Matches.from_filename(to_root, pattern, self.groups)
                 if matches is not None:
                     files_matched.append((to_root, matches))
 
         self.scanned = True
         self._files = files_matched
 
-    def _find_files_subdirectories(self):
+    def _find_files_subdirectories(self) -> None:
         """Find files checking sub-directories along the way.
 
         Each sub-directory must match against its corresponding part of the generated
@@ -535,13 +517,11 @@ class Finder:
 
         # Now only retain files that match the full pattern
         pattern = re.compile(regex)
-        files_matched: list[tuple[Matches, str]] = []
+        files_matched = []
+
         for f in files:
-            try:
-                matches = Matches(self.groups, f, pattern)
-            except ValueError:  # Filename did not match pattern
-                pass
-            else:
+            matches = Matches.from_filename(f, pattern, self.groups)
+            if matches is not None:
                 files_matched.append((f, matches))
 
         if logger.isEnabledFor(logging.DEBUG):

@@ -67,14 +67,14 @@ def test_match_filename_values(struct: StructPattern):
     for i, (val, val_str) in enumerate(zip(struct.values, struct.values_str)):
         # Unparsable group definition
         if val is not None:
-            assert matches.get_value(key=i, parse=True, discard=False) == val
+            assert matches.get_value(key=i, parse=True, keep_discard=True) == val
             if not struct.groups[i].discard:
                 assert matches[i] == val
             else:
                 with pytest.raises(KeyError):
                     _ = matches[i]
 
-        assert matches.get_value(key=i, parse=False, discard=False) == val_str
+        assert matches.get_value(key=i, parse=False, keep_discard=True) == val_str
 
 
 @given(struct=StPattern.pattern_with_values())

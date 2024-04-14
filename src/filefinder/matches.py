@@ -161,7 +161,7 @@ class Matches:
 
         Ignore groups with the 'discard' option.
         """
-        return self.get_value(key, parse=True, discard=True)
+        return self.get_value(key, parse=True, keep_discard=False)
 
     def __iter__(self) -> abc.Iterator[Match]:
         """Iterate over matches."""

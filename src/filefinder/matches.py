@@ -172,7 +172,7 @@ class Matches:
         return len(self.matches)
 
     def get_values(
-        self, key: GroupKey, parse: bool = True, discard: bool = True
+        self, key: GroupKey, parse: bool = True, keep_discard: bool = False
     ) -> list[str | t.Any]:
         """Get matched values corresponding to key.
 
@@ -185,15 +185,15 @@ class Matches:
         parse:
             If True (default), return the parsed value. If False return the
             matched string.
-        discard:
-            If True (default), groups with the 'discard' option are not kept.
+        keep_discard:
+            If true groups with the 'discard' option are kept. Defauult is false.
         """
-        matches = self.get_matches(key, discard)
+        matches = self.get_matches(key, keep_discard=keep_discard)
         values = [m.get_match(parse=parse) for m in matches]
         return values
 
     def get_value(
-        self, key: GroupKey, parse: bool = True, discard: bool = True
+        self, key: GroupKey, parse: bool = True, keep_discard: bool = False
     ) -> str | t.Any:
         """Get matched value corresponding to key.
 
@@ -207,15 +207,15 @@ class Matches:
         parse:
             If True (default), return the parsed value. If False return the
             matched string.
-        discard:
-            If True (default), groups with the 'discard' option are not kept.
+        keep_discard:
+            If true groups with the 'discard' option are kept. Defauult is false.
 
         Raises
         ------
         KeyError:
             No group with no 'discard' option was found.
         """
-        values = self.get_values(key, parse, discard)
+        values = self.get_values(key, parse=parse, keep_discard=keep_discard)
         if len(values) == 0:
             raise KeyError(
                 "No group without a 'discard' option was found " f"(key: {key})"
@@ -227,15 +227,15 @@ class Matches:
                 )
         return values[0]
 
-    def get_matches(self, key: GroupKey, discard: bool = True) -> list[Match]:
-        """Get matches corresponding to key.
+    def get_matches(self, key: GroupKey, keep_discard: bool = False) -> list[Match]:
+        """Get Match objects corresponding to key.
 
         Parameters
         ----------
         key:
             Group(s) to select, either by index or name.
-        discard:
-            If True (default), groups with the 'discard' option are not kept.
+        keep_discard:
+            If true groups with the 'discard' option are kept. Defauult is false.
 
         Returns
         -------
@@ -243,7 +243,7 @@ class Matches:
         """
         selected = get_groups_indices(self.groups, key)
         matches = [self.matches[k] for k in selected]
-        if discard:
+        if not keep_discard:
             matches = [m for m in matches if not m.group.discard]
         return matches
 

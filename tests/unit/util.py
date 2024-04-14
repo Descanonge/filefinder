@@ -393,6 +393,10 @@ class StructPattern:
     def filenames(self) -> abc.Iterator[str]:
         """Return a list of filenames using the formatted values."""
         segments = self.segments.copy()
+
+        if len(self.groups) == 0:
+            yield segments[0]
+
         for values_str in itertools.product(*self.multiple_values_str):
             for i, seg in enumerate(values_str):
                 segments[2 * i + 1] = seg

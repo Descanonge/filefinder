@@ -394,9 +394,6 @@ class StructPattern:
         """Return a list of filenames using the formatted values."""
         segments = self.segments.copy()
 
-        if len(self.groups) == 0:
-            yield segments[0]
-
         for values_str in itertools.product(*self.multiple_values_str):
             for i, seg in enumerate(values_str):
                 segments[2 * i + 1] = seg
@@ -441,7 +438,9 @@ class StPattern:
 
             text = st.text(
                 alphabet=st.characters(
-                    max_codepoint=MAX_CODEPOINT, exclude_categories=["C"]
+                    max_codepoint=MAX_CODEPOINT,
+                    exclude_categories=["C"],
+                    exclude_characters=["%", "(", ")"],
                 ),
                 max_size=64,
                 min_size=1 if separate else 0,
@@ -453,7 +452,13 @@ class StPattern:
 
             return StructPattern(segments=segments, groups=groups)
 
-        return comp()
+        # starting with / is wrong, this gets dropped by the filesystem
+        # ending with / is wrong, we are looking for files
+        out = comp().filter(
+            lambda p: not p.pattern.startswith("/") and not p.pattern.endswith("/")
+        )
+
+        return out
 
     @classmethod
     def pattern_with_values(cls, **kwargs) -> st.SearchStrategy[StructPattern]:

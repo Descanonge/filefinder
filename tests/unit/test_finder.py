@@ -243,9 +243,10 @@ def test_format_regex():
 # match... It is easy to find counter examples.
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(
-    struct=StPattern.pattern_with_multiple_values()
-    .filter(lambda p: all(not isinstance(g, JustStrategy) for g in p.groups))
-    .filter(lambda p: not p.pattern.endswith("/")),
+    struct=StPattern.pattern_with_multiple_values().filter(
+        # no groups without formatted value
+        lambda p: all(not isinstance(g, JustStrategy) for g in p.groups)
+    )
 )
 def test_file_scan(fs: FakeFilesystem, struct: StructPattern):
     data_dirname = "data"

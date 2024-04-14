@@ -51,7 +51,7 @@ class Match:
         try:
             self.match_parsed = group.parse(self.match_str)
         except Exception:
-            logger.warning("Failed to parse for group %s", str(group))
+            logger.debug("Failed to parse for group %s", str(group))
 
     def __repr__(self):
         """Human readable information."""

@@ -165,17 +165,15 @@ If the format is never specified, it defaults to a ``s`` format.
 Boolean format
 ==============
 
-The boolean format allows to easily select between two options. It is specified
-as ``:bool=<true>[:<false>]``. The second option (false), can be omitted.
-
-Both ``<true>`` and ``<false>`` here refer to regular expressions. Don't forget
-to escape any special characters!
+The boolean format allows to easily select between two *strings*. It is
+specified as ``:bool=<true>[:<false>]``. The second option (false), can be
+omitted.
 
 Here are a couple of examples. ``my_file%(special:bool=_special).txt`` would
 match both ``my_file.txt`` and ``my_file_special.txt``. We could select only
 'special' files using ``finder.fix_groups(special=True)``.
 
-We can also specify both options with ``my_file_%(good:bool=good:bad).txt``, and
+We can also specify both options with ``my_file_%(kind:bool=good:bad).txt``, and
 select either like so ::
 
     >>> finder.make_filename(kind=True)
@@ -189,9 +187,9 @@ select either like so ::
 Optional flag
 =============
 
-The optional flag ``:opt`` mark the group as an optional part of the pattern. In
-effect, it appends a ``?`` to the group regular expression. It does not affect
-the group in other ways.
+The optional flag ``:opt`` marks the group as an optional part of the pattern.
+In effect, it appends a ``?`` to the group regular expression. It does not
+affect the group in other ways.
 
 
 .. _rgx:
@@ -222,8 +220,8 @@ of the average, we might want to only recover the starting date::
 .. note::
 
    By default, when :ref:`fixing a group to a value<fix-groups>`, discarded
-   groups will not be fixed. This can be deactivated with the ``fix_discard``
-   keyword.
+   groups will not be fixed. This can be overridden with the ``fix_discard``
+   keyword argument.
 
 
 Regex outside groups

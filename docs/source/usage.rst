@@ -27,8 +27,8 @@ Create the Finder object
 To manage this, we are going to use the main entry point of this package: the
 :class:`Finder` class. Its main arguments are the root directory
 containing the files, and a pattern specifying the filename structure.
-The pattern can later be turned into a proper regular expression which allow us
-to find the existing files on disk.
+That pattern allows to get filenames corresponding to given values, but also
+to scan for files matching the pattern on disk.
 
 ::
 
@@ -37,8 +37,10 @@ to find the existing files on disk.
         "param_%(param:fmt=.1f)/%(Y)/variable_%(Y)-%(m)-%(d).nc"
     )
 
-The parts that vary from file to file are indicated in the pattern by a group
-within parentheses, preceded by a percent sign.
+The parts that vary from file to file are indicated in the pattern by
+parentheses, preceded by a percent sign. Within the parentheses are
+specifications for a :class:`~filefinder.group.Group`, that will handle creating
+the regular expression to find files and formatting values appropriately.
 
 .. important::
 
@@ -46,46 +48,70 @@ within parentheses, preceded by a percent sign.
     there: :doc:`pattern`.
 
 Here quickly, for date related parts, we only need to indicate the name:
-filefinder has them as :ref:`default<name>`. For the parameter, we indicate a
-:ref:`string format<fmt>` for a float.
+filefinder has them as :ref:`default<name>`. For the parameter, indicating a
+:ref:`string format<fmt>` will suffice.
 
 .. _fix-groups:
 
 Fix groups
 ==========
 
-The package allows to dynamically change the regular expression easily. This is
-done by replacing groups in the regular expression by a given string, using
-the :func:`Finder.fix_group` and :func:`Finder.fix_groups` methods.
+Each group can be fixed to one possible value or a set of possible values.
+This will restrict the filenames that match the pattern when scanning files.
 
-Groups to replace can be selected either by their index in the filename pattern
-(starting from 0), or by their name. If using a group name , multiple groups
-can be fixed to the same value at once.
+.. note::
 
-If the corresponding group·s have a format specified, and the given value
-is not already a string, it will be formatted.
-If using a list of values, the strings (given or formatted) will be joined by
-a regex *OR* (``(value1|value2|...)``).
+   Also, when :ref:`creating filenames<create-filenames>`, if a group already
+   has a fixed value it will be used by default.
 
-If a string is given, special characters will **not** be escaped.
-This allows to specify regular expressions.
-On the contrary, for a formatted value special characters will be escaped::
+Fixing groups can be done with either the :func:`Finder.fix_group` or
+:func:`Finder.fix_groups` methods.
+Groups can be selected either by their index in the filename pattern (starting
+from 0), or by their name. If using a group name, multiple groups can be fixed
+to the same value at once.
 
-  finder.fix_group('foo', '[a-z]+')  # will be kept as is
-  finder.fix_group('bar', 3.)  # will be formatted as '3\.0'
+The given value can be:
 
-For a more practical example, when using the following pattern::
+* a **number**: will be formatted to a string according to the group
+  specification. For scanning files, the string will be properly escaped for
+  use in a regular expression.
+* a **boolean**: if the group has two options (specified with the
+  :ref:`bool<bool>` keyword), one of the options is selected and used as a
+  string.
+* a **string**: the value is directly interpreted as a regular expression and
+  used as-is when scanning files or creating filenames, without further escaping
+  or formatting.
+* a **list** of any of the above: each element will be formatted to a string if
+  not already. When scanning files, all elements are considered by joining them
+  with *OR* (``(value1|value2|...)``), and when creating files only the
+  **first** element of the list is used.
 
-  '%(time:m)/SST_%(time:Y)%(time:m)%(time:d).nc'
+So for example::
 
-we can keep only the files corresponding to january using any of::
+  >>> finder.fix_group("param", "[a-z]+")
+  will be kept as is
+  >>> finder.fix_group("param", 3.)
+  will be formatted as "3\.0"
 
-  finder.fix_group(0, 1)
-  finder.fix_group('m', 1)
+More practically, we could keep only the files corresponding to january::
+
+  finder.fix_groups("m", 1)
 
 We could also select specific days using a list::
 
-  finder.fix_group('d', [1, 3, 5, 7])
+  finder.fix_groups(d=[1, 3, 5, 7])
+
+.. note::
+
+   Fixed values can be changed/overwritten at any time, or unfixed using the
+   :meth:`Finder.unfix_groups` method.
+
+.. warning::
+
+  A group flagged as :ref:`:discard<discard>` will not be fixed by default,
+  unless using the keyword argument ``fix_discard`` in :meth:`~Finder.fix_group`
+  and :meth:`~Finder.fix_groups`.
+
 
 .. _find-files:
 
@@ -155,6 +181,8 @@ likely example could be that of an optional directory::
   basedir/subdir_name/rest_of_pattern
 
 
+.. _create-filenames:
+
 Create filenames
 ================
 
@@ -179,6 +207,13 @@ the filename string (starting at the end of the root directory), the matched
 characters, and if available its parsed value.
 
 .. currentmodule:: filefinder.matches
+
+The most straightforward way to retrieve a value is getitem. example.
+options: parsed if parsed, only not discarded.
+
+this correspond to the method get_value with options.
+
+other way is get_values
 
 A specific match can be obtained using :func:`Matches.get_matches` and either
 the index of the group in the pattern (starting at 0), or a group name.

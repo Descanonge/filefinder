@@ -2,6 +2,8 @@
 
 import itertools
 import math
+import os
+import sys
 import typing as t
 from collections import abc
 from dataclasses import dataclass, field
@@ -400,6 +402,9 @@ class StructPattern:
             yield "".join(segments)
 
 
+FORBIDDEN_CHAR = {"win": set('<>:"\\|?'), "mac": set(":")}
+
+
 class StPattern:
     """Strategies related to pattern."""
 
@@ -436,11 +441,19 @@ class StPattern:
             )
             groups = draw(st.lists(st_group, min_size=min_group, max_size=4))
 
+            # to avoid bad group definitions in other segments
+            exclude_characters = set("%()")
+
+            if sys.platform in ["win32", "cygwin"]:
+                exclude_characters |= FORBIDDEN_CHAR["win"]
+            elif sys.platform == "darwin":
+                exclude_characters |= FORBIDDEN_CHAR["mac"]
+
             text = st.text(
                 alphabet=st.characters(
                     max_codepoint=MAX_CODEPOINT,
                     exclude_categories=["C"],
-                    exclude_characters=["%", "(", ")"],
+                    exclude_characters=exclude_characters,
                 ),
                 max_size=64,
                 min_size=1 if separate else 0,
@@ -455,7 +468,8 @@ class StPattern:
         # starting with / is wrong, this gets dropped by the filesystem
         # ending with / is wrong, we are looking for files
         out = comp().filter(
-            lambda p: not p.pattern.startswith("/") and not p.pattern.endswith("/")
+            lambda p: not p.pattern.startswith(os.sep)
+            and not p.pattern.endswith(os.sep)
         )
 
         return out

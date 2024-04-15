@@ -21,7 +21,7 @@ classifiers = [
 
     'Programming Language :: Python',
     'Programming Language :: Python :: 3 :: Only',
-    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
     'Operating System :: OS Independent',
 
     'Intended Audience :: Developers',
@@ -36,13 +36,11 @@ dependencies = [
 dev = [
     'sphinx==6.2.1',
     'sphinx-book-theme==1.0.1',
-    'ipykernel',
-    'ipython',
-    'jupyter_client',
     'ruff',
     'mypy>=1.5',
     'pytest>=7.4',
-    'pyfakefs'
+    'pyfakefs',
+    'hypothesis'
 ]
 
 [project.urls]

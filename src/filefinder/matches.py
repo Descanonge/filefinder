@@ -218,7 +218,7 @@ class Matches:
         values = self.get_values(key, parse=parse, keep_discard=keep_discard)
         if len(values) == 0:
             raise KeyError(
-                "No group without a 'discard' option was found " f"(key: {key})"
+                "No group was found " f"(key: {key}, keep_discard: {keep_discard})"
             )
         if len(values) > 1:
             if any(v != values[0] for v in values[1:]):

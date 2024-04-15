@@ -5,6 +5,8 @@
 # to the MIT License as defined in the file 'LICENSE',
 # at the root of this project. © 2021 Clément Haëck
 
+from __future__ import annotations
+
 import logging
 import re
 import typing as t
@@ -100,7 +102,7 @@ class Matches:
     @classmethod
     def from_filename(
         cls, filename: str, pattern: re.Pattern | str, groups: abc.Sequence[Group]
-    ) -> t.Self | None:
+    ) -> Matches | None:
         """Find matches for a given filename.
 
         Parameters

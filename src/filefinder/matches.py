@@ -72,8 +72,7 @@ class Match:
 
         Raises
         ------
-        ValueError:
-            Could not parse the match.
+        ValueError: Could not parse the match.
         """
         if parse:
             if self.match_parsed is None:
@@ -212,8 +211,7 @@ class Matches:
 
         Raises
         ------
-        KeyError:
-            No group with no 'discard' option was found.
+        KeyError: No group with no 'discard' option was found.
         """
         values = self.get_values(key, parse=parse, keep_discard=keep_discard)
         if len(values) == 0:
@@ -256,10 +254,8 @@ def get_groups_indices(groups: list[Group], key: GroupKey) -> list[int]:
 
     Raises
     ------
-    IndexError
-        No group found corresponding to the key
-    TypeError
-        Key is not int or str
+    IndexError: No group found corresponding to the key
+    TypeError: Key is not int or str
     """
     if isinstance(key, int):
         return [key]

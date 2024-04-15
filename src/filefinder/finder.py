@@ -160,8 +160,7 @@ class Finder:
 
         Raises
         ------
-        KeyError
-            A group name in `nested` is not found in the pattern.
+        KeyError: A group name in `nested` is not found in the pattern.
         """
 
         def get_files(files_matches):
@@ -293,7 +292,7 @@ class Finder:
     def find_matches(self, filename: str, relative: bool = True) -> Matches | None:
         """Find matches for a given filename.
 
-        Apply regex to `filename` and return the results as a :class:`Matches`
+        Apply regex to `filename` and return the results as a :class:`~.matches.Matches`
         object. Fixed values are applied as normal.
 
         Parameters
@@ -308,7 +307,7 @@ class Finder:
         Returns
         -------
         matches
-            A :class:`Matches` object, or None if the filename did not match.
+            A :class:`~.matches.Matches` object, or None if the filename did not match.
         """
         if not relative:
             filename = self.get_relative(filename)
@@ -340,8 +339,7 @@ class Finder:
 
         Raises
         ------
-        ValueError
-            `use_regex` is activated.
+        ValueError: `use_regex` is activated.
         """
         if self.use_regex:
             raise ValueError(
@@ -548,10 +546,8 @@ class Finder:
 
         Raises
         ------
-        KeyError
-            No group found.
-        TypeError
-            Key type is not valid.
+        KeyError: No group found.
+        TypeError: Key type is not valid.
         """
         selected = get_groups_indices(self.groups, key)
         groups = [self.groups[i] for i in selected]

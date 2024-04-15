@@ -11,11 +11,6 @@ Only 's', 'd', 'f', 'e' and 'E' formats types are supported.
 
 The width of the format string is not respected when matching with a regular
 expression.
-
-The parsing is quite naive and can fail on some cases.
-See :func:`Format.parse` for details.
-
-The regex generation and parsing are tested in `tests/unit/test_format.py`.
 """
 
 # This file is part of the 'filefinder' project
@@ -105,7 +100,7 @@ class FormatAbstract:
             )
 
     def format(self, value: Any) -> str:
-        """Return formatted string."""
+        """Return formatted string of a value."""
         return f"{{:{self.fmt}}}".format(value)
 
     def get_fill_regex(self):
@@ -138,7 +133,14 @@ class FormatAbstract:
         raise NotImplementedError()
 
     def generate_expression(self, capture=False) -> str:
-        """Generate a regular expression matching strings created with this format."""
+        """Generate a regular expression matching strings created with this format.
+
+        Parameters
+        ----------
+        capture
+            If true, add capturing groups that will be used to parse the value by
+            selecting only relevant information. Default is false.
+        """
         raise NotImplementedError()
 
 
@@ -162,10 +164,7 @@ class FormatString(FormatAbstract):
             raise FormatError("Sign not allowed for string format.")
 
     def parse(self, s: str) -> str:
-        """Parse string generated with this format into an appropriate value.
-
-        Only return string here.
-        """
+        """Parse string generated with this format into an appropriate value."""
         pattern = self.generate_expression(capture=True)
         m = re.fullmatch(pattern, s)
         if m is None:
@@ -175,10 +174,7 @@ class FormatString(FormatAbstract):
         return m.group(1)
 
     def generate_expression(self, capture=False) -> str:
-        """Generate a regular expression matching strings created with this format.
-
-        Will match any character, non-greedily.
-        """
+        """Generate a regular expression matching strings created with this format."""
         rgx = ".*?"
         if capture:
             rgx = f"({rgx})"
@@ -211,10 +207,13 @@ class FormatNumberAbstract(FormatAbstract):
     def prepare_parse(self, s: str) -> str:
         """Remove special characters.
 
-        Remove characters that throw off int() and float() parsing.
-        Namely fill and grouping characters.
-        Will remove fill, except when fill is zero (parsing functions are
-        okay with that).
+        Remove characters that throw off int() and float() parsing: fill/alignment
+        characters and grouping symbols.
+
+        Returns
+        -------
+        s
+            a string ready to be casted to the appropriate type.
         """
         pattern = self.generate_expression(capture=True)
         m = re.fullmatch(pattern, s)
@@ -265,15 +264,7 @@ class FormatInteger(FormatNumberAbstract):
     ALLOWED_TYPES = "d"
 
     def parse(self, s: str) -> int:
-        """Parse string generated with format.
-
-        This simply use int() to parse strings. Those are thrown
-        off when using fill characters (other than 0), or thousands groupings,
-        so we remove these from the string.
-
-        Parsing will fail for some deviously chaotic formats such as using the '-' fill
-        character on a negative number, or when padding with numbers.
-        """
+        """Parse string generated with format."""
         s = self.prepare_parse(s)
         return int(s)
 
@@ -307,16 +298,7 @@ class FormatFloat(FormatNumberAbstract):
         return rgx
 
     def parse(self, s: str) -> float:
-        """Parse string generated with format.
-
-        This simply use float() to parse strings. Those are thrown
-        off when using fill characters (other than 0), or thousands groupings,
-        so we remove these from the string.
-
-        Parsing will fail for some deviously chaotic formats such as using the '-' fill
-        character on a negative number, or when padding with numbers.
-        """
-        # Remove special characters (fill or groupings)
+        """Parse string generated with format."""
         s = self.prepare_parse(s)
         return float(s)
 

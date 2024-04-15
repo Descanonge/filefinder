@@ -123,10 +123,10 @@ Find files
 Retrieve files
 ++++++++++++++
 
-Files can be retrieved with the :func:`Finder.get_files` method, or the
+Files can be retrieved with the :func:`Finder.get_files` method, or from the
 :attr:`Finder.files` attribute. Both will automatically scan the directory for
-matching files and cache the results for future accesses. The files that are
-found are also automatically stored in alphabetical order.
+matching files and cache the results for future accesses. The files are stored
+in alphabetical order.
 
 .. note::
 
@@ -134,18 +134,146 @@ found are also automatically stored in alphabetical order.
     groups. For that reason, avoid setting attributes directly and use set
     methods.
 
-what returns get_files.
-:func:`Finder.get_files` can also return nested lists of filenames. This is
-aimed to work with `xarray.open_mfdataset
-<https://docs.xarray.dev/en/stable/generated/xarray.open_mfdataset.html#xarray.open_mfdataset>`__,
-which will merge files in a specific order when supplied a nested list of files.
+The method :meth:`~Finder.get_files` simply returns a sorted list of the
+filenames found when scanning. By default the full path is returned, ie the
+concatenation of the root directory and the pattern part. It can also return the
+filename relative to the root directory (ie only the pattern part).
 
-To this end, one must specify group names to the `nested` argument of the same
-function. The rightmost group will correspond to the innermost level.
+Instead of a flat list of filenames, :func:`~Finder.get_files` can also arrange
+them in nested lists. To that end, one must provide the ``nested`` argument with
+a list that specify the order in which groups must be nested. Each element of
+the list gives:
 
-An :ref:`example<nested-files>` is available..
+* a group, by index or name, so that files be grouped together based on the
+  value of that group
+* multiple groups, by a tuple of indices or names, so files are grouped based
+  on the combination of values from those groups.
 
-what is stored in files.
+An example might help to grasp this. Again with the same pattern, we can ask
+to group by values of 'param'::
+
+  >>> finder.get_files(nested=["param"])
+  [
+    [
+      "/data/param_0.0/2012-01-01.nc",
+      "/data/param_0.0/2012-01-02.nc",
+      ...
+    ],
+    [
+      "/data/param_1.5/2012-01-01.nc",
+      "/data/param_1.5/2012-01-02.nc",
+      ...
+    ],
+    ...
+  ]
+
+We obtain as many lists as different values found for 'param'. Because we
+did not specify any other group, the nesting stop there. But we could chose
+to *also* group by the year::
+
+  >>> finder.get_files(nested=["param", "Y"])
+  [
+    [  # param = 0
+      [  # Y = 2012
+        "/data/param_0.0/2012-01-01.nc",
+        ...
+      ],
+      [  # Y = 2013
+        "/data/param_0.0/2013-01-01.nc",
+        ...
+      ],
+      ...
+    ],
+    [  # param = 1.5
+      ...
+    ],
+    ...
+  ]
+
+Or if we wanted to group by date as well we can specify multiple groups for
+one nesting level::
+
+  >>> finder.get_files(nested=["param", ("Y", "m", "d")])
+  [
+    [  # param = 0
+      ["/data/param_0.0/2012-01-01.nc"],
+      ["/data/param_0.0/2012-01-02.nc"],
+      ...
+    ],
+    [  # param = 1.5
+      ["/data/param_1.5/2012-01-01.nc"],
+      ["/data/param_1.5/2012-01-02.nc"],
+      ...
+    ],
+    ...
+  ]
+
+.. note::
+
+      This is aimed to work with `xarray.open_mfdataset <https://docs.xarray.dev/en/stable/generated/xarray.open_mfdataset.html#xarray.open_mfdataset>`__,
+      which will merge files in a specific order when supplied a nested list of
+      files.
+
+.. _retrieve-information:
+
+Retrieve information
+++++++++++++++++++++
+
+As some metadata might only be found in the filenames, FileFinder offer the
+possibility to retrieve it easily. The Finder caches a list of files matching
+the pattern, along with information about parts that matched the groups.
+
+The :attr:`Finder.files` attribute stores a list of tuples each containing a
+filename and a :class:`~.matches.Matches` object storing that information.
+
+.. note::
+
+    One can also scan any filename for matches with the
+    :meth:`Finder.find_matches` function.
+
+.. currentmodule:: filefinder.matches
+
+For most cases, the simplest is to access the Matches object with a group index
+or name::
+
+  >>> file, matches = finder.files[0]
+  >>> matches["param"]
+  0.0  # a float, parsed from the filename
+
+This method has several caveats:
+
+* When using a group name, the first group in the pattern with that name is
+  taken, even if there could be more groups with different values (a warning is
+  issued if that is the case).
+* Only groups not flagged as ':discard' will be selected. If no group can be
+  found, an error will be raised.
+* The parsing of a value from the filename can fail for a variety of reasons, if
+  that is the case, an error will be raised.
+
+To counter those, one can use :meth:`Matches.get_values` which will return
+a list of values corresponding to the selected group(s). It has arguments
+``keep_discard`` and ``parse`` to choose whether keep discarded groups and
+whether to use the parsed value or solely the string that matched.
+
+:meth:`Matches.get_value` will return the first element of that list, raise if
+the list is empty, and warn if the values are not all equal.
+
+.. note::
+
+   ``matches[key]`` is a thin wrapper around
+   ``matches.get_value(key, parse=True, keep_discard=False)``.
+
+.. currentmodule:: filefinder
+
+As date/time values are scattered among multiple groups, the package supply the
+function :func:`library.get_date` to easily retrieve a
+:class:`~datetime.datetime` object from matches::
+
+  from filefinder.library import get_date
+  matches = finder.get_matches(filename)
+  date = get_date(matches)
+
+.. currentmodule:: filefinder.finder
 
 Scanning process
 ++++++++++++++++
@@ -186,72 +314,27 @@ likely example could be that of an optional directory::
 Create filenames
 ================
 
-quick demo
-explanation about already fixed values.
+Using the information contained in the filename pattern we can also generate
+arbitrary filenames. This is done with :meth:`Finder.make_filename`. Any group
+that does not already have its value :ref:`fixed<fix-groups>` must have a value
+supplied as argument.
+As for fixing, a value will be appropriately formatted but a string will be
+left untouched.
 
+So for instance::
 
-.. _retrieve-information:
+  >>> finder.make_filename(param=1.5, Y=2012, m=1, d=5)
+  "/data/param_1.5/2012-01-05.nc"
 
-Retrieve information
-====================
+we can also fix some groups::
 
-As some metadata might only be found in the filenames, FileFinder offer the
-possibility to retrieve it easily using 'matches'.
+  >>> finder.fix_groups(param=2., Y=2014)
+  >>> finder.make_filename(m=5, d=1)
+  "/data/param_2.0/2014-05-01.nc"
+  >>> finder.make_filename(m=6, d=1)
+  "/data/param_2.0/2014-06-01.nc"
 
-The :attr:`Finder.files` attribute stores a list of tuples each containing a
-filename and an object.... its corresponding matches. One can also scan any
-filename for matches with the :func:`Finder.find_matches` function. In both
-cases, matches are stored as a :class:`~.matches.Matches` object, which contain
-a list of :class:`~.matches.Match` objects. Each match retain its position in
-the filename string (starting at the end of the root directory), the matched
-characters, and if available its parsed value.
+and also supply a string to forgo formatting::
 
-.. currentmodule:: filefinder.matches
-
-The most straightforward way to retrieve a value is getitem. example.
-options: parsed if parsed, only not discarded.
-
-this correspond to the method get_value with options.
-
-other way is get_values
-
-A specific match can be obtained using :func:`Matches.get_matches` and either
-the index of the group in the pattern (starting at 0), or a group name.
-Because multiple groups can share the same name, a list of all corresponding
-:class:`Match` is returned.
-
-.. warning::
-
-    By default, groups with the 'discard' option are not kept.
-    This can be overridden with the ``discard=False`` keyword argument.
-
-In most cases, we only care about the value of the group (parsed or not). In
-that case we can use :func:`Matches.get_values` or :func:`Matches.get_value`
-which directly returned the value (parsed or not, depending on the ``parse``
-keyword argument).
-
-:func:`Matches.get_values` always returns a list of values, and
-:func:`Matches.get_value` a single value (if multiple groups are selected,
-the value from the first one in the filename pattern is returned).
-
-.. note::
-
-   :func:`Matches.__getitem__` wraps around :func:`Matches.get_value`,
-   with ``parse=True`` and ``discard=True``.
-
-So, here are a couple of ways to retrieve values from a filename::
-
-  finder = Finder('/data', '%(Y)/SST_%(Y)%(m)%(d).nc')
-  file, matches = finder.files[0]
-
-  # Finding the Match
-
-
-.. currentmodule:: filefinder
-
-The package supply the function :func:`library.get_date` to retrieve a
-:class:`~datetime.datetime` object from those matches::
-
-  from filefinder.library import get_date
-  matches = finder.get_matches(filename)
-  date = get_date(matches)
+  >>> finder.make_filename(param="this-feels-wrong", m=6, d=1)
+  "/data/param_this-feels-wrong/2014-06-01.nc"

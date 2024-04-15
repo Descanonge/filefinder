@@ -36,6 +36,19 @@ And we can generate a filename with a set of parameters::
     finder.make_filename(depth=100, Y=2000, m=1, d=1)
     # Specifying the month is optional since we already fixed it to 1.
 
+
+Installation
+------------
+
+FileFinder can be installed directly from pip::
+
+  pip install filefinder
+
+or from source with::
+
+  pip install -e https://github.com/Descanonge/filefinder.git#egg=filefinder
+
+
 Contents
 --------
 
@@ -44,7 +57,6 @@ Contents
 
    usage
    pattern
-   examples
 
 .. toctree::
    :maxdepth: 1

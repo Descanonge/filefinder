@@ -475,9 +475,17 @@ class Finder:
         """
         max_log_lines = 3
 
-        # patterns for each filetree depth
         regex = self.get_regex()
-        subpatterns = [re.compile(rgx) for rgx in regex.split(os.path.sep)]
+        # patterns for each filetree depth
+        if os.sep == "\\":
+            # Windows has a directory separator equal to the escape character which is
+            # present quite a lot in our regex. We split on \ NOT followed by any
+            # special regex character
+            special_chars = "()[]{}?*+-|^$\\.&~# \t\n\r\v\f"
+            subregexes = re.split(f"\\(?![{special_chars}])", regex)
+        else:
+            subregexes = regex.split(os.sep)
+        subpatterns = [re.compile(rgx) for rgx in subregexes]
         files = []
         for dirpath, dirnames, filenames in os.walk(self.root):
             depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(

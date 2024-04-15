@@ -22,7 +22,7 @@ Major overhaul, mainly streamlining.
   - Add 'z' option to format (just allow it in format string, nothing else) (added in 3.11).
   - Add alignment/fill support for string formats.
 - Fixed many minor bugs.
-- Better test suite relying heavily on hypothesis.
+- Better test suite relying heavily on hypothesis. Now tested on OS other than linux.
 
 ## v0.5.0
 

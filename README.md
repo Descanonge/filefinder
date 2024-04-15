@@ -52,7 +52,7 @@ And we can generate a filename with a set of parameters:
 
 ## Requirements
 
-Python >= 3.7.
+Python >= 3.9.
 
 ## Installation
 

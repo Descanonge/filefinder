@@ -409,8 +409,7 @@ class Finder:
 
         self._segments = [pattern[i:j] for i, j in zip(splits, splits[1:] + [None])]
 
-    def get_regex(self) -> str:
-        """Return regex."""
+    def _get_regex(self) -> str:
         segments = self._segments.copy()
         if not self.use_regex:
             # escape regex outside groups
@@ -422,6 +421,14 @@ class Finder:
             segments[2 * idx + 1] = group.get_regex()
 
         return "".join(segments)
+
+    def get_regex(self) -> str:
+        """Return regex."""
+        return self._get_regex().replace("/", re.escape(os.sep))
+
+    def get_regex_subdirs(self) -> list[str]:
+        """Return regexes for each sub-directory."""
+        return self._get_regex().split("/")
 
     def find_files(self):
         """Find files to scan and store them.
@@ -475,15 +482,7 @@ class Finder:
         """
         max_log_lines = 3
 
-        regex = self.get_regex()
-        # patterns for each filetree depth
-        if os.sep == "\\":
-            # Windows has a directory separator equal to the escape character
-            # It must be doubled
-            subregexes = regex.split(r"\\")
-        else:
-            subregexes = regex.split(os.sep)
-        subpatterns = [re.compile(rgx) for rgx in subregexes]
+        subpatterns = [re.compile(rgx) for rgx in self.get_regex_subdirs()]
         files = []
         for dirpath, dirnames, filenames in os.walk(self.root):
             depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
@@ -515,7 +514,7 @@ class Finder:
         logger.debug("Found %s files in sub-directories", len(files))
 
         # Now only retain files that match the full pattern
-        pattern = re.compile(regex)
+        pattern = re.compile(self.get_regex())
         files_matched = []
 
         for f in files:
@@ -527,7 +526,9 @@ class Finder:
             filelogs = files[:max_log_lines]
             if len(files) > max_log_lines:
                 filelogs += ["..."]
-            logger.debug("regex: %s, files:\n\t%s", regex, "\n\t".join(filelogs))
+            logger.debug(
+                "regex: %s, files:\n\t%s", pattern.pattern, "\n\t".join(filelogs)
+            )
             logger.debug("Found %s matching files in %s", len(files_matched), self.root)
 
         self.scanned = True

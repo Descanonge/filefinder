@@ -252,19 +252,18 @@ def test_format_regex():
     )
 )
 def test_file_scan(fs: FakeFilesystem, struct: StructPattern):
-    data_dirname = "data"
-    basedir = fs.root_dir_name + data_dirname
     try:
-        fs.root_dir.remove_entry(data_dirname)
+        fs.root_dir.remove_entry("data")
     except KeyError:
         pass
+    basedir = path.join(fs.root_dir_name, "data")
     fs.create_dir(basedir)
 
     files = list(struct.filenames)
     files = list(set(files))
     files.sort()
     for f in files:
-        fs.create_file(basedir + fs.path_separator + f)
+        fs.create_file(path.join(basedir, f))
 
     log.info("pattern: %s", struct.pattern)
     log.info("n_files: %d", len(files))
@@ -283,7 +282,7 @@ def test_file_scan_manual(fs):
     params = [-1.5, 0.0, 1.5]
     options = [False, True]
 
-    datadir = path.sep + "data"
+    datadir = path.join(fs.root_dir_name + "data")
     fs.create_dir(datadir)
     files = []
     for d, p, o in itertools.product(dates, params, options):
@@ -299,10 +298,7 @@ def test_file_scan_manual(fs):
 
     finder = Finder(
         datadir,
-        (
-            f"%(Y){path.sep}test_%(Y)-%(m)-%(d)_"
-            "%(param:fmt=.1f)%(option:bool=_yes).ext"
-        ),
+        "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
     )
     assert len(finder.files) == len(files)
     for f, f_ref in zip(finder.get_files(relative=True), files):
@@ -324,16 +320,9 @@ def test_opt_directory(fs):
     for f in files:
         fs.create_file(path.join(datadir, f))
 
-    # Double separator fo
-    sep = fs.path_separator
-    if sep == "\\":
-        sep *= 2
-
     finder = Finder(
         datadir,
-        f"%(folder:rgx=[a-z]{sep}:opt)"
-        f"%(folder:rgx=[a-z]{sep}:opt)"
-        "%(param:fmt=d).txt",
+        "%(folder:rgx=[a-z]/:opt)%(folder:rgx=[a-z]/:opt)%(param:fmt=d).txt",
         scan_everything=True,
     )
     assert len(finder.get_files()) == len(files)

@@ -270,7 +270,7 @@ class StGroup:
     """Store group related strategies."""
 
     alphabet = st.characters(
-        exclude_characters=["(", ")", ":", "%", "/"],
+        exclude_characters=["(", ")", ":", "%", "/", "\\"],
         exclude_categories=["C"],
         max_codepoint=MAX_CODEPOINT,
     )
@@ -389,7 +389,7 @@ class StructPattern:
         segments = self.segments.copy()
         for i, seg in enumerate(self.values_str):
             segments[2 * i + 1] = seg
-        return "".join(segments)
+        return "".join(segments).replace("/", os.sep)
 
     @property
     def filenames(self) -> abc.Iterator[str]:
@@ -399,7 +399,7 @@ class StructPattern:
         for values_str in itertools.product(*self.multiple_values_str):
             for i, seg in enumerate(values_str):
                 segments[2 * i + 1] = seg
-            yield "".join(segments)
+            yield "".join(segments).replace("/", os.sep)
 
 
 FORBIDDEN_CHAR = {"win": set('<>:"\\|?'), "mac": set(":")}
@@ -442,7 +442,7 @@ class StPattern:
             groups = draw(st.lists(st_group, min_size=min_group, max_size=4))
 
             # to avoid bad group definitions in other segments
-            exclude_characters = set("%()")
+            exclude_characters = set("%()\\")
 
             if sys.platform in ["win32", "cygwin"]:
                 exclude_characters |= FORBIDDEN_CHAR["win"]
@@ -468,8 +468,7 @@ class StPattern:
         # starting with / is wrong, this gets dropped by the filesystem
         # ending with / is wrong, we are looking for files
         out = comp().filter(
-            lambda p: not p.pattern.startswith(os.sep)
-            and not p.pattern.endswith(os.sep)
+            lambda p: not p.pattern.startswith("/") and not p.pattern.endswith("/")
         )
 
         return out

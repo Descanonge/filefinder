@@ -275,14 +275,20 @@ function :func:`library.get_date` to easily retrieve a
 
 .. currentmodule:: filefinder.finder
 
-Scanning process
-++++++++++++++++
+Directories in pattern
+++++++++++++++++++++++
 
-At its creation, the :class:`Finder` has all the information it needs to find
-the files on disk that correspond to the given pattern under the given root
-directory. The scanning process is launched automatically when using
-:meth:`Finder.get_files` or :attr:`Finder.files`, but can also be launched
-manually using :meth:`Finder.find_files`.
+The pattern can contain directory separators. The :class:`Finder` can explore
+sub-directories to find the files.
+
+.. important::
+
+   In the pattern, a directory separator should always be indicated with the
+   forward slash ``/``, even on Windows where we normally use the backslash. It
+   will be replaced by the correct character when necessary.
+
+   We do this because the backslash has special meanings in regular expressions,
+   and it is difficult to disambiguate the two.
 
 The scanning process is as follows. It first generates a regular expression
 based on the pattern and the fixed values. This expression is meant to match

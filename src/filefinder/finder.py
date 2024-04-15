@@ -365,7 +365,7 @@ class Finder:
             else:
                 raise ValueError(f"Group '{g!s}' has no fixed value.")
 
-        filename = "".join(segments)
+        filename = "".join(segments).replace("/", os.sep)
 
         if not relative:
             filename = self.get_absolute(filename)

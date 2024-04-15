@@ -339,13 +339,23 @@ class StGroup:
         """
         if ignore is None:
             ignore = []
-        specs = ["fmt", "rgx", "bool_elts", "opt", "discard"]
-        specs = [s for s in specs if s not in ignore]
+        specs = set(["fmt", "rgx", "bool_elts", "opt", "discard"])
+        specs -= set(ignore)
+
+        # we must have at least one of those
+        must_have = set(["fmt", "rgx", "bool_elts"])
+        assert specs & must_have
 
         @st.composite
         def comp(draw):
             # select the specs to use
-            chosen = draw(st.lists(st.sampled_from(specs), unique=True, max_size=5))
+            spec_strat = st.lists(
+                st.sampled_from(list(specs)),
+                unique=True,
+                min_size=1,
+                max_size=len(specs),
+            ).filter(lambda x: len(set(x) & must_have) > 0)
+            chosen = draw(spec_strat)
             values = {}
             values["name"] = draw(cls.name())
             if "fmt" in chosen:

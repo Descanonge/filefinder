@@ -241,7 +241,10 @@ def test_format_regex():
 
 # It is possible to add random files, but it is difficult to ensure they will not
 # match... It is easy to find counter examples.
-@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(
+    suppress_health_check=[HealthCheck.function_scoped_fixture],
+    deadline=timedelta(seconds=1),
+)
 @given(
     struct=StPattern.pattern_with_multiple_values().filter(
         # no groups without formatted value

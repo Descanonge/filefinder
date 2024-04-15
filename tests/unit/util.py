@@ -116,7 +116,7 @@ class StFormat:
         """
         alph = st.characters(
             exclude_categories=["Cc", "Cs"],
-            exclude_characters=["{", "}", "(", ")", "/"],
+            exclude_characters=["{", "}", "(", ")", "/", "\\"],
         )
         return st.text(alphabet=alph, min_size=0, max_size=1)
 

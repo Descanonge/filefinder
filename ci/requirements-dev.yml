@@ -18,4 +18,6 @@ dependencies:
   - pip
   - pip:
       - hypothesis
+      - coverage
+      - pytest-cov
       - --no-deps -e .

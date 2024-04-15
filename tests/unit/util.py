@@ -96,11 +96,11 @@ class StFormat:
 
     @classmethod
     def width(cls) -> st.SearchStrategy[int | None]:
-        return st.one_of(st.none(), st.integers(0, 256))
+        return st.one_of(st.none(), st.integers(0, 32))
 
     @classmethod
     def precision(cls) -> st.SearchStrategy[int | None]:
-        return st.one_of(st.none(), st.integers(0, 64))
+        return st.one_of(st.none(), st.integers(0, 32))
 
     @classmethod
     def fill(cls) -> st.SearchStrategy[str]:

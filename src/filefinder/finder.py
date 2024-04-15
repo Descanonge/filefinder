@@ -478,11 +478,9 @@ class Finder:
         regex = self.get_regex()
         # patterns for each filetree depth
         if os.sep == "\\":
-            # Windows has a directory separator equal to the escape character which is
-            # present quite a lot in our regex. We split on \ NOT followed by any
-            # special regex character
-            special_chars = "()[]{}?*+-|^$\\.&~# \t\n\r\v\f"
-            subregexes = re.split(f"\\(?![{special_chars}])", regex)
+            # Windows has a directory separator equal to the escape character
+            # It must be doubled
+            subregexes = regex.split(r"\\")
         else:
             subregexes = regex.split(os.sep)
         subpatterns = [re.compile(rgx) for rgx in subregexes]

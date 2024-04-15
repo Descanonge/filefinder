@@ -324,10 +324,15 @@ def test_opt_directory(fs):
     for f in files:
         fs.create_file(path.join(datadir, f))
 
+    # Double separator fo
+    sep = fs.path_separator
+    if sep == "\\":
+        sep *= 2
+
     finder = Finder(
         datadir,
-        f"%(folder:rgx=[a-z]{path.sep}:opt)"
-        f"%(folder:rgx=[a-z]{path.sep}:opt)"
+        f"%(folder:rgx=[a-z]{sep}:opt)"
+        f"%(folder:rgx=[a-z]{sep}:opt)"
         "%(param:fmt=d).txt",
         scan_everything=True,
     )

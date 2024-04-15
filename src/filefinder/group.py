@@ -151,8 +151,8 @@ class Group:
         if rgx:
             self.rgx = rgx
 
-        if self.rgx is None:
-            raise GroupParseError(self, "No regex has been produced.")
+        if not self.rgx:
+            raise GroupParseError("No regex has been produced.", self)
 
         self.rgx = self._replace_regex_defaults(self.rgx)
 

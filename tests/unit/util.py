@@ -216,6 +216,13 @@ class StructGroup:
     def __contains__(self, key: str) -> bool:
         return key in self.ordered_specs
 
+    def is_valid(self) -> bool:
+        try:
+            Group(self.definition, 0)
+        except Exception:
+            return False
+        return True
+
     @property
     def definition(self) -> str:
         out = self.name
@@ -351,7 +358,7 @@ class StGroup:
 
             return StructGroup(**values, ordered_specs=chosen)
 
-        return comp()
+        return comp().filter(lambda g: g.is_valid())
 
 
 @dataclass

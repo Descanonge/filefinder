@@ -199,14 +199,13 @@ def test_group_parenthesis():
     def test(pattern: str):
         Finder("", pattern)
 
-    test("0_%(normal_defintion)")
-    test("0_%(paren(in_name))")
+    test("0_%(normal_defintion:fmt=d)")
     test("0_%(paren(in_name):fmt=0d)")
     test("0_%(paren_in_bool:bool=(opt1):opt2)")
     test("0_%(paren_in_rgx:rgx=(?:barr))")  # note non matching to be legal
 
     for pattern in [
-        "0_%(unbalanced()",
+        "0_%(unbalanced(:fmt=d)",
         "0_%(unbalanced:rgx=(())",
         "0_%(unbalanced:bool=()",
     ]:
@@ -245,12 +244,7 @@ def test_format_regex():
     suppress_health_check=[HealthCheck.function_scoped_fixture],
     deadline=None,
 )
-@given(
-    struct=StPattern.pattern_with_multiple_values().filter(
-        # no groups without formatted value
-        lambda p: all(not isinstance(g, JustStrategy) for g in p.groups)
-    )
-)
+@given(struct=StPattern.pattern_with_multiple_values())
 def test_file_scan(fs: FakeFilesystem, struct: StructPattern):
     try:
         fs.root_dir.remove_entry("data")

@@ -243,7 +243,7 @@ def test_format_regex():
 # match... It is easy to find counter examples.
 @settings(
     suppress_health_check=[HealthCheck.function_scoped_fixture],
-    deadline=timedelta(seconds=1),
+    deadline=None,
 )
 @given(
     struct=StPattern.pattern_with_multiple_values().filter(

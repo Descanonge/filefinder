@@ -267,7 +267,6 @@ def test_file_scan(fs: FakeFilesystem, struct: StructPattern):
         assert f == f_ref
 
 
-# TODO test nested
 # TODO test if create finder, change use_regex, and use it
 
 
@@ -299,7 +298,105 @@ def test_file_scan_manual(fs):
         assert f == f_ref
 
 
+def test_file_scan_nested(fs):
+    """Test simple case of nested filenames output."""
+
+    def make_filename(date: datetime, param: float, option: bool) -> str:
+        filename = (
+            f"{date.year}{os.sep}test"
+            f"_{date.strftime('%Y-%m-%d')}"
+            f"_{param:.1f}{'_yes' if option else ''}.ext"
+        )
+        return filename
+
+    def make_filenames(
+        dates: list[datetime], params: list[float], options: list[bool]
+    ) -> list[str]:
+        files = []
+        for date, param, option in itertools.product(dates, params, options):
+            files.append(make_filename(date, param, option))
+        files.sort()
+        return files
+
+    dates = [datetime(2000, 1, 1) + i * timedelta(days=15) for i in range(50)]
+    params = [-1.5, 0.0, 1.5]
+    options = [False, True]
+
+    datadir = path.join(fs.root_dir_name + "data")
+    fs.create_dir(datadir)
+    files = make_filenames(dates, params, options)
+    for f in files:
+        fs.create_file(path.join(datadir, f))
+
+    for i in range(20):
+        fs.create_file(path.join(datadir, f"invalid_files_{i}.ext"))
+
+    finder = Finder(
+        datadir,
+        "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
+    )
+    assert len(finder.files) == len(files)
+
+    # Nest by param
+    nested_param = finder.get_files(relative=True, nested=["param"])
+    assert len(nested_param) == len(params)
+    for param_ref, nested_inner in zip(params, nested_param):
+        nest_files_ref = make_filenames(dates, [param_ref], options)
+        assert len(nested_inner) == len(nest_files_ref)
+        for f, f_ref in zip(nested_inner, nest_files_ref):
+            assert f == f_ref
+
+    # Nest by year
+    nested_y = finder.get_files(relative=True, nested=["Y"])
+    years = sorted(list(set(d.year for d in dates)))
+    assert len(nested_y) == len(years)
+    for year_ref, nested_inner in zip(years, nested_y):
+        nested_inner_ref = make_filenames(
+            [d for d in dates if d.year == year_ref], params, options
+        )
+        assert len(nested_inner) == len(nested_inner_ref)
+        for f, f_ref in zip(nested_inner, nested_inner_ref):
+            assert f == f_ref
+
+    # Nest by option then param
+    nested_option = finder.get_files(relative=True, nested=["option", "param"])
+    assert len(nested_option) == len(options)
+    for option_ref, nested_param in zip(options, nested_option):
+        assert len(nested_param) == len(params)
+        for param_ref, nested_inner in zip(params, nested_param):
+            assert len(nested_inner) == len(dates)
+            nested_inner_ref = make_filenames(dates, [param_ref], [option_ref])
+            for f, f_ref in zip(nested_inner, nested_inner_ref):
+                assert f == f_ref
+
+    # Nest by everything
+    nested_param = finder.get_files(
+        relative=True, nested=["param", "option", "Y", "m", "d"]
+    )
+    assert len(nested_param) == len(params)
+    for param_ref, nested_option in zip(params, nested_param):
+        assert len(nested_option) == len(options)
+        for option_ref, nested_y in zip(options, nested_option):
+            years = sorted(list(set(d.year for d in dates)))
+            assert len(nested_y) == len(years)
+            for y_ref, nested_m in zip(years, nested_y):
+                dates_y = [d for d in dates if d.year == y_ref]
+                months = sorted(list(set(d.month for d in dates_y)))
+                assert len(nested_m) == len(months)
+                for m_ref, nested_d in zip(months, nested_m):
+                    dates_m = [d for d in dates_y if d.month == m_ref]
+                    days = sorted(list(set(d.day for d in dates_m)))
+                    assert len(nested_d) == len(dates_m)
+                    for d_ref, nested_inner in zip(days, nested_d):
+                        assert len(nested_inner) == 1
+                        filename = make_filename(
+                            datetime(y_ref, m_ref, d_ref), param_ref, option_ref
+                        )
+                        assert nested_inner[0] == filename
+
+
 def test_opt_directory(fs):
+    """Test having a directory separator in an optional group."""
     datadir = path.sep + "alpha"
     fs.create_dir(datadir)
 

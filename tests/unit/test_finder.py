@@ -9,20 +9,21 @@ from os import path
 import pytest
 from filefinder import Finder
 from hypothesis import HealthCheck, given, settings
-from hypothesis.strategies._internal.misc import JustStrategy
 from pyfakefs.fake_filesystem import FakeFilesystem
 from util import StPattern, StructPattern
 
 log = logging.getLogger(__name__)
 
 
-def assert_pattern(pattern, regex):
+def assert_pattern(pattern: str, regex: str):
+    """Assert that `pattern` will generate `regex`"""
     finder = Finder("", pattern)
     assert finder.get_regex() == regex
 
 
 @given(struct=StPattern.pattern(separate=False))
 def test_group_names(struct: StructPattern):
+    """Test that we retain group names, and the correct number of groups."""
     f = Finder("", struct.pattern)
     assert f.n_groups == len(f.groups) == len(struct.groups)
 
@@ -32,6 +33,7 @@ def test_group_names(struct: StructPattern):
 
 @given(struct=StPattern.pattern(separate=False))
 def test_get_groups(struct: StructPattern):
+    """Test that Finder.get_groups return the correct indices given a group name."""
     f = Finder("", struct.pattern)
 
     names = set(g.name for g in struct.groups)
@@ -42,7 +44,7 @@ def test_get_groups(struct: StructPattern):
         assert indices_ref == indices
 
 
-@given(struct=StPattern.pattern_with_values())
+@given(struct=StPattern.pattern_with_values(parsable=True, ignore=["opt"]))
 def test_match_filename_values(struct: StructPattern):
     """Test values in a matched filename are correctly parsed.
 
@@ -65,14 +67,12 @@ def test_match_filename_values(struct: StructPattern):
     assert len(matches) == len(struct.groups)
 
     for i, (val, val_str) in enumerate(zip(struct.values, struct.values_str)):
-        # Unparsable group definition
-        if val is not None:
-            assert matches.get_value(key=i, parse=True, keep_discard=True) == val
-            if not struct.groups[i].discard:
-                assert matches[i] == val
-            else:
-                with pytest.raises(KeyError):
-                    _ = matches[i]
+        assert matches.get_value(key=i, parse=True, keep_discard=True) == val
+        if not struct.groups[i].discard:
+            assert matches[i] == val
+        else:
+            with pytest.raises(KeyError):
+                _ = matches[i]
 
         assert matches.get_value(key=i, parse=False, keep_discard=True) == val_str
 
@@ -98,13 +98,13 @@ def test_make_filename_by_str(struct: StructPattern):
             f.make_filename()
 
 
-@given(struct=StPattern.pattern_with_values())
+# No s-type formats, strings are not considered values by filefinder
+@given(struct=StPattern.pattern_with_values(fmt_kind="dfeE"))
 def test_make_filename_by_val(struct: StructPattern):
     """Test filename creation using values as fixes."""
     f = Finder("/base/", struct.pattern)
     fixes = {
-        i: val if val is not None else val_str
-        for i, (val, val_str) in enumerate(zip(struct.values, struct.values_str))
+        i: val for i, (val, val_str) in enumerate(zip(struct.values, struct.values_str))
     }
     assert f.make_filename(fixes, relative=True) == struct.filename
 
@@ -114,7 +114,7 @@ def test_make_filename_by_val(struct: StructPattern):
 
 
 @given(
-    struct=StPattern.pattern_with_values(min_group=1)
+    struct=StPattern.pattern_with_values(min_group=1, fmt_kind="dfeE")
     .filter(lambda p: len(set(g.name for g in p.groups)) == len(p.groups))
     .filter(lambda p: all(g.name != "relative" for g in p.groups))
 )
@@ -127,13 +127,13 @@ def test_make_filename_by_val_by_name(struct: StructPattern):
     """
     f = Finder("/base/", struct.pattern)
     fixes_by_name = {
-        g.name: val if val is not None else val_str
+        g.name: val
         for g, val, val_str in zip(struct.groups, struct.values, struct.values_str)
     }
     assert f.make_filename(**fixes_by_name, relative=True) == struct.filename
 
 
-@given(struct=StPattern.pattern_with_values())
+@given(struct=StPattern.pattern_with_values(fmt_kind="dfeE"))
 def test_make_filename_by_fix(struct: StructPattern):
     """Test filename creating with prior value fixing.
 
@@ -158,7 +158,7 @@ def test_make_filename_by_fix(struct: StructPattern):
     f.make_filename()
 
 
-@given(struct=StPattern.pattern_with_values(min_group=2))
+@given(struct=StPattern.pattern_with_values(min_group=2, fmt_kind="dfeE"))
 def test_make_filename_half_by_fix(struct: StructPattern):
     """Test filename creating with prior value fixing (not all groups).
 
@@ -221,13 +221,22 @@ def test_group_parenthesis():
         f.find_matches("0_barr")
 
 
-# Tested systematically in test_group.test_random_definitions
 def test_custom_regex():
+    """Test that a custom regex is conserved.
+
+    Tested systematically for groups in test_group.test_random_definitions.
+    Here with test that it still works at the Finder level.
+    """
     assert_pattern("test_%(Y:rgx=[a-z]*?)", "test_([a-z]*?)")
     assert_pattern("test_%(Y:fmt=d:rgx=[a-z]*?)", "test_([a-z]*?)")
 
 
 def test_format_regex():
+    """Test that the correct regex is generated from a format string.
+
+    Tested systematically for groups in test_group.test_random_definitions.
+    Here with test that it still works at the Finder level.
+    """
     assert_pattern("test_%(Y:fmt=d)", r"test_(-?\d+)")
     assert_pattern("test_%(Y:fmt=a>5d)", r"test_(a*-?\d+)")
     assert_pattern("test_%(Y:fmt=a<5d)", r"test_(-?\d+a*)")
@@ -244,8 +253,15 @@ def test_format_regex():
     suppress_health_check=[HealthCheck.function_scoped_fixture],
     deadline=None,
 )
-@given(struct=StPattern.pattern_with_multiple_values())
+@given(struct=StPattern.pattern_with_multiple_values(parsable=False))
 def test_file_scan(fs: FakeFilesystem, struct: StructPattern):
+    """Test that we scan files generated randomly.
+
+    Each pattern comes with lists of values for each group to generate multiple
+    filenames.
+    Groups are separated by at least one character to avoid ambiguous parsing (for
+    instance two consecutive integers cannot be separated).
+    """
     try:
         fs.root_dir.remove_entry("data")
     except KeyError:

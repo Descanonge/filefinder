@@ -3,6 +3,7 @@
 import itertools
 import math
 import os
+import re
 import sys
 import typing as t
 from collections import abc
@@ -13,6 +14,13 @@ from filefinder.group import Group
 from hypothesis import strategies as st
 
 MAX_CODEPOINT = 1024
+
+if sys.platform in ["win32", "cygwin"]:
+    FORBIDDEN_CHAR = set('<>:"\\|?')
+elif sys.platform == "darwin":
+    FORBIDDEN_CHAR = set(":")
+else:
+    FORBIDDEN_CHAR = set()
 
 
 def form(fmt: str, value: t.Any) -> str:
@@ -116,7 +124,7 @@ class StFormat:
         """
         alph = st.characters(
             exclude_categories=["Cc", "Cs"],
-            exclude_characters=["{", "}", "(", ")", "/", "\\"],
+            exclude_characters=set("{}()/\\") | FORBIDDEN_CHAR,
         )
         return st.text(alphabet=alph, min_size=0, max_size=1)
 
@@ -242,18 +250,23 @@ class StructGroup:
 
     @property
     def strategy_value(self) -> st.SearchStrategy:
+        if "rgx" in self:
+            return st.from_regex(self.rgx, fullmatch=True)
         if "bool_elts" in self:
             return st.booleans()
         if "fmt" in self and self.fmt_struct is not None:
             fmt = self.fmt_struct
             if fmt.kind == "s":
+                exclude = set("()/") | FORBIDDEN_CHAR
+                fill = fmt.fill if fmt.fill and fmt.align else " "
+                exclude.add(fill)
                 return st.text(
                     alphabet=st.characters(
                         max_codepoint=MAX_CODEPOINT,
                         exclude_categories=["C"],
-                        exclude_characters=["/", "(", ")"],
+                        exclude_characters=exclude,
                     )
-                ).map(lambda s: form(self.fmt, s))
+                ).map(lambda s: form(self.fmt, s).strip(fill))
             if fmt.kind == "d":
                 return st.integers()
             if fmt.kind in "feE":
@@ -266,6 +279,8 @@ class StructGroup:
         return st.none()
 
     def get_value_str(self, value: t.Any) -> str:
+        if "rgx" in self:
+            return value
         if "bool_elts" in self:
             return self.bool_elts[not value]
         if "fmt" in self:
@@ -276,25 +291,51 @@ class StructGroup:
 class StGroup:
     """Store group related strategies."""
 
-    alphabet = st.characters(
-        exclude_characters=["(", ")", ":", "%", "/", "\\"],
-        exclude_categories=["C"],
-        max_codepoint=MAX_CODEPOINT,
-    )
-
     @classmethod
     def name(cls) -> st.SearchStrategy[str]:
-        return st.text(alphabet=cls.alphabet, min_size=1)
+        return st.text(
+            alphabet=st.characters(
+                exclude_categories=["C"],
+                exclude_characters=["(", ")", ":"],
+                max_codepoint=MAX_CODEPOINT,
+            ),
+            min_size=1,
+        )
 
     @classmethod
     def rgx(cls) -> st.SearchStrategy[str]:
         """Choose a valid regex.
 
-        Some special characters are excluded: `():%`
-        Replacement syntax with percent is avoided to simplify things and is tested
-        separately.
+        Some special characters are excluded:
+
+        * ^, $, \\A and \\Z (start and end of string)
+        * parenthesis to avoid unbalanced group definition
+        * percent to avoid regex replacement (this is tested separately)
+        * forward slash
+        * double backslash for windows compatibility
         """
-        return st.text(alphabet=cls.alphabet, min_size=1)
+
+        def is_valid(rgx: str) -> bool:
+            try:
+                re.compile(rgx)
+            except Exception:
+                return False
+            return True
+
+        strat = (
+            st.text(
+                alphabet=st.characters(
+                    max_codepoint=MAX_CODEPOINT,
+                    exclude_categories=["C"],
+                    exclude_characters=list(r"()/%^$\A\Z"),
+                ),
+                min_size=1,
+            )
+            .filter(lambda rgx: r"\\" not in rgx)
+            .filter(lambda rgx: is_valid(rgx))
+        )
+
+        return strat
 
     @classmethod
     def fmt(cls, kind: str = "sdfeE") -> st.SearchStrategy[StructFormat]:
@@ -303,12 +344,17 @@ class StGroup:
 
     @classmethod
     def bool_elts(cls) -> st.SearchStrategy[tuple[str, str]]:
-        """Choose two valid regexes. The first one is not empty."""
+        """Choose two valid strings. The first one is not empty."""
+        alphabet = st.characters(
+            exclude_characters=set("():/\\") | FORBIDDEN_CHAR,
+            exclude_categories=["C"],
+            max_codepoint=MAX_CODEPOINT,
+        )
 
         @st.composite
         def comp(draw) -> tuple[str, str]:
-            a = draw(cls.rgx().filter(lambda s: len(s) > 0))
-            b = draw(cls.rgx())
+            a = draw(st.text(alphabet=alphabet, min_size=1))
+            b = draw(st.text(alphabet=alphabet))
             return a, b
 
         return comp().filter(lambda ab: ab[0] != ab[1])
@@ -323,7 +369,10 @@ class StGroup:
 
     @classmethod
     def group(
-        cls, ignore: list[str] | None = None, fmt_kind: str = "sdfeE"
+        cls,
+        ignore: list[str] | None = None,
+        fmt_kind: str = "sdfeE",
+        parsable: bool = False,
     ) -> st.SearchStrategy[StructGroup]:
         """Generate group structure.
 
@@ -336,6 +385,9 @@ class StGroup:
             List of specs to not draw
         fmt_kind
             Kinds of format to generate.
+        parsable:
+            If true, group is made to be able to generate a value and parse it back.
+            Spec `rgx` is removed if `bool` or `fmt` is present.
         """
         if ignore is None:
             ignore = []
@@ -347,7 +399,7 @@ class StGroup:
         assert specs & must_have
 
         @st.composite
-        def comp(draw):
+        def comp(draw, fmt_kind: str):
             # select the specs to use
             spec_strat = st.lists(
                 st.sampled_from(list(specs)),
@@ -355,9 +407,15 @@ class StGroup:
                 min_size=1,
                 max_size=len(specs),
             ).filter(lambda x: len(set(x) & must_have) > 0)
+
             chosen = draw(spec_strat)
+
             values = {}
             values["name"] = draw(cls.name())
+
+            if parsable and "rgx" in chosen:
+                if "bool_elts" in chosen or "fmt" in chosen:
+                    chosen.remove("rgx")
             if "fmt" in chosen:
                 values["fmt_struct"] = draw(cls.fmt(kind=fmt_kind))
                 values["fmt"] = values["fmt_struct"].fmt
@@ -368,7 +426,7 @@ class StGroup:
 
             return StructGroup(**values, ordered_specs=chosen)
 
-        return comp().filter(lambda g: g.is_valid())
+        return comp(fmt_kind).filter(lambda g: g.is_valid())
 
 
 @dataclass
@@ -388,12 +446,6 @@ class StructPattern:
     """Values of appropriate type for each group."""
     multiple_values_str: list[list[str]] = field(default_factory=lambda: [])
     """Formatted value for each group."""
-
-    # def __repr__(self) -> str:
-    #     try:
-    #         return self.pattern
-    #     except Exception:
-    #         return super().__repr__()
 
     @property
     def pattern(self) -> str:
@@ -419,15 +471,14 @@ class StructPattern:
             yield "".join(segments).replace("/", os.sep)
 
 
-FORBIDDEN_CHAR = {"win": set('<>:"\\|?'), "mac": set(":")}
-
-
 class StPattern:
     """Strategies related to pattern."""
 
+    max_group: int = 4
+
     @classmethod
     def pattern(
-        cls, min_group: int = 0, separate: bool = True
+        cls, min_group: int = 0, separate: bool = True, **kwargs
     ) -> st.SearchStrategy[StructPattern]:
         """Generate a pattern structure.
 
@@ -438,39 +489,33 @@ class StPattern:
         There are some limitations:
 
         * The name is not one of the default groups.
-        * `rgx` spec is not included. Its presence cannot guarantee to be able to
-          generate parsable values.
-        * `fmt` kinds are limited to number. string formats are difficult to parse
-          without limitations
         * If argument `separate` is true, groups are separated by at least one
-          character, not realistic but avoids confusion in some general cases.
+          character, this is to avoid some ambiguous cases like two consecutive
+          integers for instance (it can be impossible to correctly separate the two).
 
         Parameters
         ----------
         min_group
             Minimum number of groups in pattern. Default is zero.
+        separate
+            If True, groups are separated by at least one character in the pattern.
+        kwargs
+            Passed to StGroup strategy.
         """
 
         @st.composite
         def comp(draw) -> StructPattern:
-            st_group = StGroup.group(ignore=["rgx"], fmt_kind="dfeE").filter(
+            st_group = StGroup.group(**kwargs).filter(
                 lambda g: g.name not in Group.DEFAULT_GROUPS
             )
-            groups = draw(st.lists(st_group, min_size=min_group, max_size=4))
-
-            # to avoid bad group definitions in other segments
-            exclude_characters = set("%()\\")
-
-            if sys.platform in ["win32", "cygwin"]:
-                exclude_characters |= FORBIDDEN_CHAR["win"]
-            elif sys.platform == "darwin":
-                exclude_characters |= FORBIDDEN_CHAR["mac"]
-
+            groups = draw(
+                st.lists(st_group, min_size=min_group, max_size=cls.max_group)
+            )
             text = st.text(
                 alphabet=st.characters(
                     max_codepoint=MAX_CODEPOINT,
                     exclude_categories=["C"],
-                    exclude_characters=exclude_characters,
+                    exclude_characters=set("%()\\") | FORBIDDEN_CHAR,
                 ),
                 max_size=64,
                 min_size=1 if separate else 0,

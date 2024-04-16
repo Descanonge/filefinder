@@ -374,9 +374,9 @@ def get_format(format: str) -> FormatAbstract:
         raise FormatError("Precision parameter is currently not supported.")
 
     # defaults values for unset remaining parameters
-    defaults = dict(align=">", fill=" ")
+    defaults = dict(align="<", fill=" ")
     if kind in "dfeE":
-        defaults |= dict(sign="-", width="0", precision=".6", grouping="")
+        defaults |= dict(align=">", sign="-", width="0", precision=".6", grouping="")
 
     for k, v in defaults.items():
         if params[k] is None:

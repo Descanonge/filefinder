@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 
 def assert_pattern(pattern: str, regex: str):
-    """Assert that `pattern` will generate `regex`"""
+    """Assert that `pattern` will generate `regex`."""
     finder = Finder("", pattern)
     assert finder.get_regex() == regex
 
@@ -281,9 +281,6 @@ def test_file_scan(fs: FakeFilesystem, struct: StructPattern):
     assert len(finder.files) == len(files)
     for f, f_ref in zip(finder.get_files(relative=True), files):
         assert f == f_ref
-
-
-# TODO test if create finder, change use_regex, and use it
 
 
 def test_file_scan_manual(fs):

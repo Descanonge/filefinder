@@ -304,11 +304,11 @@ class StGroup:
 
     @classmethod
     def rgx(cls) -> st.SearchStrategy[str]:
-        """Choose a valid regex.
+        r"""Choose a valid regex.
 
         Some special characters are excluded:
 
-        * ^, $, \\A and \\Z (start and end of string)
+        * ^, $, \A and \Z (start and end of string)
         * parenthesis to avoid unbalanced group definition
         * percent to avoid regex replacement (this is tested separately)
         * forward slash
@@ -427,6 +427,20 @@ class StGroup:
             return StructGroup(**values, ordered_specs=chosen)
 
         return comp(fmt_kind).filter(lambda g: g.is_valid())
+
+    @classmethod
+    def group_with_values(
+        cls, size: int = 16, **kwargs
+    ) -> st.SearchStrategy[tuple[StructGroup, list[t.Any]]]:
+        @st.composite
+        def comp(draw):
+            struct = draw(cls.group(**kwargs))
+            values = st.lists(
+                struct.strategy_value, min_size=size, max_size=size, unique=True
+            )
+            return struct, draw(values)
+
+        return comp()
 
 
 @dataclass

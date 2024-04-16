@@ -67,6 +67,15 @@ def test_bool(ab):
     assert grp.rgx == f"{c}|"
 
 
+@given(input=StGroup.group_with_values(parsable=True))
+def test_group_parse(input):
+    """Test if a group can parse a value that it formatted."""
+    struct, values = input
+    grp = Group(struct.definition, 0)
+    for val in values:
+        assert grp.parse(grp.format(val)) == val
+
+
 @pytest.mark.parametrize(
     "spec",
     [

@@ -154,6 +154,9 @@ class Group:
         if not self.rgx:
             raise GroupParseError("No regex has been produced.", self)
 
+        if self.options is not None:
+            # rgx is A|B, A and B being strings we don't do "% replacement"
+            return
         self.rgx = self._replace_regex_defaults(self.rgx)
 
     def _check_duplicates(self, m: re.Match):

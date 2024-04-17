@@ -10,7 +10,7 @@ import pytest
 from filefinder import Finder
 from hypothesis import HealthCheck, given, settings
 from pyfakefs.fake_filesystem import FakeFilesystem
-from util import StPattern, StructPattern
+from util import PatternValue, PatternValues, StPattern, StructPattern
 
 log = logging.getLogger(__name__)
 
@@ -44,8 +44,8 @@ def test_get_groups(struct: StructPattern):
         assert indices_ref == indices
 
 
-@given(struct=StPattern.pattern_with_values(parsable=True, ignore=["opt"]))
-def test_match_filename_values(struct: StructPattern):
+@given(pval=StPattern.pattern_value(parsable=True, ignore=["opt"]))
+def test_match_filename_values(pval: PatternValue):
     """Test values in a matched filename are correctly parsed.
 
     Pattern is generated automatically with appropriate values (and formatted values).
@@ -57,40 +57,36 @@ def test_match_filename_values(struct: StructPattern):
     If the group has no discard flag, we also test Matches.__getitem__.
     """
     # reference filename
-    filename = struct.filename
-
-    f = Finder("", struct.pattern)
-    matches = f.find_matches(filename)
+    f = Finder("", pval.pattern.pattern)
+    matches = f.find_matches(pval.filename)
     assert matches is not None
 
     # Correct number of matches
-    assert len(matches) == len(struct.groups)
+    assert len(matches) == len(pval.pattern.groups)
 
-    for i, (val, val_str) in enumerate(zip(struct.values, struct.values_str)):
-        assert matches.get_value(key=i, parse=True, keep_discard=True) == val
-        if not struct.groups[i].discard:
-            assert matches[i] == val
+    for i, grp in enumerate(pval.value):
+        assert matches.get_value(key=i, parse=True, keep_discard=True) == grp.value
+        assert matches.get_value(key=i, parse=False, keep_discard=True) == grp.value_str
+        # Test shortcut
+        if not grp.struct.discard:
+            assert matches[i] == grp.value
         else:
             with pytest.raises(KeyError):
                 _ = matches[i]
 
-        assert matches.get_value(key=i, parse=False, keep_discard=True) == val_str
 
-
-@given(struct=StPattern.pattern_with_values())
-def test_make_filename_by_str(struct: StructPattern):
+@given(pval=StPattern.pattern_value())
+def test_make_filename_by_str(pval: PatternValue):
     """Test filename creation using string as fixes.
 
     Check fixing by value is conserved.
     Check by index. Only run by name (cannot check the expected filename).
     """
-    f = Finder("/base/", struct.pattern)
-    fixes = {i: val_str for i, val_str in enumerate(struct.values_str)}
+    f = Finder("/base/", pval.pattern.pattern)
+    fixes = {i: grp.value_str for i, grp in enumerate(pval.value)}
     # we won't check the output for those
-    fixes_by_name = {
-        g.name: val_str for g, val_str in zip(struct.groups, struct.values_str)
-    }
-    assert f.make_filename(fixes, relative=True) == struct.filename
+    fixes_by_name = {grp.struct.name: grp.value_str for grp in pval.value}
+    assert f.make_filename(fixes, relative=True) == pval.filename
     f.make_filename(fixes_by_name)
 
     if f.n_groups > 0:
@@ -99,14 +95,12 @@ def test_make_filename_by_str(struct: StructPattern):
 
 
 # No s-type formats, strings are not considered values by filefinder
-@given(struct=StPattern.pattern_with_values(fmt_kind="dfeE"))
-def test_make_filename_by_val(struct: StructPattern):
+@given(pval=StPattern.pattern_value(fmt_kind="dfeE"))
+def test_make_filename_by_val(pval: PatternValue):
     """Test filename creation using values as fixes."""
-    f = Finder("/base/", struct.pattern)
-    fixes = {
-        i: val for i, (val, val_str) in enumerate(zip(struct.values, struct.values_str))
-    }
-    assert f.make_filename(fixes, relative=True) == struct.filename
+    f = Finder("/base/", pval.pattern.pattern)
+    fixes = {i: grp.value_str for i, grp in enumerate(pval.value)}
+    assert f.make_filename(fixes, relative=True) == pval.filename
 
     if f.n_groups > 0:
         with pytest.raises(ValueError):
@@ -114,43 +108,38 @@ def test_make_filename_by_val(struct: StructPattern):
 
 
 @given(
-    struct=StPattern.pattern_with_values(min_group=1, fmt_kind="dfeE")
-    .filter(lambda p: len(set(g.name for g in p.groups)) == len(p.groups))
-    .filter(lambda p: all(g.name != "relative" for g in p.groups))
+    pval=StPattern.pattern_value(min_group=1, fmt_kind="dfeE")
+    .filter(lambda p: len(set(g.struct.name for g in p.value)) == len(p.value))
+    .filter(lambda p: all(g.struct.name != "relative" for g in p.value))
 )
-def test_make_filename_by_val_by_name(struct: StructPattern):
+def test_make_filename_by_val_by_name(pval: PatternValue):
     """Test filename creation fixing values by group name.
 
     Separate test function to make sure all names are differents, otherwise
     group.fix_value might have different output despite having the same name.
     Also avoid keyword name relative.
     """
-    f = Finder("/base/", struct.pattern)
-    fixes_by_name = {
-        g.name: val
-        for g, val, val_str in zip(struct.groups, struct.values, struct.values_str)
-    }
-    assert f.make_filename(**fixes_by_name, relative=True) == struct.filename
+    f = Finder("/base/", pval.pattern.pattern)
+    fixes_by_name = {grp.struct.name: grp.value for grp in pval.value}
+    assert f.make_filename(**fixes_by_name, relative=True) == pval.filename
 
 
-@given(struct=StPattern.pattern_with_values(fmt_kind="dfeE"))
-def test_make_filename_by_fix(struct: StructPattern):
+@given(pval=StPattern.pattern_value(fmt_kind="dfeE"))
+def test_make_filename_by_fix(pval: PatternValue):
     """Test filename creating with prior value fixing.
 
     All formatted values are fixed by index. Filename is checked against expected value.
     Groups are unfixed, and refixed by name before testing if filename creation runs
     (no value check against expected filename).
     """
-    f = Finder("/base/", struct.pattern)
-    fixes = {i: val_str for i, val_str in enumerate(struct.values_str)}
+    f = Finder("/base/", pval.pattern.pattern)
+    fixes = {i: grp.value_str for i, grp in enumerate(pval.value)}
     # we won't check the output for those
-    fixes_by_name = {
-        g.name: val_str for g, val_str in zip(struct.groups, struct.values_str)
-    }
+    fixes_by_name = {grp.struct.name: grp.value_str for grp in pval.value}
 
     # Fix and check output
     f.fix_groups(fixes, fix_discard=True)
-    assert f.make_filename(relative=True) == struct.filename
+    assert f.make_filename(relative=True) == pval.filename
 
     # Reset, fix by name and check there is no error.
     f.unfix_groups()
@@ -158,25 +147,25 @@ def test_make_filename_by_fix(struct: StructPattern):
     f.make_filename()
 
 
-@given(struct=StPattern.pattern_with_values(min_group=2, fmt_kind="dfeE"))
-def test_make_filename_half_by_fix(struct: StructPattern):
+@given(pval=StPattern.pattern_value(min_group=2, fmt_kind="dfeE"))
+def test_make_filename_half_by_fix(pval: PatternValue):
     """Test filename creating with prior value fixing (not all groups).
 
     Same as previous, but half groups are fixed, and second half is given on
     make_filename call. Formatted values are fixed by index.
     """
-    f = Finder("/base/", struct.pattern)
+    f = Finder("/base/", pval.pattern.pattern)
     n_fix = int(f.n_groups / 2)
-    f.fix_groups({i: struct.values_str[i] for i in range(n_fix)}, fix_discard=True)
+    f.fix_groups({i: pval.value[i].value_str for i in range(n_fix)}, fix_discard=True)
 
     # As is, not everything is fixed
     with pytest.raises(ValueError):
         f.make_filename()
 
     result = f.make_filename(
-        {i: struct.values_str[i] for i in range(n_fix, f.n_groups)}, relative=True
+        {i: pval.value[i].value_str for i in range(n_fix, f.n_groups)}, relative=True
     )
-    assert result == struct.filename
+    assert result == pval.filename
 
 
 @pytest.mark.parametrize("pattern", ["ab%(foo:fmt=d)", "ab%(foo:rgx=.*)"])
@@ -253,8 +242,8 @@ def test_format_regex():
     suppress_health_check=[HealthCheck.function_scoped_fixture],
     deadline=None,
 )
-@given(struct=StPattern.pattern_with_multiple_values(parsable=False))
-def test_file_scan(fs: FakeFilesystem, struct: StructPattern):
+@given(pval=StPattern.pattern_values(min_group=1, parsable=False))
+def test_file_scan(fs: FakeFilesystem, pval: PatternValues):
     """Test that we scan files generated randomly.
 
     Each pattern comes with lists of values for each group to generate multiple
@@ -269,15 +258,15 @@ def test_file_scan(fs: FakeFilesystem, struct: StructPattern):
     basedir = path.join(fs.root_dir_name, "data")
     fs.create_dir(basedir)
 
-    files = list(struct.filenames)
+    files = list(pval.filenames)
     files = list(set(files))
     files.sort()
     for f in files:
         fs.create_file(path.join(basedir, f))
 
-    log.info("pattern: %s", struct.pattern)
+    log.info("pattern: %s", pval.pattern.pattern)
     log.info("n_files: %d", len(files))
-    finder = Finder(basedir, struct.pattern)
+    finder = Finder(basedir, pval.pattern.pattern)
     assert len(finder.files) == len(files)
     for f, f_ref in zip(finder.get_files(relative=True), files):
         assert f == f_ref

@@ -220,7 +220,6 @@ class StFormat:
                 if k in "feE":
                     to_draw.append("precision")
 
-            print(to_draw)
             fill = draw(cls.fill(for_pattern=for_pattern, for_filename=for_filename))
 
             f = FormatTest(
@@ -299,7 +298,17 @@ class GroupTest:
         self, for_pattern: bool = False, for_filename: bool = False
     ) -> st.SearchStrategy:
         if "rgx" in self:
-            return st.from_regex(self.rgx, fullmatch=True)
+            exclude = build_exclude(for_pattern=for_pattern, for_filename=for_filename)
+            alphabet = alphabet = st.characters(
+                max_codepoint=MAX_CODEPOINT,
+                exclude_categories=["C"],
+                exclude_characters=exclude,
+            )
+            return st.from_regex(
+                self.rgx,
+                fullmatch=True,
+                alphabet=alphabet,
+            ).filter(lambda s: len(s) < MAX_TEXT_SIZE)
         if "bool_elts" in self:
             return st.booleans()
         if "fmt" in self and self.fmt_struct is not None:

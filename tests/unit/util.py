@@ -462,6 +462,10 @@ class StGroup:
 
         flags = set(["opt", "discard"]) - set(ignore)
 
+        if parsable:
+            fmt_kind = fmt_kind.replace("s", "")
+            specs.remove("rgx")
+
         @st.composite
         def comp(draw, fmt_kind: str):
             # select the specs to use

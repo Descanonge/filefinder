@@ -61,7 +61,7 @@ def test_bool_regex(ab):
     assert grp.options == ("", a)
 
 
-@given(ref=StGroup.group_value(parsable=True, ignore=["rgx"]))
+@given(ref=StGroup.group_value(parsable=True))
 def test_group_parse_back(ref: GroupValue):
     """Test if a group can parse a value that it formatted."""
     grp = Group(ref.definition, 0)

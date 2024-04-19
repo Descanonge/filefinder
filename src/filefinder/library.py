@@ -14,9 +14,7 @@ from .matches import Matches
 logger = logging.getLogger(__name__)
 
 
-def get_date(
-    matches: Matches, default_date: dict | None = None, groups: list[str] | None = None
-) -> datetime:
+def get_date(matches: Matches, default_date: dict | None = None) -> datetime:
     """Retrieve date from matched elements.
 
     If a matcher is *not* found in the filename, it will be replaced by the
@@ -29,9 +27,6 @@ def get_date(
     ----------
     matches:
         Matches obtained from a filename.
-    groups:
-        If not None, restrict matches for the groups which names are in this
-        list.
     default_date:
         Default date. Dictionnary with keys: year, month, day, hour, minute,
         and second. Defaults to 1970-01-01 00:00:00
@@ -63,9 +58,7 @@ def get_date(
     date.update(default_date)
 
     elts = {
-        m.group.name: m.get_match(parse=False)
-        for m in matches
-        if (not m.group.discard and (groups is None or m.group.name in groups))
+        m.group.name: m.get_match(parse=False) for m in matches if not m.group.discard
     }
 
     elts_needed = set("xXYmdBjHMSF")

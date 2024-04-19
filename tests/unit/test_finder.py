@@ -10,7 +10,7 @@ import pytest
 from filefinder import Finder
 from hypothesis import HealthCheck, given, settings
 from pyfakefs.fake_filesystem import FakeFilesystem
-from util import PatternValue, PatternValues, StPattern, StructPattern
+from util import Pattern, PatternValue, PatternValues, StPattern
 
 log = logging.getLogger(__name__)
 
@@ -21,31 +21,31 @@ def assert_pattern(pattern: str, regex: str):
     assert finder.get_regex() == regex
 
 
-@given(struct=StPattern.pattern(separate=False))
-def test_group_names(struct: StructPattern):
+@given(ref=StPattern.pattern(separate=False))
+def test_group_names(ref: Pattern):
     """Test that we retain group names, and the correct number of groups."""
-    f = Finder("", struct.pattern)
-    assert f.n_groups == len(f.groups) == len(struct.groups)
+    f = Finder("", ref.pattern)
+    assert f.n_groups == len(f.groups) == len(ref.groups)
 
     for i in range(f.n_groups):
-        assert f.groups[i].name == struct.groups[i].name
+        assert f.groups[i].name == ref.groups[i].name
 
 
-@given(struct=StPattern.pattern(separate=False))
-def test_get_groups(struct: StructPattern):
+@given(ref=StPattern.pattern(separate=False))
+def test_get_groups(ref: Pattern):
     """Test that Finder.get_groups return the correct indices given a group name."""
-    f = Finder("", struct.pattern)
+    f = Finder("", ref.pattern)
 
-    names = set(g.name for g in struct.groups)
+    names = set(g.name for g in ref.groups)
 
     for name in names:
-        indices_ref = [i for i, g in enumerate(struct.groups) if g.name == name]
+        indices_ref = [i for i, g in enumerate(ref.groups) if g.name == name]
         indices = [g.idx for g in f.get_groups(name)]
         assert indices_ref == indices
 
 
-@given(pval=StPattern.pattern_value(parsable=True, ignore=["opt"]))
-def test_match_filename_values(pval: PatternValue):
+@given(ref=StPattern.pattern_value(parsable=True, ignore=["opt"]))
+def test_match_filename_values(ref: PatternValue):
     """Test values in a matched filename are correctly parsed.
 
     Pattern is generated automatically with appropriate values (and formatted values).
@@ -57,36 +57,36 @@ def test_match_filename_values(pval: PatternValue):
     If the group has no discard flag, we also test Matches.__getitem__.
     """
     # reference filename
-    f = Finder("", pval.pattern.pattern)
-    matches = f.find_matches(pval.filename)
+    f = Finder("", ref.pattern)
+    matches = f.find_matches(ref.filename)
     assert matches is not None
 
     # Correct number of matches
-    assert len(matches) == len(pval.pattern.groups)
+    assert len(matches) == len(ref.groups)
 
-    for i, grp in enumerate(pval.value):
+    for i, grp in enumerate(ref.groups):
         assert matches.get_value(key=i, parse=True, keep_discard=True) == grp.value
         assert matches.get_value(key=i, parse=False, keep_discard=True) == grp.value_str
         # Test shortcut
-        if not grp.struct.discard:
+        if not grp.discard:
             assert matches[i] == grp.value
         else:
             with pytest.raises(KeyError):
                 _ = matches[i]
 
 
-@given(pval=StPattern.pattern_value())
-def test_make_filename_by_str(pval: PatternValue):
+@given(ref=StPattern.pattern_value())
+def test_make_filename_by_str(ref: PatternValue):
     """Test filename creation using string as fixes.
 
     Check fixing by value is conserved.
     Check by index. Only run by name (cannot check the expected filename).
     """
-    f = Finder("/base/", pval.pattern.pattern)
-    fixes = {i: grp.value_str for i, grp in enumerate(pval.value)}
+    f = Finder("/base/", ref.pattern)
+    fixes = {i: grp.value_str for i, grp in enumerate(ref.groups)}
     # we won't check the output for those
-    fixes_by_name = {grp.struct.name: grp.value_str for grp in pval.value}
-    assert f.make_filename(fixes, relative=True) == pval.filename
+    fixes_by_name = {grp.name: grp.value_str for grp in ref.groups}
+    assert f.make_filename(fixes, relative=True) == ref.filename
     f.make_filename(fixes_by_name)
 
     if f.n_groups > 0:
@@ -95,12 +95,12 @@ def test_make_filename_by_str(pval: PatternValue):
 
 
 # No s-type formats, strings are not considered values by filefinder
-@given(pval=StPattern.pattern_value(fmt_kind="dfeE"))
-def test_make_filename_by_val(pval: PatternValue):
+@given(ref=StPattern.pattern_value(fmt_kind="dfeE"))
+def test_make_filename_by_val(ref: PatternValue):
     """Test filename creation using values as fixes."""
-    f = Finder("/base/", pval.pattern.pattern)
-    fixes = {i: grp.value_str for i, grp in enumerate(pval.value)}
-    assert f.make_filename(fixes, relative=True) == pval.filename
+    f = Finder("/base/", ref.pattern)
+    fixes = {i: grp.value_str for i, grp in enumerate(ref.groups)}
+    assert f.make_filename(fixes, relative=True) == ref.filename
 
     if f.n_groups > 0:
         with pytest.raises(ValueError):
@@ -108,38 +108,38 @@ def test_make_filename_by_val(pval: PatternValue):
 
 
 @given(
-    pval=StPattern.pattern_value(min_group=1, fmt_kind="dfeE")
-    .filter(lambda p: len(set(g.struct.name for g in p.value)) == len(p.value))
-    .filter(lambda p: all(g.struct.name != "relative" for g in p.value))
+    ref=StPattern.pattern_value(min_group=1, fmt_kind="dfeE")
+    .filter(lambda p: len(set(g.name for g in p.groups)) == len(p.groups))
+    .filter(lambda p: all(g.name != "relative" for g in p.groups))
 )
-def test_make_filename_by_val_by_name(pval: PatternValue):
+def test_make_filename_by_val_by_name(ref: PatternValue):
     """Test filename creation fixing values by group name.
 
     Separate test function to make sure all names are differents, otherwise
     group.fix_value might have different output despite having the same name.
     Also avoid keyword name relative.
     """
-    f = Finder("/base/", pval.pattern.pattern)
-    fixes_by_name = {grp.struct.name: grp.value for grp in pval.value}
-    assert f.make_filename(**fixes_by_name, relative=True) == pval.filename
+    f = Finder("/base/", ref.pattern)
+    fixes_by_name = {grp.name: grp.value for grp in ref.groups}
+    assert f.make_filename(**fixes_by_name, relative=True) == ref.filename
 
 
-@given(pval=StPattern.pattern_value(fmt_kind="dfeE"))
-def test_make_filename_by_fix(pval: PatternValue):
+@given(ref=StPattern.pattern_value(fmt_kind="dfeE"))
+def test_make_filename_by_fix(ref: PatternValue):
     """Test filename creating with prior value fixing.
 
     All formatted values are fixed by index. Filename is checked against expected value.
     Groups are unfixed, and refixed by name before testing if filename creation runs
     (no value check against expected filename).
     """
-    f = Finder("/base/", pval.pattern.pattern)
-    fixes = {i: grp.value_str for i, grp in enumerate(pval.value)}
+    f = Finder("/base/", ref.pattern)
+    fixes = {i: grp.value_str for i, grp in enumerate(ref.groups)}
     # we won't check the output for those
-    fixes_by_name = {grp.struct.name: grp.value_str for grp in pval.value}
+    fixes_by_name = {grp.name: grp.value_str for grp in ref.groups}
 
     # Fix and check output
     f.fix_groups(fixes, fix_discard=True)
-    assert f.make_filename(relative=True) == pval.filename
+    assert f.make_filename(relative=True) == ref.filename
 
     # Reset, fix by name and check there is no error.
     f.unfix_groups()
@@ -147,25 +147,25 @@ def test_make_filename_by_fix(pval: PatternValue):
     f.make_filename()
 
 
-@given(pval=StPattern.pattern_value(min_group=2, fmt_kind="dfeE"))
-def test_make_filename_half_by_fix(pval: PatternValue):
+@given(ref=StPattern.pattern_value(min_group=2, fmt_kind="dfeE"))
+def test_make_filename_half_by_fix(ref: PatternValue):
     """Test filename creating with prior value fixing (not all groups).
 
     Same as previous, but half groups are fixed, and second half is given on
     make_filename call. Formatted values are fixed by index.
     """
-    f = Finder("/base/", pval.pattern.pattern)
+    f = Finder("/base/", ref.pattern)
     n_fix = int(f.n_groups / 2)
-    f.fix_groups({i: pval.value[i].value_str for i in range(n_fix)}, fix_discard=True)
+    f.fix_groups({i: ref.groups[i].value_str for i in range(n_fix)}, fix_discard=True)
 
     # As is, not everything is fixed
     with pytest.raises(ValueError):
         f.make_filename()
 
     result = f.make_filename(
-        {i: pval.value[i].value_str for i in range(n_fix, f.n_groups)}, relative=True
+        {i: ref.groups[i].value_str for i in range(n_fix, f.n_groups)}, relative=True
     )
-    assert result == pval.filename
+    assert result == ref.filename
 
 
 @pytest.mark.parametrize("pattern", ["ab%(foo:fmt=d)", "ab%(foo:rgx=.*)"])
@@ -242,8 +242,8 @@ def test_format_regex():
     suppress_health_check=[HealthCheck.function_scoped_fixture],
     deadline=None,
 )
-@given(pval=StPattern.pattern_values(min_group=1, parsable=False))
-def test_file_scan(fs: FakeFilesystem, pval: PatternValues):
+@given(ref=StPattern.pattern_values(min_group=1, parsable=False))
+def test_file_scan(fs: FakeFilesystem, ref: PatternValues):
     """Test that we scan files generated randomly.
 
     Each pattern comes with lists of values for each group to generate multiple
@@ -258,15 +258,15 @@ def test_file_scan(fs: FakeFilesystem, pval: PatternValues):
     basedir = path.join(fs.root_dir_name, "data")
     fs.create_dir(basedir)
 
-    files = list(pval.filenames)
+    files = list(ref.filenames)
     files = list(set(files))
     files.sort()
     for f in files:
         fs.create_file(path.join(basedir, f))
 
-    log.info("pattern: %s", pval.pattern.pattern)
+    log.info("pattern: %s", ref.pattern)
     log.info("n_files: %d", len(files))
-    finder = Finder(basedir, pval.pattern.pattern)
+    finder = Finder(basedir, ref.pattern)
     assert len(finder.files) == len(files)
     for f, f_ref in zip(finder.get_files(relative=True), files):
         assert f == f_ref

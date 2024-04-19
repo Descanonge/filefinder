@@ -53,7 +53,7 @@ class FormatChoices:
 
 
 @dataclass
-class StructFormat:
+class FormatTest:
     """Store formt specs and generate format string."""
 
     align: str = ""
@@ -134,12 +134,8 @@ class StructFormat:
 
 
 @dataclass
-class FormatValue:
-    struct: StructFormat
-    value: t.Any
-
-    def __iter__(self):
-        return iter([self.struct, self.value])
+class FormatValue(FormatTest):
+    value: t.Any = None
 
 
 class StFormat:
@@ -199,7 +195,7 @@ class StFormat:
         safe: bool = False,
         for_pattern: bool = False,
         for_filename: bool = False,
-    ) -> st.SearchStrategy[StructFormat]:
+    ) -> st.SearchStrategy[FormatTest]:
         """Generate a format.
 
         Parameters
@@ -212,7 +208,7 @@ class StFormat:
         """
 
         @st.composite
-        def comp(draw) -> StructFormat:
+        def comp(draw) -> FormatTest:
             if len(kind) > 1:
                 k = draw(st.sampled_from(kind))
             else:
@@ -224,9 +220,10 @@ class StFormat:
                 if k in "feE":
                     to_draw.append("precision")
 
+            print(to_draw)
             fill = draw(cls.fill(for_pattern=for_pattern, for_filename=for_filename))
 
-            f = StructFormat(
+            f = FormatTest(
                 kind=k,
                 fill=fill,
                 **{spec: draw(getattr(cls, spec)()) for spec in to_draw},
@@ -244,20 +241,21 @@ class StFormat:
     def format_value(cls, **kwargs) -> st.SearchStrategy[FormatValue]:
         @st.composite
         def comp(draw) -> FormatValue:
-            struct = draw(cls.format(**kwargs))
-            value = draw(struct.get_value_strategy())
-            return FormatValue(struct, value)
+            f = draw(cls.format(**kwargs))
+            value = draw(f.get_value_strategy())
+            f.value = value
+            return f
 
         return comp()
 
 
 @dataclass
-class StructGroup:
+class GroupTest:
     """Store group specs and generate a definition."""
 
     name: str = ""
     fmt: str = ""
-    fmt_struct: StructFormat | None = None
+    fmt_struct: FormatTest | None = None
     rgx: str = ""
     bool_elts: tuple[str, str] = ("", "")
     opt: bool = False
@@ -323,26 +321,21 @@ class StructGroup:
 
 
 @dataclass
-class GroupValue:
-    struct: StructGroup
-    value: t.Any
-
-    def __iter__(self):
-        return iter([self.struct, self.value])
+class GroupValue(GroupTest):
+    value: t.Any = None
 
     @property
     def value_str(self) -> str:
-        return self.struct.get_value_str(self.value)
+        return self.get_value_str(self.value)
 
 
 @dataclass
-class GroupValues:
-    struct: StructGroup
-    values: list[t.Any]
+class GroupValues(GroupTest):
+    values: list[t.Any] = field(default_factory=lambda: [])
 
     @property
     def values_str(self) -> list[str]:
-        return [self.struct.get_value_str(v) for v in self.values]
+        return [self.get_value_str(v) for v in self.values]
 
 
 class StGroup:
@@ -399,7 +392,7 @@ class StGroup:
     @classmethod
     def fmt(
         cls, kind: str = "sdfeE", for_filename: bool = False
-    ) -> st.SearchStrategy[StructFormat]:
+    ) -> st.SearchStrategy[FormatTest]:
         """Choose a valid format."""
         return StFormat.format(
             safe=True, kind=kind, for_pattern=True, for_filename=for_filename
@@ -437,7 +430,8 @@ class StGroup:
         fmt_kind: str = "sdfeE",
         parsable: bool = False,
         for_filename: bool = False,
-    ) -> st.SearchStrategy[StructGroup]:
+        group_type: type[GroupTest] = GroupTest,
+    ) -> st.SearchStrategy[GroupTest]:
         """Generate group structure.
 
         Specs (fmt, rgx, bool, opt, discard) are put in any order, and not necessarily
@@ -493,18 +487,23 @@ class StGroup:
                     continue
                 args[spec] = draw(getattr(cls, spec)())
 
-            return StructGroup(**args, ordered_specs=chosen)
+            return group_type(**args, ordered_specs=chosen)
 
         return comp(fmt_kind)
 
     @classmethod
-    def group_value(cls, **kwargs) -> st.SearchStrategy[GroupValue]:
+    def group_value(
+        cls, for_filename: bool = False, **kwargs
+    ) -> st.SearchStrategy[GroupValue]:
         @st.composite
         def comp(draw):
-            struct = draw(cls.group(**kwargs))
-            value = draw(struct.get_value_strategy())
+            group = draw(
+                cls.group(for_filename=for_filename, group_type=GroupValue, **kwargs)
+            )
+            value = draw(group.get_value_strategy(for_filename=for_filename))
+            group.value = value
 
-            return GroupValue(struct, value)
+            return group
 
         return comp()
 
@@ -522,9 +521,9 @@ class StGroup:
 
 
 @dataclass
-class StructPattern:
+class Pattern:
     segments: list[str]
-    groups: list[StructGroup]
+    groups: abc.Sequence[GroupTest]
 
     @property
     def pattern(self) -> str:
@@ -533,33 +532,35 @@ class StructPattern:
 
 
 @dataclass
-class PatternValue:
-    pattern: StructPattern
-    value: list[GroupValue]
+class PatternValue(Pattern):
+    groups: abc.Sequence[GroupValue]
 
     @property
     def filename(self) -> str:
         """Return a filename using the formatted value."""
-        segments = self.pattern.segments.copy()
-        for i, grp in enumerate(self.value):
+        segments = self.segments.copy()
+        for i, grp in enumerate(self.groups):
             segments[2 * i + 1] = grp.value_str
         return "".join(segments).replace("/", os.sep)
 
 
 @dataclass
-class PatternValues:
-    pattern: StructPattern
-    values: list[GroupValues]
+class PatternValues(Pattern):
+    groups: abc.Sequence[GroupValues]
 
     @property
     def filenames(self) -> abc.Iterator[str]:
         """Return a list of filenames using the formatted values."""
-        segments = self.pattern.segments.copy()
+        segments = self.segments.copy()
 
-        for values_str in itertools.product(*[grp.values_str for grp in self.values]):
+        for values_str in itertools.product(*[grp.values_str for grp in self.groups]):
             for i, seg in enumerate(values_str):
                 segments[2 * i + 1] = seg
             yield "".join(segments).replace("/", os.sep)
+
+
+_G = t.TypeVar("_G", bound=GroupTest)
+_P = t.TypeVar("_P", bound=Pattern)
 
 
 class StPattern:
@@ -568,50 +569,49 @@ class StPattern:
     max_group: int = 4
 
     @classmethod
-    def draw_segments(
-        cls, draw: abc.Callable, groups: list[StructGroup], separate: bool
-    ):
-        text = st.text(
-            alphabet=st.characters(
-                max_codepoint=MAX_CODEPOINT,
-                exclude_categories=["C"],
-                exclude_characters=set("%()\\") | FORBIDDEN_CHAR,
-            ),
-            min_size=1 if separate else 0,
-            max_size=MAX_TEXT_SIZE,
-        )
-
-        segments = ["" for _ in range(2 * len(groups) + 1)]
-        if len(groups) == 0:
-            return segments
-
-        segments[1::2] = [f"%({g.definition})" for g in groups]
-        ends = text.filter(lambda s: not s.startswith("/") and not s.endswith("/"))
-        segments[0] = draw(ends)
-        segments[-1] = draw(ends)
-
-        if len(groups) > 1:
-            segments[2:-2:2] = [draw(text) for _ in range(len(groups) - 1)]
-
-        return segments
-
-    @classmethod
-    def draw_groups(
+    def _pattern_strat(
         cls,
-        draw: abc.Callable,
-        strategy: abc.Callable[..., st.SearchStrategy],
         min_group: int,
-        **kwargs,
+        separate: bool,
+        group_strat: st.SearchStrategy[_G],
+        pattern_type: type[_P],
     ):
-        groups = st.lists(
-            strategy(**kwargs), min_size=min_group, max_size=cls.max_group
-        )
-        return draw(groups)
+        @st.composite
+        def comp(draw) -> _P:
+            groups: list[_G] = draw(
+                st.lists(group_strat, min_size=min_group, max_size=cls.max_group)
+            )
+
+            text = st.text(
+                alphabet=st.characters(
+                    max_codepoint=MAX_CODEPOINT,
+                    exclude_categories=["C"],
+                    exclude_characters=set("%()\\") | FORBIDDEN_CHAR,
+                ),
+                min_size=1 if separate else 0,
+                max_size=MAX_TEXT_SIZE,
+            )
+
+            segments = ["" for _ in range(2 * len(groups) + 1)]
+            if len(groups) > 0:
+                segments[1::2] = [f"%({g.definition})" for g in groups]
+                ends = text.filter(
+                    lambda s: not s.startswith("/") and not s.endswith("/")
+                )
+                segments[0] = draw(ends)
+                segments[-1] = draw(ends)
+
+            if len(groups) > 1:
+                segments[2:-2:2] = [draw(text) for _ in range(len(groups) - 1)]
+
+            return pattern_type(segments=segments, groups=groups)
+
+        return comp()
 
     @classmethod
     def pattern(
         cls, min_group: int = 0, separate: bool = True, **kwargs
-    ) -> st.SearchStrategy[StructPattern]:
+    ) -> st.SearchStrategy[Pattern]:
         """Generate a pattern structure.
 
         Each pattern comes with fixing values and strings for each group. (should be
@@ -633,45 +633,20 @@ class StPattern:
         kwargs
             Passed to StGroup strategy.
         """
-
-        @st.composite
-        def comp(draw) -> StructPattern:
-            groups: list[StructGroup] = cls.draw_groups(
-                draw, StGroup.group, min_group, **kwargs
-            )
-            segments = cls.draw_segments(draw, groups, separate)
-            return StructPattern(segments=segments, groups=groups)
-
-        return comp()
+        return cls._pattern_strat(min_group, separate, StGroup.group(**kwargs), Pattern)
 
     @classmethod
     def pattern_value(
         cls, min_group: int = 0, separate: bool = True, **kwargs
     ) -> st.SearchStrategy[PatternValue]:
-        @st.composite
-        def comp(draw) -> PatternValue:
-            groups_val: list[GroupValue] = cls.draw_groups(
-                draw, StGroup.group_value, min_group, **kwargs
-            )
-            groups = [g.struct for g in groups_val]
-            segments = cls.draw_segments(draw, groups, separate)
-            pattern = StructPattern(segments=segments, groups=groups)
-            return PatternValue(pattern=pattern, value=groups_val)
-
-        return comp()
+        return cls._pattern_strat(
+            min_group, separate, StGroup.group_value(**kwargs), PatternValue
+        )
 
     @classmethod
     def pattern_values(
         cls, min_group: int = 0, separate: bool = True, **kwargs
     ) -> st.SearchStrategy[PatternValues]:
-        @st.composite
-        def comp(draw) -> PatternValues:
-            groups_val: list[GroupValues] = cls.draw_groups(
-                draw, StGroup.group_values, min_group, **kwargs
-            )
-            groups = [g.struct for g in groups_val]
-            segments = cls.draw_segments(draw, groups, separate)
-            pattern = StructPattern(segments=segments, groups=groups)
-            return PatternValues(pattern=pattern, values=groups_val)
-
-        return comp()
+        return cls._pattern_strat(
+            min_group, separate, StGroup.group_values(**kwargs), PatternValues
+        )

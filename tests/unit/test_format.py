@@ -20,25 +20,23 @@ from hypothesis import given
 from util import FormatValue, StFormat
 
 
-@given(formatval=StFormat.format_value(safe=True))
-def test_regex_match(formatval: FormatValue):
-    struct, val = formatval
-    fmt = Format(struct.format_string)
+@given(ref=StFormat.format_value(safe=True))
+def test_regex_match(ref: FormatValue):
+    fmt = Format(ref.format_string)
 
-    string = fmt.format(val)
+    string = fmt.format(ref.value)
     pattern = fmt.generate_expression()
     m = re.fullmatch(pattern, string)
     assert m is not None, f"Could not parse '{string}' with regex '{pattern}'"
 
 
-@given(formatval=StFormat.format_value(safe=True))
-def test_parse_back(formatval: FormatValue):
-    struct, val = formatval
-    fmt = Format(struct.format_string)
+@given(ref=StFormat.format_value(safe=True))
+def test_parse_back(ref: FormatValue):
+    fmt = Format(ref.format_string)
 
-    string = fmt.format(val)
+    string = fmt.format(ref.value)
     parsed = fmt.parse(string)
-    assert val == parsed
+    assert ref.value == parsed
 
 
 @pytest.mark.parametrize(

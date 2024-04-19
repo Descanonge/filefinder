@@ -218,14 +218,18 @@ class StFormat:
             else:
                 k = kind
 
-            to_draw = ["align", "fill", "width"]
+            to_draw = ["align", "width"]
             if k != "s":
                 to_draw += ["sign", "alt", "zero", "grouping"]
                 if k in "feE":
                     to_draw.append("precision")
 
+            fill = draw(cls.fill(for_pattern=for_pattern, for_filename=for_filename))
+
             f = StructFormat(
-                kind=k, **{spec: draw(getattr(cls, spec)()) for spec in to_draw}
+                kind=k,
+                fill=fill,
+                **{spec: draw(getattr(cls, spec)()) for spec in to_draw},
             )
             return f
 

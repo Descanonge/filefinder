@@ -192,7 +192,7 @@ class StFormat:
     def format(
         cls,
         kind: str = "sdfeE",
-        safe: bool = False,
+        safe: bool = True,
         for_pattern: bool = False,
         for_filename: bool = False,
     ) -> st.SearchStrategy[FormatTest]:
@@ -403,9 +403,7 @@ class StGroup:
         cls, kind: str = "sdfeE", for_filename: bool = False
     ) -> st.SearchStrategy[FormatTest]:
         """Choose a valid format."""
-        return StFormat.format(
-            safe=True, kind=kind, for_pattern=True, for_filename=for_filename
-        )
+        return StFormat.format(kind=kind, for_pattern=True, for_filename=for_filename)
 
     @classmethod
     def bool_elts(cls) -> st.SearchStrategy[tuple[str, str]]:

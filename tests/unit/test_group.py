@@ -130,7 +130,7 @@ def test_percent_rgx():
         Group("foo:rgx=%e", 0)
 
 
-@given(ref=StFormat.format_value(kind="dfeE", safe=True))
+@given(ref=StFormat.format_value(kind="dfeE"))
 def test_fix_format_number(ref: FormatValue):
     fmt = ref.format_string
     number = ref.value
@@ -152,7 +152,7 @@ def test_fix_value_consecutive(a: int, b: int):
     assert g.fixed_value == b
 
 
-@given(ref=StFormat.format_value(kind="s", safe=True))
+@given(ref=StFormat.format_value(kind="s"))
 def test_fix_value_string(ref: FormatValue):
     g = Group(f"foo:fmt={ref.format_string}", 0)
     g.fix_value(ref.value)
@@ -174,7 +174,7 @@ def test_fix_value_bool():
 
 @given(
     elements=st.lists(st.integers(), min_size=1),
-    fmt=StFormat.format(kind="d", safe=True).map(lambda ref: ref.format_string),
+    fmt=StFormat.format(kind="d").map(lambda ref: ref.format_string),
 )
 def test_fix_value_integer_list(elements: list[int], fmt: str):
     g = Group(f"foo:fmt={fmt}", 0)

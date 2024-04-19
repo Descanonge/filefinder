@@ -20,7 +20,7 @@ from hypothesis import given
 from util import FormatValue, StFormat
 
 
-@given(ref=StFormat.format_value(safe=True))
+@given(ref=StFormat.format_value())
 def test_regex_match(ref: FormatValue):
     fmt = Format(ref.format_string)
 
@@ -30,7 +30,7 @@ def test_regex_match(ref: FormatValue):
     assert m is not None, f"Could not parse '{string}' with regex '{pattern}'"
 
 
-@given(ref=StFormat.format_value(safe=True))
+@given(ref=StFormat.format_value())
 def test_parse_back(ref: FormatValue):
     fmt = Format(ref.format_string)
 

@@ -42,3 +42,5 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: Descanonge/filefinder
+          env:
+            HYPOTHESIS_PROFILE: CI

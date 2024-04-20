@@ -1,3 +1,9 @@
+"""Test library functions.
+
+Presentely, only `library.get_date`.
+"""
+
+import os
 import typing as t
 from datetime import datetime
 
@@ -28,6 +34,7 @@ name_to_date = {
 
 @st.composite
 def segments(draw) -> list[str]:
+    """Generate pattern segments with date elements."""
     names = draw(
         st.lists(
             st.sampled_from(group_names),
@@ -60,6 +67,18 @@ def segments(draw) -> list[str]:
     default_date=st.datetimes(),
 )
 def test_get_date(segments: list[str], date: datetime, default_date: datetime):
+    """Test obtaining a date from a pattern.
+
+    Parameters
+    ----------
+    segments
+        Segments indicating the pattern. Odd elements are group names, even elements
+        text. The pattern and a filename are generated from it.
+    date
+        Date to generate a filename with and to test parsing.
+    default_date
+        Random default date for `library.get_date`.
+    """
     # start from the default date
     default_elements = {
         attr: getattr(default_date, attr)
@@ -95,7 +114,7 @@ def test_get_date(segments: list[str], date: datetime, default_date: datetime):
             seg = date_ref.strftime(f"%{name}")
         segments[2 * i + 1] = seg
 
-    filename = "".join(segments)
+    filename = "".join(segments).replace("/", os.sep)
 
     for i, name in enumerate(names):
         segments[2 * i + 1] = f"%({name})"

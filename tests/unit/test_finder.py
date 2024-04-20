@@ -44,7 +44,7 @@ def test_get_groups(ref: Pattern):
         assert indices_ref == indices
 
 
-@given(ref=StPattern.pattern_value(parsable=True, ignore=["opt"]))
+@given(ref=StPattern.pattern_value(separate=True, parsable=True, ignore=["opt"]))
 def test_match_filename_values(ref: PatternValue):
     """Test values in a matched filename are correctly parsed.
 

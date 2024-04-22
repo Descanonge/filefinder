@@ -19,7 +19,7 @@ def assert_grp(spec: str, expected_rgx: str, expected_fmt: str):
 @given(ref=StGroup.group(), idx=st.integers(min_value=0, max_value=1024))
 def test_group_str(ref: GroupTest, idx: int):
     g = Group(ref.definition, idx)
-    assert f"{ref.definition}:{idx}" == str(g)
+    assert f"{ref.name}:{idx}" == str(g)
     repr(g)
 
 

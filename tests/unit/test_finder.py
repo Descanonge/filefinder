@@ -9,8 +9,16 @@ from os import path
 import pytest
 from filefinder import Finder
 from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 from pyfakefs.fake_filesystem import FakeFilesystem
-from util import Pattern, PatternValue, PatternValues, StPattern
+from util import (
+    MAX_CODEPOINT,
+    MAX_TEXT_SIZE,
+    Pattern,
+    PatternValue,
+    PatternValues,
+    StPattern,
+)
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +50,24 @@ def test_get_groups(ref: Pattern):
         indices_ref = [i for i, g in enumerate(ref.groups) if g.name == name]
         indices = [g.idx for g in f.get_groups(name)]
         assert indices_ref == indices
+
+
+@given(
+    ref=StPattern.pattern(separate=False),
+    root=st.text(
+        alphabet=st.characters(
+            exclude_categories=["C"],
+            max_codepoint=MAX_CODEPOINT,
+        ),
+        max_size=MAX_TEXT_SIZE,
+    ),
+)
+def test_finder_str(ref: Pattern, root: str):
+    f = Finder(root, ref.pattern)
+    lines = str(f).splitlines()
+    assert lines[0] == f"root: {root}"
+    assert lines[1] == f"pattern: {ref.pattern}"
+    assert lines[-1] == "not scanned"
 
 
 @given(
@@ -77,6 +103,25 @@ def test_match_filename_values(ref: PatternValue):
         else:
             with pytest.raises(KeyError):
                 _ = matches[i]
+
+
+@given(
+    ref=StPattern.pattern_value(
+        separate=True, parsable=True, ignore=["opt"], for_filename=True
+    )
+)
+def test_matches_str(ref: PatternValue):
+    """Check Match(es).__str__ do not raise."""
+    # reference filename
+    f = Finder("", ref.pattern)
+    matches = f.find_matches(ref.filename)
+    assert matches is not None
+
+    str(matches)
+    repr(matches)
+    for m in matches.matches:
+        str(m)
+        repr(m)
 
 
 @given(ref=StPattern.pattern_value(for_filename=True))
@@ -144,6 +189,9 @@ def test_make_filename_by_fix(ref: PatternValue):
     # Fix and check output
     f.fix_groups(fixes, fix_discard=True)
     assert f.make_filename(relative=True) == ref.filename
+    # check str/repr
+    str(f)
+    repr(f)
 
     # Reset, fix by name and check there is no error.
     f.unfix_groups()
@@ -274,6 +322,10 @@ def test_file_scan(fs: FakeFilesystem, ref: PatternValues):
     assert len(finder.files) == len(files)
     for f, f_ref in zip(finder.get_files(relative=True), files):
         assert f == f_ref
+
+    # Check str/repr
+    lines = str(finder).splitlines()
+    assert lines[-1] == f"scanned: found {len(files)} files"
 
 
 def test_file_scan_manual(fs):

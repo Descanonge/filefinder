@@ -413,7 +413,7 @@ class StGroup:
         cls, for_filename: bool = False
     ) -> st.SearchStrategy[tuple[str, str]]:
         """Choose two valid strings. The first one is not empty."""
-        exclude = build_exclude(set(":"), for_pattern=True, for_filename=for_filename)
+        exclude = build_exclude(set(":/"), for_pattern=True, for_filename=for_filename)
         alphabet = st.characters(
             exclude_characters=exclude,
             exclude_categories=["C"],

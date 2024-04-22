@@ -331,7 +331,7 @@ class FormatFloat(FormatNumberAbstract):
         number = (
             self.get_left_of_decimal()
             + self.get_right_of_decimal()
-            + rf"{self.type}[+-]\d+"
+            + rf"{self.type}[+-]\d{{2,3}}"
         )
         if capture:
             number = f"({number})"

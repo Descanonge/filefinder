@@ -237,11 +237,17 @@ class StFormat:
         return strat
 
     @classmethod
-    def format_value(cls, **kwargs) -> st.SearchStrategy[FormatValue]:
+    def format_value(
+        cls, for_pattern: bool = False, for_filename: bool = False, **kwargs
+    ) -> st.SearchStrategy[FormatValue]:
         @st.composite
         def comp(draw) -> FormatValue:
-            f = draw(cls.format(**kwargs))
-            value = draw(f.get_value_strategy())
+            f = draw(
+                cls.format(for_pattern=for_pattern, for_filename=for_filename, **kwargs)
+            )
+            value = draw(
+                f.get_value_strategy(for_pattern=for_pattern, for_filename=for_filename)
+            )
             f.value = value
             return f
 

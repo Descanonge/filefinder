@@ -372,7 +372,7 @@ class StGroup:
         )
 
     @classmethod
-    def rgx(cls) -> st.SearchStrategy[str]:
+    def rgx(cls, for_filename: bool = False) -> st.SearchStrategy[str]:
         r"""Choose a valid regex.
 
         Some special characters are excluded:
@@ -391,12 +391,15 @@ class StGroup:
                 return False
             return True
 
+        exclude = build_exclude(
+            set(r"()%^$\A\Z"), for_pattern=True, for_filename=for_filename
+        )
         strat = (
             st.text(
                 alphabet=st.characters(
                     max_codepoint=MAX_CODEPOINT,
                     exclude_categories=["C"],
-                    exclude_characters=list(r"()/%^$\A\Z"),
+                    exclude_characters=exclude,
                 ),
                 min_size=1,
                 max_size=MAX_TEXT_SIZE,
@@ -503,18 +506,23 @@ class StGroup:
                 if "bool_elts" in chosen or "fmt" in chosen:
                     chosen.remove("rgx")
 
+            to_draw = list(chosen)
             if "fmt" in chosen:
                 args["fmt_struct"] = draw(
                     cls.fmt(kind=fmt_kind, for_filename=for_filename)
                 )
                 args["fmt"] = args["fmt_struct"].format_string
+                to_draw.remove("fmt")
 
             if "bool_elts" in chosen:
                 args["bool_elts"] = draw(cls.bool_elts(for_filename=for_filename))
+                to_draw.remove("bool_elts")
 
-            for spec in chosen:
-                if spec in ["fmt", "bool_elts"]:
-                    continue
+            if "rgx" in chosen:
+                args["rgx"] = draw(cls.rgx(for_filename=for_filename))
+                to_draw.remove("rgx")
+
+            for spec in to_draw:
                 args[spec] = draw(getattr(cls, spec)())
 
             return group_type(**args, ordered_specs=chosen)

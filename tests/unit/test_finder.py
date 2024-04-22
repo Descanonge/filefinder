@@ -44,7 +44,11 @@ def test_get_groups(ref: Pattern):
         assert indices_ref == indices
 
 
-@given(ref=StPattern.pattern_value(separate=True, parsable=True, ignore=["opt"]))
+@given(
+    ref=StPattern.pattern_value(
+        separate=True, parsable=True, ignore=["opt"], for_filename=True
+    )
+)
 def test_match_filename_values(ref: PatternValue):
     """Test values in a matched filename are correctly parsed.
 
@@ -75,7 +79,7 @@ def test_match_filename_values(ref: PatternValue):
                 _ = matches[i]
 
 
-@given(ref=StPattern.pattern_value())
+@given(ref=StPattern.pattern_value(for_filename=True))
 def test_make_filename_by_str(ref: PatternValue):
     """Test filename creation using string as fixes.
 
@@ -95,7 +99,7 @@ def test_make_filename_by_str(ref: PatternValue):
 
 
 # No s-type formats, strings are not considered values by filefinder
-@given(ref=StPattern.pattern_value(fmt_kind="dfeE"))
+@given(ref=StPattern.pattern_value(for_filename=True, fmt_kind="dfeE"))
 def test_make_filename_by_val(ref: PatternValue):
     """Test filename creation using values as fixes."""
     f = Finder("/base/", ref.pattern)
@@ -108,7 +112,7 @@ def test_make_filename_by_val(ref: PatternValue):
 
 
 @given(
-    ref=StPattern.pattern_value(min_group=1, fmt_kind="dfeE")
+    ref=StPattern.pattern_value(for_filename=True, min_group=1, fmt_kind="dfeE")
     .filter(lambda p: len(set(g.name for g in p.groups)) == len(p.groups))
     .filter(lambda p: all(g.name != "relative" for g in p.groups))
 )
@@ -124,7 +128,7 @@ def test_make_filename_by_val_by_name(ref: PatternValue):
     assert f.make_filename(**fixes_by_name, relative=True) == ref.filename
 
 
-@given(ref=StPattern.pattern_value(fmt_kind="dfeE"))
+@given(ref=StPattern.pattern_value(for_filename=True, fmt_kind="dfeE"))
 def test_make_filename_by_fix(ref: PatternValue):
     """Test filename creating with prior value fixing.
 
@@ -147,7 +151,7 @@ def test_make_filename_by_fix(ref: PatternValue):
     f.make_filename()
 
 
-@given(ref=StPattern.pattern_value(min_group=2, fmt_kind="dfeE"))
+@given(ref=StPattern.pattern_value(for_filename=True, min_group=2, fmt_kind="dfeE"))
 def test_make_filename_half_by_fix(ref: PatternValue):
     """Test filename creating with prior value fixing (not all groups).
 
@@ -242,7 +246,7 @@ def test_format_regex():
     suppress_health_check=[HealthCheck.function_scoped_fixture],
     deadline=None,
 )
-@given(ref=StPattern.pattern_values(min_group=1, parsable=False))
+@given(ref=StPattern.pattern_values(for_filename=True, min_group=1, parsable=False))
 def test_file_scan(fs: FakeFilesystem, ref: PatternValues):
     """Test that we scan files generated randomly.
 

@@ -9,7 +9,7 @@ from datetime import datetime
 
 import filefinder.library
 from filefinder.finder import Finder
-from hypothesis import assume, given
+from hypothesis import given
 from hypothesis import strategies as st
 from util import FORBIDDEN_CHAR, MAX_CODEPOINT, MAX_TEXT_SIZE
 

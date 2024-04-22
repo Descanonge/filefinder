@@ -39,6 +39,7 @@ def build_exclude(
         exclude |= set("%()")
     if for_filename:
         exclude |= FORBIDDEN_CHAR
+        exclude.add("/")
     return exclude
 
 
@@ -629,6 +630,8 @@ class StPattern:
             )
 
             exclude = build_exclude(for_pattern=True, for_filename=for_filename)
+            # authorize folder separator in segments
+            exclude.discard("/")
             text = st.text(
                 alphabet=st.characters(
                     max_codepoint=MAX_CODEPOINT,

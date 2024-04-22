@@ -347,6 +347,9 @@ class GroupValues(GroupTest):
         return [self.get_value_str(v) for v in self.values]
 
 
+_G = t.TypeVar("_G", bound=GroupTest)
+
+
 class StGroup:
     """Store group related strategies."""
 
@@ -406,10 +409,13 @@ class StGroup:
         return StFormat.format(kind=kind, for_pattern=True, for_filename=for_filename)
 
     @classmethod
-    def bool_elts(cls) -> st.SearchStrategy[tuple[str, str]]:
+    def bool_elts(
+        cls, for_filename: bool = False
+    ) -> st.SearchStrategy[tuple[str, str]]:
         """Choose two valid strings. The first one is not empty."""
+        exclude = build_exclude(set(":"), for_pattern=True, for_filename=for_filename)
         alphabet = st.characters(
-            exclude_characters=set("():/\\") | FORBIDDEN_CHAR,
+            exclude_characters=exclude,
             exclude_categories=["C"],
             max_codepoint=MAX_CODEPOINT,
         )
@@ -437,8 +443,8 @@ class StGroup:
         fmt_kind: str = "sdfeE",
         parsable: bool = False,
         for_filename: bool = False,
-        group_type: type[GroupTest] = GroupTest,
-    ) -> st.SearchStrategy[GroupTest]:
+        group_type: type[_G] | type[GroupTest] = GroupTest,
+    ) -> st.SearchStrategy[_G]:
         """Generate group structure.
 
         Specs (fmt, rgx, bool, opt, discard) are put in any order, and not necessarily
@@ -490,11 +496,18 @@ class StGroup:
             if parsable and "rgx" in chosen:
                 if "bool_elts" in chosen or "fmt" in chosen:
                     chosen.remove("rgx")
+
             if "fmt" in chosen:
-                args["fmt_struct"] = draw(cls.fmt(kind=fmt_kind))
+                args["fmt_struct"] = draw(
+                    cls.fmt(kind=fmt_kind, for_filename=for_filename)
+                )
                 args["fmt"] = args["fmt_struct"].format_string
+
+            if "bool_elts" in chosen:
+                args["bool_elts"] = draw(cls.bool_elts(for_filename=for_filename))
+
             for spec in chosen:
-                if spec == "fmt":
+                if spec in ["fmt", "bool_elts"]:
                     continue
                 args[spec] = draw(getattr(cls, spec)())
 
@@ -509,7 +522,7 @@ class StGroup:
         @st.composite
         def comp(draw):
             group = draw(
-                cls.group(for_filename=for_filename, group_type=GroupValue, **kwargs)
+                cls.group(group_type=GroupValue, for_filename=for_filename, **kwargs)
             )
             value = draw(group.get_value_strategy(for_filename=for_filename))
             group.value = value
@@ -519,12 +532,20 @@ class StGroup:
         return comp()
 
     @classmethod
-    def group_values(cls, **kwargs) -> st.SearchStrategy[GroupValue]:
+    def group_values(
+        cls, for_filename: bool = False, **kwargs
+    ) -> st.SearchStrategy[GroupValue]:
         @st.composite
         def comp(draw):
-            struct = draw(cls.group(**kwargs))
+            struct = draw(
+                cls.group(group_type=GroupValues, for_filename=for_filename, **kwargs)
+            )
             values = draw(
-                st.lists(struct.get_value_strategy(), min_size=1, unique=True)
+                st.lists(
+                    struct.get_value_strategy(for_filename=for_filename),
+                    min_size=1,
+                    unique=True,
+                )
             )
             return GroupValues(struct, values)
 
@@ -570,7 +591,6 @@ class PatternValues(Pattern):
             yield "".join(segments).replace("/", os.sep)
 
 
-_G = t.TypeVar("_G", bound=GroupTest)
 _P = t.TypeVar("_P", bound=Pattern)
 
 
@@ -582,10 +602,11 @@ class StPattern:
     @classmethod
     def _pattern_strat(
         cls,
-        min_group: int,
-        separate: bool,
         group_strat: st.SearchStrategy[_G],
         pattern_type: type[_P],
+        min_group: int = 0,
+        separate: bool = True,
+        for_filename: bool = False,
     ):
         @st.composite
         def comp(draw) -> _P:
@@ -593,11 +614,12 @@ class StPattern:
                 st.lists(group_strat, min_size=min_group, max_size=cls.max_group)
             )
 
+            exclude = build_exclude(for_pattern=True, for_filename=for_filename)
             text = st.text(
                 alphabet=st.characters(
                     max_codepoint=MAX_CODEPOINT,
                     exclude_categories=["C"],
-                    exclude_characters=set("%()\\") | FORBIDDEN_CHAR,
+                    exclude_characters=exclude,
                 ),
                 min_size=1 if separate else 0,
                 max_size=MAX_TEXT_SIZE,
@@ -621,7 +643,11 @@ class StPattern:
 
     @classmethod
     def pattern(
-        cls, min_group: int = 0, separate: bool = True, **kwargs
+        cls,
+        min_group: int = 0,
+        separate: bool = True,
+        for_filename: bool = False,
+        **kwargs,
     ) -> st.SearchStrategy[Pattern]:
         """Generate a pattern structure.
 
@@ -644,20 +670,42 @@ class StPattern:
         kwargs
             Passed to StGroup strategy.
         """
-        return cls._pattern_strat(min_group, separate, StGroup.group(**kwargs), Pattern)
+        return cls._pattern_strat(
+            StGroup.group(for_filename=for_filename, **kwargs),
+            Pattern,
+            min_group=min_group,
+            separate=separate,
+            for_filename=for_filename,
+        )
 
     @classmethod
     def pattern_value(
-        cls, min_group: int = 0, separate: bool = True, **kwargs
+        cls,
+        min_group: int = 0,
+        separate: bool = True,
+        for_filename: bool = False,
+        **kwargs,
     ) -> st.SearchStrategy[PatternValue]:
         return cls._pattern_strat(
-            min_group, separate, StGroup.group_value(**kwargs), PatternValue
+            StGroup.group_value(for_filename=for_filename, **kwargs),
+            PatternValue,
+            min_group=min_group,
+            separate=separate,
+            for_filename=for_filename,
         )
 
     @classmethod
     def pattern_values(
-        cls, min_group: int = 0, separate: bool = True, **kwargs
+        cls,
+        min_group: int = 0,
+        separate: bool = True,
+        for_filename: bool = False,
+        **kwargs,
     ) -> st.SearchStrategy[PatternValues]:
         return cls._pattern_strat(
-            min_group, separate, StGroup.group_values(**kwargs), PatternValues
+            StGroup.group_values(for_filename=for_filename, **kwargs),
+            PatternValues,
+            min_group=min_group,
+            separate=separate,
+            for_filename=for_filename,
         )

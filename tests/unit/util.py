@@ -635,7 +635,7 @@ class StPattern:
             text = st.text(
                 alphabet=st.characters(
                     max_codepoint=MAX_CODEPOINT,
-                    exclude_categories=["C"],
+                    exclude_categories=["C", "Nd"],
                     exclude_characters=exclude,
                 ),
                 min_size=1 if separate else 0,

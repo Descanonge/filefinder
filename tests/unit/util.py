@@ -503,10 +503,6 @@ class StGroup:
             args = {}
             args["name"] = draw(cls.name())
 
-            if parsable and "rgx" in chosen:
-                if "bool_elts" in chosen or "fmt" in chosen:
-                    chosen.remove("rgx")
-
             to_draw = list(chosen)
             if "fmt" in chosen:
                 args["fmt_struct"] = draw(

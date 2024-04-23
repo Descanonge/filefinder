@@ -7,7 +7,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/filefinder)](https://pypi.org/project/filefinder)
 [![GitHub release](https://img.shields.io/github/v/release/Descanonge/filefinder)](https://github.com/Descanonge/filefinder/releases)
-[![codecov](https://codecov.io/github/Descanonge/filefinder/coverage.svg?branch=master)](https://codecov.io/github/Descanonge/filefinder?branch=master)
+[![codecov](https://codecov.io/github/Descanonge/filefinder/branch/master/graph/badge.svg?token=D5OBXX61HM)](https://codecov.io/github/Descanonge/filefinder)
 ![test status](https://github.com/Descanonge/filefinder/actions/workflows/tests.yml/badge.svg)
 [![Documentation Status](https://readthedocs.org/projects/filefinder/badge/?version=latest)](https://filefinder.readthedocs.io/en/latest/?badge=latest)
 

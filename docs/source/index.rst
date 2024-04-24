@@ -40,6 +40,8 @@ And we can generate a filename with a set of parameters::
 Installation
 ------------
 
+:Requirements: Python >= 3.10
+
 FileFinder can be installed directly from pip::
 
   pip install filefinder

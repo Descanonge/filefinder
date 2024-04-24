@@ -1,9 +1,10 @@
 
 # v1.0.0
 
-Major overhaul, mainly streamlining.
+Major overhaul.
+- Requirement is now python >= 3.10
 - Renamed 'matchers' to 'groups' to be consistent with regex tools.
-- Removed the 'group' spec (no more 'group:name' stuff, there is only a name now).
+- Removed the 'group' spec (no more 'group:name' stuff, a group only has a name now).
 - Group definition is now orderless (rgx, fmt, etc can be specified in any order).
   - `:opt` is now only a flag for specifying the group as optional
   - new `:bool=true[:false]` property. Note the order from old `:opt` is reversed. Options are strings (not regex).
@@ -15,7 +16,7 @@ Major overhaul, mainly streamlining.
 - `Matches.__getitem__` now wraps `Match.get_value`.
 - Moved fixing to the Group object, not the Finder.
 - `make_filename` now re-use the value-fixing done by groups, instead of having its own (nearly duplicate) logic.
-- Make some Finder attributes public.
+- Make most Finder attributes public.
 - Make package typed.
 - Refactor format module.
   - Use sub-classes for different format types, avoiding frequent dispatching.

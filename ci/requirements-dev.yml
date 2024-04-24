@@ -20,4 +20,3 @@ dependencies:
       - hypothesis
       - coverage
       - pytest-cov
-      - --no-deps -e .

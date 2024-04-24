@@ -14,9 +14,9 @@ values for some names). Once setup, it can:
 - Select only filenames with specific values
 - Generate filenames
 
-The following example will find all files with the structure ``Data/[year]/Temperature_[depth]_[date].nc``::
+The following example will find all files with the structure ``Data/param_[parameter]/Temperature_[date].nc``::
 
-    finder = Finder('/.../Data', '%(Y)/Temperature_%(depth:fmt=d)_%(Y)%(m)%(d).nc')
+    finder = Finder('/.../Data', 'param_%(parameter:fmt=.1f)/%(Y)/Temperature_%(Y)%(m)%(d).nc')
     files = finder.get_files()
 
 We can also select only some files, for instance only in january::
@@ -27,13 +27,13 @@ We can also select only some files, for instance only in january::
 We can retrieve values from found files::
 
     filename, matches = finder.files[0]
-    depth = matches["depth"]
+    parameter = matches["parameter"]
     # the date as a datetime object
     date = filefinder.library.get_date(matches)
 
 And we can generate a filename with a set of parameters::
 
-    finder.make_filename(depth=100, Y=2000, m=1, d=1)
+    finder.make_filename(parameter=0.5, Y=2000, m=1, d=1)
     # Specifying the month is optional since we already fixed it to 1.
 
 

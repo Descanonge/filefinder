@@ -5,8 +5,6 @@
 # to the MIT License as defined in the file 'LICENSE',
 # at the root of this project. © 2021 Clément Haëck
 
-from __future__ import annotations
-
 import logging
 import re
 import typing as t
@@ -89,12 +87,12 @@ class Match:
 class Matches:
     """Scan an input file and store the results.
 
-    Parameter
-    ---------
-    match:
+    Parameters
+    ----------
+    match
         Match object obtained from a filename. It should have as much capturing groups
         as the pattern.
-    groups:
+    groups
         Sequence of Groups objects present in the pattern.
 
     """
@@ -102,7 +100,7 @@ class Matches:
     @classmethod
     def from_filename(
         cls, filename: str, pattern: re.Pattern | str, groups: abc.Sequence[Group]
-    ) -> Matches | None:
+    ) -> "Matches | None":
         """Find matches for a given filename.
 
         Parameters

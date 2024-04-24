@@ -4,7 +4,6 @@ Presentely, only `library.get_date`.
 """
 
 import os
-import typing as t
 from datetime import datetime
 
 import filefinder.library

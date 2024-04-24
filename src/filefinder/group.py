@@ -259,7 +259,7 @@ class Group:
         """
         self.fixed_value = fix
 
-        if not isinstance(fix, (list, tuple)):
+        if not isinstance(fix, list | tuple):
             fix = [fix]
 
         if len(fix) == 0:

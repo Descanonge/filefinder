@@ -33,22 +33,22 @@ files = finder.get_files()
 
 We can also select only some files, for instance only in january:
 ``` python
-    finder.fix_group('m', 1)
-    files = finder.get_files()
+finder.fix_group('m', 1)
+files = finder.get_files()
 ```
 
 We can retrieve values from found files:
 ``` python
-    filename, matches = finder.files[0]
-    parameter = matches["parameter"]
-    # the date as a datetime object
-    date = filefinder.library.get_date(matches)
+filename, matches = finder.files[0]
+parameter = matches["parameter"]
+# the date as a datetime object
+date = filefinder.library.get_date(matches)
 ```
 
 And we can generate a filename with a set of parameters:
 ``` python
-    finder.make_filename(parameter=0.5, Y=2000, m=1, d=1)
-    # Specifying the month is optional since we already fixed it to 1.
+finder.make_filename(parameter=0.5, Y=2000, m=1, d=1)
+# Specifying the month is optional since we already fixed it to 1.
 ```
 
 ## Requirements

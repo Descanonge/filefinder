@@ -432,7 +432,7 @@ class StGroup:
 
         @st.composite
         def comp(draw) -> tuple[str, str]:
-            a = draw(st.text(alphabet=alphabet, min_size=1, max_size=MAX_TEXT_SIZE))
+            a = draw(st.text(alphabet=alphabet, max_size=MAX_TEXT_SIZE))
             b = draw(st.text(alphabet=alphabet, max_size=MAX_TEXT_SIZE))
             return a, b
 

@@ -64,6 +64,12 @@ pip install filefinder
 
 From source:
 ``` sh
+git clone https://github.com/Descanonge/filefinder.git
+cd filefinder
+pip install -e .
+```
+or
+``` sh
 pip install -e https://github.com/Descanonge/filefinder.git#egg=filefinder
 ```
 

@@ -48,6 +48,12 @@ FileFinder can be installed directly from pip::
 
 or from source with::
 
+  git clone https://github.com/Descanonge/filefinder.git
+  cd filefinder
+  pip install -e .
+
+or
+
   pip install -e https://github.com/Descanonge/filefinder.git#egg=filefinder
 
 

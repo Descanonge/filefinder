@@ -311,11 +311,16 @@ class GroupTest:
                 exclude_categories=["C"],
                 exclude_characters=exclude,
             )
-            return st.from_regex(
-                self.rgx,
-                fullmatch=True,
-                alphabet=alphabet,
-            ).filter(lambda s: len(s) < MAX_TEXT_SIZE)
+            return (
+                st.from_regex(
+                    self.rgx,
+                    fullmatch=True,
+                    alphabet=alphabet,
+                )
+                .filter(lambda s: len(s) < MAX_TEXT_SIZE)
+                .map(lambda s: s.strip())
+                .filter(lambda s: re.fullmatch(self.rgx, s))
+            )
         if "bool_elts" in self:
             return st.booleans()
         if "fmt" in self and self.fmt_struct is not None:

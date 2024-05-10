@@ -366,8 +366,8 @@ class StGroup:
     """Store group related strategies."""
 
     @classmethod
-    def name(cls) -> st.SearchStrategy[str]:
-        return st.text(
+    def name(cls, parsable: bool = False) -> st.SearchStrategy[str]:
+        strat = st.text(
             alphabet=st.characters(
                 exclude_categories=["C"],
                 exclude_characters=["(", ")", ":"],
@@ -376,6 +376,9 @@ class StGroup:
             min_size=1,
             max_size=MAX_TEXT_SIZE,
         )
+        if parsable:
+            strat.filter(lambda s: s not in Group.DEFAULT_GROUPS)
+        return strat
 
     @classmethod
     def rgx(cls, for_filename: bool = False) -> st.SearchStrategy[str]:
@@ -511,7 +514,7 @@ class StGroup:
                 )
 
             args = {}
-            args["name"] = draw(cls.name())
+            args["name"] = draw(cls.name(parsable=parsable))
 
             to_draw = list(chosen)
             if "fmt" in chosen:

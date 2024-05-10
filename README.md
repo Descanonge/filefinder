@@ -25,7 +25,7 @@ values for some names). Once setup, it can:
 
 ## Quick examples
 
-The following example will find all files with the structure ``Data/param_[parameter]/Temperature_[date].nc``:
+The following example will find all files with the structure ``Data/param_[parameter]/[year]/Temperature_[date].nc``:
 ``` python
 finder = Finder('/.../Data', 'param_%(parameter:fmt=.1f)/%(Y)/Temperature_%(Y)%(m)%(d).nc')
 files = finder.get_files()

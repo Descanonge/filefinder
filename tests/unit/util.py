@@ -479,8 +479,8 @@ class StGroup:
         flags = set(["opt", "discard"]) - set(ignore)
 
         if parsable:
+            # s format is really that impossible ?
             fmt_kind = fmt_kind.replace("s", "")
-            specs.remove("rgx")
 
         @st.composite
         def comp(draw, fmt_kind: str):
@@ -493,6 +493,11 @@ class StGroup:
             )
 
             chosen = draw(spec_strat)
+
+            if parsable:
+                if ("fmt" in chosen or "bool_elts" in chosen) and "rgx" in chosen:
+                    chosen.remove("rgx")
+
             if flags:
                 chosen += draw(
                     st.lists(

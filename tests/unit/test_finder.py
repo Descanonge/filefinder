@@ -290,10 +290,7 @@ def test_format_regex():
 
 # It is possible to add random files, but it is difficult to ensure they will not
 # match... It is easy to find counter examples.
-@settings(
-    suppress_health_check=[HealthCheck.function_scoped_fixture],
-    deadline=None,
-)
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
 @given(ref=StPattern.pattern_values(for_filename=True, min_group=1, parsable=False))
 def test_file_scan(fs: FakeFilesystem, ref: PatternValues):
     """Test that we scan files generated randomly.

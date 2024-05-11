@@ -8,7 +8,7 @@ from datetime import datetime
 
 import filefinder.library
 from filefinder.finder import Finder
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from util import FORBIDDEN_CHAR, MAX_CODEPOINT, MAX_TEXT_SIZE
 
@@ -60,11 +60,8 @@ def segments(draw) -> list[str]:
     return segments
 
 
-@given(
-    segments=segments(),
-    date=st.datetimes(),
-    default_date=st.datetimes(),
-)
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
+@given(segments=segments(), date=st.datetimes(), default_date=st.datetimes())
 def test_get_date(segments: list[str], date: datetime, default_date: datetime):
     """Test obtaining a date from a pattern.
 

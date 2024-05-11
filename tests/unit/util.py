@@ -377,7 +377,7 @@ class StGroup:
             max_size=MAX_TEXT_SIZE,
         )
         if parsable:
-            strat.filter(lambda s: s not in Group.DEFAULT_GROUPS)
+            strat = strat.filter(lambda s: s not in Group.DEFAULT_GROUPS)
         return strat
 
     @classmethod

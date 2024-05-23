@@ -65,6 +65,7 @@ Contents
 
    usage
    pattern
+   filtering
 
 .. toctree::
    :maxdepth: 1

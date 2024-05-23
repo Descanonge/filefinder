@@ -493,7 +493,7 @@ class Finder:
             for filename, matches in self._files:
                 if all(filt(self, filename, matches) for filt in self.filters.values()):
                     kept_files.append((filename, matches))
-        self._files = kept_files
+            self._files = kept_files
 
         self._files.sort(key=lambda x: x[0])
 

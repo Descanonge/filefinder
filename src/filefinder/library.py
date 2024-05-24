@@ -163,9 +163,9 @@ def filter_by_range(
 
     parsed = matches.get_value(group, parse=True, keep_discard=False)
 
-    if min is not None and parsed <= min:
+    if min is not None and parsed < min:
         return False
-    if max is not None and parsed >= max:
+    if max is not None and parsed > max:
         return False
     return True
 

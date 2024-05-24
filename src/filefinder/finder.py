@@ -4,19 +4,35 @@
 # (http://github.com/Descanonge/filefinder) and subject
 # to the MIT License as defined in the file 'LICENSE',
 # at the root of this project. © 2021 Clément Haëck
-
+import functools
 import itertools
 import logging
 import os
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from copy import copy
-from typing import Any
+from typing import Any, Protocol
 
 from filefinder.group import Group, GroupKey
 from filefinder.matches import Matches, get_groups_indices
 
 logger = logging.getLogger(__name__)
+
+
+class _FilterUserFunc(Protocol):
+    """Defines the signature of filters callables (for static type checkers).
+
+    See `<https://mypy.readthedocs.io/en/stable/protocols.html#callback-protocols>`__
+    for details.
+    """
+
+    def __call__(
+        self, __finder: "Finder", filename: str, matches: Matches, **kwargs: Any
+    ) -> bool:
+        ...
+
+
+FilterPartial = Callable[["Finder", str, Matches], bool]
 
 
 class Finder:
@@ -76,6 +92,13 @@ class Finder:
 
         Is reset to False if the cache (of scanned files) is voided, for instance by
         operation like changing fixed values of groups.
+        """
+
+        self.filters: list[FilterPartial] = []
+        """List of filters to apply to found files.
+
+        Each value is a :func:`partial function<functools.partial>` with keyword
+        arguments applied.
         """
 
         self.set_pattern(pattern)
@@ -430,16 +453,50 @@ class Finder:
         """Return regexes for each sub-directory."""
         return self._get_regex().split("/")
 
-    def find_files(self):
+    def add_filter(self, func: _FilterUserFunc, **kwargs: Any):
+        """Add a filter with which to select scanned files.
+
+        See :doc:`/filtering` for details.
+
+        :rtype func: Callable
+
+        Parameters
+        ----------
+        func: ~collections.abc.Callable[[Finder, str, Matches, ...], bool]
+            Callable that returns True if the file is to be kept, False otherwise.
+        kwargs
+            Will be passed to the function when executed.
+        """
+        filt = functools.partial(func, **kwargs)
+        self.filters.append(filt)
+        self._apply_filters(filt)
+
+    def clear_filters(self) -> None:
+        """Remove all filters."""
+        self.filters.clear()
+        self._void_cache()
+
+    def _apply_filters(self, filter: FilterPartial | None = None) -> None:
+        filters = [filter] if filter is not None else self.filters
+        kept_files = []
+        for filename, matches in self._files:
+            if all(filt(self, filename, matches) for filt in filters):
+                kept_files.append((filename, matches))
+        self._files = kept_files
+
+    def find_files(self) -> None:
         """Find files to scan and store them.
 
-        Is automatically called when accessing :attr:`files` or :func:`get_files`. Sort
-        files alphabetically.
+        Is automatically called when accessing :attr:`files` or :func:`get_files`. Apply
+        all filters and sort files alphabetically.
         """
         if self.scan_everything:
             self._find_files_scan_everything()
         else:
             self._find_files_subdirectories()
+
+        if self.filters:
+            self._apply_filters()
 
         self._files.sort(key=lambda x: x[0])
 

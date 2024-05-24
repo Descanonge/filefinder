@@ -8,6 +8,7 @@ import sys
 import typing as t
 from collections import abc
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from filefinder.format import Format, FormatError
 from filefinder.group import Group
@@ -22,6 +23,31 @@ elif sys.platform == "darwin":
     FORBIDDEN_CHAR = set(":")
 else:
     FORBIDDEN_CHAR = set()
+
+
+def setup_files(
+    fs, dates: abc.Sequence[datetime], params: abc.Sequence[float]
+) -> tuple[str, list[str]]:
+    def make_filename(date: datetime, param: float, option: bool) -> str:
+        filename = (
+            f"{date.year}{os.sep}test"
+            f"_{date.strftime('%Y-%m-%d')}"
+            f"_{param:.1f}{'_yes' if option else ''}.ext"
+        )
+        return filename
+
+    options = [False, True]
+
+    datadir = os.path.join(fs.root_dir_name + "data")
+    fs.create_dir(datadir)
+
+    files = [make_filename(*args) for args in itertools.product(dates, params, options)]
+    files.sort()
+
+    for f in files:
+        fs.create_file(os.path.join(datadir, f))
+
+    return datadir, files
 
 
 def form(fmt: str, value: t.Any) -> str:
@@ -311,11 +337,16 @@ class GroupTest:
                 exclude_categories=["C"],
                 exclude_characters=exclude,
             )
-            return st.from_regex(
-                self.rgx,
-                fullmatch=True,
-                alphabet=alphabet,
-            ).filter(lambda s: len(s) < MAX_TEXT_SIZE)
+            return (
+                st.from_regex(
+                    self.rgx,
+                    fullmatch=True,
+                    alphabet=alphabet,
+                )
+                .filter(lambda s: len(s) < MAX_TEXT_SIZE)
+                .map(lambda s: s.strip())
+                .filter(lambda s: re.fullmatch(self.rgx, s))
+            )
         if "bool_elts" in self:
             return st.booleans()
         if "fmt" in self and self.fmt_struct is not None:
@@ -361,8 +392,8 @@ class StGroup:
     """Store group related strategies."""
 
     @classmethod
-    def name(cls) -> st.SearchStrategy[str]:
-        return st.text(
+    def name(cls, parsable: bool = False) -> st.SearchStrategy[str]:
+        strat = st.text(
             alphabet=st.characters(
                 exclude_categories=["C"],
                 exclude_characters=["(", ")", ":"],
@@ -371,6 +402,9 @@ class StGroup:
             min_size=1,
             max_size=MAX_TEXT_SIZE,
         )
+        if parsable:
+            strat = strat.filter(lambda s: s not in Group.DEFAULT_GROUPS)
+        return strat
 
     @classmethod
     def rgx(cls, for_filename: bool = False) -> st.SearchStrategy[str]:
@@ -506,7 +540,7 @@ class StGroup:
                 )
 
             args = {}
-            args["name"] = draw(cls.name())
+            args["name"] = draw(cls.name(parsable=parsable))
 
             to_draw = list(chosen)
             if "fmt" in chosen:

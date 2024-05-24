@@ -18,6 +18,7 @@ from util import (
     PatternValue,
     PatternValues,
     StPattern,
+    setup_files,
 )
 
 log = logging.getLogger(__name__)
@@ -290,10 +291,7 @@ def test_format_regex():
 
 # It is possible to add random files, but it is difficult to ensure they will not
 # match... It is easy to find counter examples.
-@settings(
-    suppress_health_check=[HealthCheck.function_scoped_fixture],
-    deadline=None,
-)
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
 @given(ref=StPattern.pattern_values(for_filename=True, min_group=1, parsable=False))
 def test_file_scan(fs: FakeFilesystem, ref: PatternValues):
     """Test that we scan files generated randomly.
@@ -331,18 +329,8 @@ def test_file_scan(fs: FakeFilesystem, ref: PatternValues):
 def test_file_scan_manual(fs):
     dates = [datetime(2000, 1, 1) + i * timedelta(days=15) for i in range(50)]
     params = [-1.5, 0.0, 1.5]
-    options = [False, True]
 
-    datadir = path.join(fs.root_dir_name + "data")
-    fs.create_dir(datadir)
-    files = []
-    for d, p, o in itertools.product(dates, params, options):
-        filename = "{}{}test_{}_{:.1f}{}.ext".format(
-            d.year, path.sep, d.strftime("%F"), p, "_yes" if o else ""
-        )
-        files.append(filename)
-        fs.create_file(path.join(datadir, filename))
-    files.sort()
+    datadir, files = setup_files(fs, dates, params)
 
     for i in range(20):
         fs.create_file(path.join(datadir, f"invalid_files_{i}.ext"))

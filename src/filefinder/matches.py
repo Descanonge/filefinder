@@ -47,12 +47,6 @@ class Match:
         self.start: int = match.start(idx + 1)
         self.end: int = match.end(idx + 1)
 
-        self.match_parsed: t.Any = None
-        try:
-            self.match_parsed = group.parse(self.match_str)
-        except Exception:
-            logger.debug("Failed to parse for group %s", str(group))
-
     def __repr__(self):
         """Human readable information."""
         return "\n".join([super().__repr__(), self.__str__()])
@@ -61,14 +55,22 @@ class Match:
         """Human readable information."""
         return f"{self.group!s} = {self.match_str}"
 
-    def get_match(self, parse: bool = True) -> str | t.Any:
+    @property
+    def match_parsed(self) -> t.Any | None:
+        """Parsed value, None if parsing was not successful."""
+        try:
+            return self.group.parse(self.match_str)
+        except Exception:
+            logger.debug("Failed to parse for group %s", str(self.group))
+            return None
+
+    def get_match(self, parse: bool = True) -> t.Any:
         """Get match string or value.
 
         Parameters
         ----------
         parse:
-            If True (default), and the parsing was successful, return the
-            parsed value instead of the matched string.
+            If True (default) return the parsed value instead of the matched string.
 
         Raises
         ------
@@ -172,7 +174,7 @@ class Matches:
 
     def get_values(
         self, key: GroupKey, parse: bool = True, keep_discard: bool = False
-    ) -> list[str | t.Any]:
+    ) -> list[t.Any]:
         """Get matched values corresponding to key.
 
         Return a list of values, even if only one group is selected.
@@ -193,7 +195,7 @@ class Matches:
 
     def get_value(
         self, key: GroupKey, parse: bool = True, keep_discard: bool = False
-    ) -> str | t.Any:
+    ) -> t.Any:
         """Get matched value corresponding to key.
 
         Return a single value. If multiple groups correspond to ``key``,

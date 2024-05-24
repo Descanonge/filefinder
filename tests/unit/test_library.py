@@ -3,14 +3,18 @@
 Presentely, only `library.get_date`.
 """
 
+import itertools
 import os
-from datetime import datetime
+from collections import abc
+from datetime import datetime, timedelta
+from os import path
 
 import filefinder.library
+import pyfakefs
 from filefinder.finder import Finder
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
-from util import FORBIDDEN_CHAR, MAX_CODEPOINT, MAX_TEXT_SIZE
+from util import FORBIDDEN_CHAR, MAX_CODEPOINT, MAX_TEXT_SIZE, setup_files
 
 group_names: list[str] = list("FxXYmdBjHMS")
 """List of group names that are understood as date by filefinder."""
@@ -60,11 +64,8 @@ def segments(draw) -> list[str]:
     return segments
 
 
-@given(
-    segments=segments(),
-    date=st.datetimes(),
-    default_date=st.datetimes(),
-)
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
+@given(segments=segments(), date=st.datetimes(), default_date=st.datetimes())
 def test_get_date(segments: list[str], date: datetime, default_date: datetime):
     """Test obtaining a date from a pattern.
 
@@ -125,3 +126,65 @@ def test_get_date(segments: list[str], date: datetime, default_date: datetime):
     date_parsed = filefinder.library.get_date(matches, default_elements)
 
     assert date_ref == date_parsed
+
+
+def test_filter_dates(fs):
+    dates = [datetime(2000, 1, 1) + i * timedelta(days=1) for i in range(365)]
+    params = list(range(20))
+    datadir, files = setup_files(fs, dates, params)
+
+    finder = Finder(
+        datadir,
+        "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
+    )
+
+    # Simple case
+    finder.add_filter(
+        filefinder.library.filter_date_range, start="2000-01-01", stop="2000-01-02"
+    )
+    ndays = 2
+    assert len(finder.files) == ndays * len(params) * 2
+
+    finder.clear_filters()
+    finder.add_filter(
+        filefinder.library.filter_date_range, start="2000-05-10", stop="2000-06-10"
+    )
+    ndays = 32
+    assert len(finder.files) == ndays * len(params) * 2
+
+    finder.fix_groups(m=[5, 6])
+    finder.clear_filters()
+    finder.add_filter(
+        filefinder.library.filter_date_range,
+        start=datetime(2000, 5, 10),
+        stop=datetime(2000, 6, 10),
+    )
+    assert len(finder.files) == ndays * len(params) * 2
+
+    finder.fix_groups(m=2)
+    assert len(finder.files) == 0
+
+
+def test_filter_values(fs):
+    dates = [datetime(2000, 1, 1) + i * timedelta(days=1) for i in range(60)]
+    params = list(range(20))
+    datadir, files = setup_files(fs, dates, params)
+
+    finder = Finder(
+        datadir,
+        "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
+    )
+
+    finder.add_filter(filefinder.library.filter_by_range, group="param", min=5)
+    nvalues = 19 - 5 + 1
+    assert len(finder.files) == 2 * len(dates) * nvalues
+
+    # test adding filter without re-scanning files
+    finder.add_filter(filefinder.library.filter_by_range, group="param", max=10)
+    nvalues = 10 - 5 + 1
+    assert len(finder.files) == 2 * len(dates) * nvalues
+
+    finder.clear_filters()
+    finder.add_filter(filefinder.library.filter_by_range, group="param", min=10, max=15)
+    nvalues = 15 - 10 + 1
+    assert len(finder.files) == 2 * len(dates) * nvalues

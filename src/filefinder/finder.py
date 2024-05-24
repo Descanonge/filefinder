@@ -467,11 +467,22 @@ class Finder:
         kwargs
             Will be passed to the function when executed.
         """
-        self.filters.append(functools.partial(func, kwargs=kwargs))
+        filt = functools.partial(func, **kwargs)
+        self.filters.append(filt)
+        self._apply_filters(filt)
 
     def clear_filters(self) -> None:
         """Remove all filters."""
         self.filters.clear()
+        self._void_cache()
+
+    def _apply_filters(self, filter: FilterPartial | None = None) -> None:
+        filters = [filter] if filter is not None else self.filters
+        kept_files = []
+        for filename, matches in self._files:
+            if all(filt(self, filename, matches) for filt in filters):
+                kept_files.append((filename, matches))
+        self._files = kept_files
 
     def find_files(self) -> None:
         """Find files to scan and store them.
@@ -485,11 +496,7 @@ class Finder:
             self._find_files_subdirectories()
 
         if self.filters:
-            kept_files = []
-            for filename, matches in self._files:
-                if all(filt(self, filename, matches) for filt in self.filters.values()):
-                    kept_files.append((filename, matches))
-            self._files = kept_files
+            self._apply_filters()
 
         self._files.sort(key=lambda x: x[0])
 

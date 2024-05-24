@@ -34,15 +34,18 @@ the next filters won't run).
 
 .. note::
 
-    The filters are stored in the :attr:`Finder.filters` attributes, as
-    :func:`partial functions<functools.partial>` with the `kwargs` applied.
+   The same filter can be applied multiple times with different keyword
+   arguments::
+
+     finder.add_filter(some_filter, value=1.)
+     finder.add_filter(some_filter, value=3.5)
 
 
 .. currentmodule:: filefinder
 
 
-Example of filter
------------------
+Examples of filter
+------------------
 
 The package provides an example of filter. :func:`library.filter_date_range`
 will only keep files that correspond to a date which falls within a specified

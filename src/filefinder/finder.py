@@ -94,11 +94,8 @@ class Finder:
         operation like changing fixed values of groups.
         """
 
-        self.filters: dict[str, FilterPartial] = {}
-        """Mapping of filters to apply to found files.
-
-        The key is the ``__name__`` attribute of the callable if available, else its
-        representation (using :func:`repr`).
+        self.filters: list[FilterPartial] = []
+        """List of filters to apply to found files.
 
         Each value is a :func:`partial function<functools.partial>` with keyword
         arguments applied.
@@ -470,8 +467,7 @@ class Finder:
         kwargs
             Will be passed to the function when executed.
         """
-        name = getattr(func, "__name__", repr(func))
-        self.filters[name] = functools.partial(func, kwargs=kwargs)
+        self.filters.append(functools.partial(func, kwargs=kwargs))
 
     def clear_filters(self) -> None:
         """Remove all filters."""

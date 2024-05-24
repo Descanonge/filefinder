@@ -61,7 +61,7 @@ class Match:
         """Human readable information."""
         return f"{self.group!s} = {self.match_str}"
 
-    def get_match(self, parse: bool = True) -> str | t.Any:
+    def get_match(self, parse: bool = True) -> t.Any:
         """Get match string or value.
 
         Parameters
@@ -172,7 +172,7 @@ class Matches:
 
     def get_values(
         self, key: GroupKey, parse: bool = True, keep_discard: bool = False
-    ) -> list[str | t.Any]:
+    ) -> list[t.Any]:
         """Get matched values corresponding to key.
 
         Return a list of values, even if only one group is selected.
@@ -193,7 +193,7 @@ class Matches:
 
     def get_value(
         self, key: GroupKey, parse: bool = True, keep_discard: bool = False
-    ) -> str | t.Any:
+    ) -> t.Any:
         """Get matched value corresponding to key.
 
         Return a single value. If multiple groups correspond to ``key``,

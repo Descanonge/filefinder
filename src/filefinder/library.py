@@ -140,6 +140,9 @@ def filter_by_range(
 ) -> bool:
     """Filter filename using the value parsed for `group`.
 
+    Keep filename for which the value parsed for `group` fall within a specific range
+    defined by `min` and `max`.
+
     Parameters
     ----------
     group
@@ -160,9 +163,9 @@ def filter_by_range(
 
     parsed = matches.get_value(group, parse=True, keep_discard=False)
 
-    if min is not None and parsed < min:
+    if min is not None and parsed <= min:
         return False
-    if max is not None and parsed > max:
+    if max is not None and parsed >= max:
         return False
     return True
 
@@ -197,9 +200,9 @@ def filter_date_range(
     if isinstance(stop, str):
         stop = dt.datetime.fromisoformat(stop)
 
-    if start > stop:
+    if start >= stop:
         raise ValueError(f"Start ({start}) must be before stop ({stop})")
 
     current = get_date(matches, default_date=default_date)
 
-    return start < current < stop
+    return start <= current <= stop

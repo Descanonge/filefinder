@@ -47,11 +47,25 @@ the next filters won't run).
 Examples of filter
 ------------------
 
-The package provides an example of filter. :func:`library.filter_date_range`
-will only keep files that correspond to a date which falls within a specified
-range. It can be applied as such::
+The package provides two filters. The first one,
+:func:`library.filter_by_range`, allows to keep filename which have values
+parsed for one of the group that fall within a certain range::
 
-    from filefinder import Finder
+    from filefinder.library import filter_date_range
+
+    f = Finder("/data", "file_%(x:fmt=d).nc")
+    # values of 'x' will need to be greater or equal to 5
+    f.add_filter(filter_by_range, group="x", min=5)
+
+    # values will need to fall between 5 and 10  boundaries included)
+    f.clean_filters()
+    f.add_filter(filter_by_range, group="x", min=5, max=10)
+
+
+:func:`library.filter_date_range`
+will only keep files that correspond to a date which falls within a specified
+range (start and stop dates are included). It can be applied as such::
+
     from filefinder.library import filter_date_range
 
     f = Finder("/data", "my_variable_%(Y)-%(m)-%(d).nc")

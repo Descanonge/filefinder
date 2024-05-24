@@ -130,6 +130,43 @@ def _find_month_number(name: str) -> int:
     raise ValueError(f"Could not interpret month name '{name}'")
 
 
+def filter_by_range(
+    finder: Finder,
+    filename: str,
+    matches: Matches,
+    group: str,
+    min: float | None = None,
+    max: float | None = None,
+) -> bool:
+    """Filter filename using the value parsed for `group`.
+
+    Parameters
+    ----------
+    group
+        Name of the group to use the parsed value. The first non-discard group of that
+        name will be used.
+    min
+        If not None, the parsed value must be above this.
+    max
+        If not None, the parsed value mest be below this.
+
+    Raises
+    ------
+    TypeError
+        `min` and `max` cannot be both None.
+    """
+    if min is None and max is None:
+        raise TypeError("`min` and `max` cannot be both None.")
+
+    parsed = matches.get_value(group, parse=True, keep_discard=False)
+
+    if min is not None and parsed < min:
+        return False
+    if max is not None and parsed > max:
+        return False
+    return True
+
+
 def filter_date_range(
     finder: Finder,
     filename: str,

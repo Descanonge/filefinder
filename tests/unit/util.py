@@ -8,6 +8,7 @@ import sys
 import typing as t
 from collections import abc
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from filefinder.format import Format, FormatError
 from filefinder.group import Group
@@ -22,6 +23,31 @@ elif sys.platform == "darwin":
     FORBIDDEN_CHAR = set(":")
 else:
     FORBIDDEN_CHAR = set()
+
+
+def setup_files(
+    fs, dates: abc.Sequence[datetime], params: abc.Sequence[float]
+) -> tuple[str, list[str]]:
+    def make_filename(date: datetime, param: float, option: bool) -> str:
+        filename = (
+            f"{date.year}{os.sep}test"
+            f"_{date.strftime('%Y-%m-%d')}"
+            f"_{param:.1f}{'_yes' if option else ''}.ext"
+        )
+        return filename
+
+    options = [False, True]
+
+    datadir = os.path.join(fs.root_dir_name + "data")
+    fs.create_dir(datadir)
+
+    files = [make_filename(*args) for args in itertools.product(dates, params, options)]
+    files.sort()
+
+    for f in files:
+        fs.create_file(os.path.join(datadir, f))
+
+    return datadir, files
 
 
 def form(fmt: str, value: t.Any) -> str:

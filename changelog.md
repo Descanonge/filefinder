@@ -1,4 +1,6 @@
 
+## v1.1.0
+
 - [2024-05-24] Make matches parsing lazy
 - [2024-05-24] Add filtering functions: by value range and by date range
 - [2024-05-23] Add filtering step: discard files using user-defined functions

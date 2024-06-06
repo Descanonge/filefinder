@@ -1,4 +1,9 @@
 
+## v1.2.0
+
+- [2024-06-06] Add method to retrieve group names
+- [2024-06-06] Add explicit Group.fixed property
+
 ## v1.1.0
 
 - [2024-05-24] Make matches parsing lazy

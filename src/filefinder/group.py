@@ -98,6 +98,7 @@ class Group:
         """If True, the whole group is marked as optional (``()?``).
         Is set to False unless specification ':opt' is indicated."""
 
+        self._fixed = False
         self.fixed_value: Any | None = None
         self.fixed_string: str | None = None
         self.fixed_regex: str | None = None
@@ -229,6 +230,11 @@ class Group:
         """Human readable information."""
         return f"{self.name}:{self.idx:d}"
 
+    @property
+    def fixed(self) -> bool:
+        """True if the group has fixed value(s)."""
+        return self._fixed
+
     def format(self, value: Any) -> str:
         """Return formatted string from value."""
         return self.fmt.format(value)
@@ -257,6 +263,7 @@ class Group:
             A string is directly used as a regular expression, otherwise the
             value is formatted according to the group 'format' specification.
         """
+        self._fixed = True
         self.fixed_value = fix
 
         if not isinstance(fix, list | tuple):
@@ -292,6 +299,7 @@ class Group:
 
     def unfix(self):
         """Unfix value."""
+        self._fixed = False
         self.fixed_value = None
         self.fixed_string = None
         self.fixed_regex = None

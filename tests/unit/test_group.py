@@ -143,9 +143,15 @@ def test_fix_format_number(ref: FormatValue):
     number = ref.value
     g = Group(f"foo:fmt={fmt}", 0)
     g.fix_value(number)
+    assert g.fixed
     assert g.fixed_value == number
     assert g.fixed_string == form(fmt, number)
     assert g.fixed_regex == re.escape(form(fmt, number))
+    g.unfix()
+    assert not g.fixed
+    assert g.fixed_value is None
+    assert g.fixed_string is None
+    assert g.fixed_regex is None
 
 
 @given(a=st.integers(), b=st.integers())

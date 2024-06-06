@@ -159,6 +159,21 @@ class Finder:
         """Set value for attribute :attr:`use_regex`."""
         self.use_regex = use_regex
 
+    def get_group_names(self, fixed: bool | None = None) -> set[str]:
+        """Get the names of groups in the pattern.
+
+        Parameters
+        ----------
+        fixed
+            If True, only return names of groups with a fixed value. If False, return
+            only those without a fixed value. If None (default), return for all groups.
+        """
+        groups = self.groups
+        if fixed is not None:
+            groups = [g for g in groups if g.fixed == fixed]
+
+        return set(g.name for g in groups)
+
     def get_files(
         self,
         relative: bool = False,

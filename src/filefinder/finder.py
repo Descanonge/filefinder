@@ -308,7 +308,7 @@ class Finder:
             self.fix_group(*f, fix_discard=fix_discard)
 
     def unfix_groups(self, *keys: str):
-        """Unfix groups.
+        """Unfix groups, and remove group related filters.
 
         Parameters
         ----------
@@ -324,6 +324,13 @@ class Finder:
                 groups = self.get_groups(key)
                 for g in groups:
                     g.unfix()
+                    pattern = re.compile(rf"({g.idx}|{g.name})__\d+")
+                    self.filters = {
+                        name: filt
+                        for name, filt in self.filters.items()
+                        if pattern.fullmatch(name) is None
+                    }
+
         self._void_cache()
 
     def add_filter(self, func: _FilterUserFunc, name: str = "", **kwargs: Any):

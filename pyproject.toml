@@ -55,7 +55,7 @@ disable_error_code = ['annotation-unchecked']
 # allow_untyped_defs = true
 ignore_missing_imports = true
 
-[tool.ruff]
+[tool.lint.ruff]
 select = [
        'E',  # pycodestyle
        'W',  # pycodestyle
@@ -77,11 +77,12 @@ ignore = [
        'D213', # multiline docstring start at 2nd line
        'D417', # not all parameters need doc
 ]
+unfixable = ["F401"]
 
-[too.ruff.pycodestyle]
+[too.ruff.lint.pycodestyle]
 max-line-length = 90
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = 'numpy'
 
 [tool.ruff.format]

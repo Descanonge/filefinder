@@ -3,11 +3,8 @@
 Presentely, only `library.get_date`.
 """
 
-import itertools
 import os
-from collections import abc
 from datetime import datetime, timedelta
-from os import path
 
 import filefinder.library
 import pyfakefs
@@ -165,6 +162,12 @@ def test_filter_dates(fs):
     assert len(finder.files) == 0
 
 
+def assert_filter(finder, n_files: int):
+    assert len(finder.files) == n_files
+    finder._void_cache()
+    assert len(finder.files) == n_files
+
+
 def test_filter_values(fs):
     dates = [datetime(2000, 1, 1) + i * timedelta(days=1) for i in range(60)]
     params = list(range(20))
@@ -179,12 +182,40 @@ def test_filter_values(fs):
     nvalues = 19 - 5 + 1
     assert len(finder.files) == 2 * len(dates) * nvalues
 
-    # test adding filter without re-scanning files
-    finder.add_filter(filefinder.library.filter_by_range, group="param", max=10)
+    finder.add_filter(
+        filefinder.library.filter_by_range, group="param", name="filter2", max=10
+    )
     nvalues = 10 - 5 + 1
-    assert len(finder.files) == 2 * len(dates) * nvalues
+    assert_filter(finder, 2 * len(dates) * nvalues)
 
     finder.clear_filters()
     finder.add_filter(filefinder.library.filter_by_range, group="param", min=10, max=15)
     nvalues = 15 - 10 + 1
-    assert len(finder.files) == 2 * len(dates) * nvalues
+    assert_filter(finder, 2 * len(dates) * nvalues)
+
+
+def test_filter_group(fs):
+    dates = [datetime(2000, 1, 1) + i * timedelta(days=1) for i in range(60)]
+    params = list(range(20))
+    datadir, files = setup_files(fs, dates, params)
+
+    finder = Finder(
+        datadir,
+        "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
+    )
+
+    finder.fix_by_filter("m", lambda m: m == 1)
+    assert len(finder.files) == 2 * 31 * len(params)
+
+    finder.fix_by_filter("option", bool)
+    assert_filter(finder, 31 * len(params))
+
+    # test unfixing
+    finder.unfix_groups("m")
+    assert_filter(finder, len(dates) * len(params))
+
+    finder.fix_by_filter("param", lambda x: x < 10)
+    assert_filter(finder, len(dates) * 10)
+
+    finder.fix_by_filter("param", lambda x: x % 2 == 0)
+    assert_filter(finder, len(dates) * 5)

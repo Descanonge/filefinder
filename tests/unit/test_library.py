@@ -182,9 +182,7 @@ def test_filter_values(fs):
     nvalues = 19 - 5 + 1
     assert len(finder.files) == 2 * len(dates) * nvalues
 
-    finder.add_filter(
-        filefinder.library.filter_by_range, group="param", name="filter2", max=10
-    )
+    finder.add_filter(filefinder.library.filter_by_range, group="param", max=10)
     nvalues = 10 - 5 + 1
     assert_filter(finder, 2 * len(dates) * nvalues)
 

@@ -9,7 +9,7 @@ import itertools
 import logging
 import os
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Sequence, Container
 from copy import copy
 from typing import Any, Protocol
 
@@ -17,6 +17,15 @@ from filefinder.group import Group, GroupKey
 from filefinder.matches import Matches, get_groups_indices
 
 logger = logging.getLogger(__name__)
+
+
+def _get_unique_name(name: str, existing: Container[str]) -> str:
+    i = 0
+    r_name = f"{name}__{i}"
+    while r_name in existing:
+        i += 1
+        r_name = f"{name}__{i}"
+    return r_name
 
 
 class _FilterUserFunc(Protocol):
@@ -345,13 +354,19 @@ class Finder:
         func ~collections.abc.Callable[[Finder, str, Matches, ...], bool]
             Callable that returns True if the file is to be kept, False otherwise.
         name
-            Name of the filter, if not specified, the function name `func` will be used.
+            Name of the filter, if not specified, the function name of `func` will be
+            used. In this case, if the same filter is already registered the name will
+            be changed. If the name is provided as an argument however, any double will
+            raise an error.
         kwargs
             Will be passed to the function when executed.
         """
         filt: FilterPartial = functools.partial(func, **kwargs)
         if not name:
             name = func.__name__  # type: ignore
+            if name in self.filters:
+                name = _get_unique_name(name, self.filters)
+
         if name in self.filters:
             raise KeyError(f"A filter with the name {name} is already registered.")
         self.filters[name] = filt
@@ -411,12 +426,7 @@ class Finder:
 
             return all(func(v) for v in values)
 
-        # Find a name not taken
-        for id_num in range(99):
-            name = f"{key}__{id_num}"
-            if name not in self.filters:
-                break
-
+        name = _get_unique_name(str(key), self.filters)
         self.add_filter(filt, name=name)
 
     def find_matches(self, filename: str, relative: bool = True) -> Matches | None:

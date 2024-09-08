@@ -15,6 +15,18 @@ from .group import Group, GroupKey
 logger = logging.getLogger(__name__)
 
 
+class Sentinel:
+    def __init__(self, msg: str = ""):
+        self.msg = msg
+
+    def __str__(self) -> str:
+        return self.msg
+
+
+PARSE_FAIL = Sentinel("Could not parse")
+NOT_PARSED = Sentinel("Not yet parsed")
+
+
 class Match:
     """Match extract from a filename.
 
@@ -46,6 +58,7 @@ class Match:
         self.match_str: str = match.group(idx + 1)
         self.start: int = match.start(idx + 1)
         self.end: int = match.end(idx + 1)
+        self._parsed: t.Any | Sentinel = NOT_PARSED
 
     def __repr__(self):
         """Human readable information."""
@@ -56,33 +69,42 @@ class Match:
         return f"{self.group!s} = {self.match_str}"
 
     @property
-    def match_parsed(self) -> t.Any | None:
-        """Parsed value, None if parsing was not successful."""
-        try:
-            return self.group.parse(self.match_str)
-        except Exception:
-            logger.debug("Failed to parse for group %s", str(self.group))
-            return None
+    def match_parsed(self) -> t.Any | Sentinel:
+        if self._parsed is NOT_PARSED:
+            try:
+                self._parsed = self.group.parse(self.match_str)
+            except Exception:
+                self._parsed = PARSE_FAIL
+                logger.debug("Failed to parse for group %s", str(self.group))
+        return self._parsed
 
-    def get_match(self, parse: bool = True) -> t.Any:
+    def can_parse(self) -> bool:
+        """Return if the match can be parsed."""
+        return self.match_parsed is not PARSE_FAIL
+
+    def get_match(self, parse: bool = True, raise_on_unparsed: bool = True) -> t.Any:
         """Get match string or value.
 
         Parameters
         ----------
         parse:
             If True (default) return the parsed value instead of the matched string.
-
+        raise_on_unparsed
+            If True (default), will raise an error if the parsed value was asked but the
+            parsing failed. If False, return the string match instead.
         Raises
         ------
         ValueError: Could not parse the match.
         """
         if parse:
-            if self.match_parsed is None:
+            if self.can_parse():
+                return self.match_parsed
+
+            if raise_on_unparsed:
                 raise ValueError(
                     f"Failed to parse value '{self.match_str}' "
                     f"for group '{self.group!s}'."
                 )
-            return self.match_parsed
         return self.match_str
 
 

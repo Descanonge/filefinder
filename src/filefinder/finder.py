@@ -571,10 +571,19 @@ class Finder:
         else:
             self._find_files_subdirectories()
 
-        if self.filters:
-            self._apply_filters()
-
         self._files.sort(key=lambda x: x[0])
+
+        logger.debug("Found %d files matching and filtered", len(self._files))
+        if len(self._files) == 0:
+            logger.info("Found no matching files (after filtering)")
+
+    def _add_file(self, filename: str, pattern: re.Pattern):
+        """Add file if it matches pattern and pass filters."""
+        matches = Matches.from_filename(filename, pattern, self.groups)
+        if matches is not None and all(
+            filt(self, filename, matches) for filt in self.filters.values()
+        ):
+            self._files.append((filename, matches))
 
     def _find_files_scan_everything(self) -> None:
         """Find files checking every sub-directory.
@@ -587,23 +596,22 @@ class Finder:
         found, which can be significant work in some cases.
         """
         pattern = re.compile(self.get_regex())
-        files_matched = []
 
         for dirpath, dirnames, filenames in os.walk(self.root):
             depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
                 os.sep
             ).count(os.sep)
+            logger.debug(
+                "Scanning in %s (depth %d/%d)", dirpath, depth, self.max_scan_depth
+            )
             if depth > self.max_scan_depth:
                 dirnames.clear()
 
             for f in filenames:
                 to_root = self.get_relative(os.path.join(dirpath, f))
-                matches = Matches.from_filename(to_root, pattern, self.groups)
-                if matches is not None:
-                    files_matched.append((to_root, matches))
+                self._add_file(to_root, pattern)
 
         self.scanned = True
-        self._files = files_matched
 
     def _find_files_subdirectories(self) -> None:
         """Find files checking sub-directories along the way.
@@ -615,57 +623,42 @@ class Finder:
         """
         max_log_lines = 3
 
+        full_pattern = re.compile(self.get_regex())
         subpatterns = [re.compile(rgx) for rgx in self.get_regex_subdirs()]
-        files = []
+        maxdepth = len(subpatterns) - 1
         for dirpath, dirnames, filenames in os.walk(self.root):
             depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
                 os.sep
             ).count(os.sep)
             pattern = subpatterns[depth]
 
-            if depth == len(subpatterns) - 1:
+            logger.debug(
+                "Scanning in %s (depth %d/%d) with pattern %s",
+                dirpath,
+                depth,
+                maxdepth,
+                pattern.pattern,
+            )
+
+            if depth == maxdepth:
                 dirnames.clear()  # look no deeper
-                files += [
-                    self.get_relative(os.path.join(dirpath, f)) for f in filenames
-                ]
-            elif logger.isEnabledFor(logging.DEBUG):
-                dirlogs = dirnames[:max_log_lines]
-                if len(dirnames) > max_log_lines:
-                    dirlogs += ["..."]
-                logger.debug(
-                    "depth: %d, pattern: %s, folders:\n\t%s",
-                    depth,
-                    pattern.pattern,
-                    "\n\t".join(dirlogs),
-                )
+
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("Found %d files in %s", len(filenames), dirpath)
+                    logger.debug("\t%s", "\n\t".join(filenames[:max_log_lines]))
+                    if len(filenames) > max_log_lines:
+                        logger.debug("...")
+
+                for f in filenames:
+                    to_root = self.get_relative(os.path.join(dirpath, f))
+                    self._add_file(to_root, full_pattern)
 
             # Removes directories not matching regex
             to_remove = [d for d in dirnames if not pattern.fullmatch(d)]
             for d in to_remove:
                 dirnames.remove(d)
 
-        logger.debug("Found %s files in sub-directories", len(files))
-
-        # Now only retain files that match the full pattern
-        pattern = re.compile(self.get_regex())
-        files_matched = []
-
-        for f in files:
-            matches = Matches.from_filename(f, pattern, self.groups)
-            if matches is not None:
-                files_matched.append((f, matches))
-
-        if logger.isEnabledFor(logging.DEBUG):
-            filelogs = files[:max_log_lines]
-            if len(files) > max_log_lines:
-                filelogs += ["..."]
-            logger.debug(
-                "regex: %s, files:\n\t%s", pattern.pattern, "\n\t".join(filelogs)
-            )
-            logger.debug("Found %s matching files in %s", len(files_matched), self.root)
-
         self.scanned = True
-        self._files = files_matched
 
     def _void_cache(self) -> None:
         self.scanned = False

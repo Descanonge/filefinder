@@ -445,6 +445,17 @@ class Finder:
         name = get_unique_name(str(key), self.filters)
         self.add_filter(filt, name=name)
 
+    def _make_matches(
+        self, filename: str, pattern: str | re.Pattern | None = None
+    ) -> Matches | None:
+        if pattern is None:
+            pattern = self.get_regex()
+
+        matches = Matches.from_filename(filename, pattern, self.groups)
+        if matches is not None:
+            matches.date_is_first_class = self.date_is_first_class
+        return matches
+
     def find_matches(self, filename: str, relative: bool = True) -> Matches | None:
         """Find matches for a given filename.
 
@@ -468,7 +479,7 @@ class Finder:
         if not relative:
             filename = self.get_relative(filename)
 
-        return Matches.from_filename(filename, self.get_regex(), self.groups)
+        return self._make_matches(filename)
 
     def make_filename(
         self,
@@ -605,7 +616,7 @@ class Finder:
 
     def _add_file(self, filename: str, pattern: re.Pattern):
         """Add file if it matches pattern and pass filters."""
-        matches = Matches.from_filename(filename, pattern, self.groups)
+        matches = self._make_matches(filename, pattern)
         if matches is not None and all(
             filt(self, filename, matches) for filt in self.filters.values()
         ):
@@ -692,6 +703,9 @@ class Finder:
 
     def get_groups(self, key: GroupKey) -> list[Group]:
         """Return list of groups corresponding to key.
+
+        If :attr:`date_is_first_class` is True, for the key 'date' return all time
+        related groups.
 
         Parameters
         ----------

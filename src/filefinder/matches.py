@@ -163,6 +163,8 @@ class Matches:
         for i in range(len(groups)):
             self.matches.append(Match(groups[i], match, i))
 
+        self.date_is_first_class: bool = True
+
     def __repr__(self) -> str:
         """Human readable information."""
         return "\n".join([super().__repr__(), self.__str__()])

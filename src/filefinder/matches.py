@@ -11,18 +11,9 @@ import typing as t
 from collections import abc
 
 from .group import Group, GroupKey
+from .util import Sentinel
 
 logger = logging.getLogger(__name__)
-
-
-class Sentinel:
-    """Sentinel objects."""
-
-    def __init__(self, msg: str = ""):
-        self.msg = msg
-
-    def __str__(self) -> str:
-        return self.msg
 
 
 PARSE_FAIL = Sentinel("Could not parse")
@@ -269,26 +260,3 @@ class Matches:
         if not keep_discard:
             matches = [m for m in matches if not m.group.discard]
         return matches
-
-
-def get_groups_indices(groups: list[Group], key: GroupKey) -> list[int]:
-    """Get sorted list of groups indices corresponding to key.
-
-    Key can be an integer index, or a string of a group name. Since multiple
-    groups can share the same name, multiple indices can be returned (sorted).
-
-    Raises
-    ------
-    IndexError: No group found corresponding to the key
-    TypeError: Key is not int or str
-    """
-    if isinstance(key, int):
-        return [key]
-    if isinstance(key, str):
-        selected = [i for i, group in enumerate(groups) if group.name == key]
-
-        if len(selected) == 0:
-            raise IndexError(f"No group found for key '{key}'")
-        return selected
-
-    raise TypeError("Key must be int or str.")

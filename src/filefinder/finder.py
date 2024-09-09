@@ -9,26 +9,18 @@ import itertools
 import logging
 import os
 import re
-from collections.abc import Callable, Sequence, Container
+import typing as t
+from collections import abc
 from copy import copy
-from typing import Any, Protocol
 
-from filefinder.group import Group, GroupKey
-from filefinder.matches import Matches, get_groups_indices
+from .group import Group, GroupKey
+from .matches import Matches
+from .util import get_groups_indices, get_unique_name
 
 logger = logging.getLogger(__name__)
 
 
-def _get_unique_name(name: str, existing: Container[str]) -> str:
-    i = 0
-    r_name = f"{name}__{i}"
-    while r_name in existing:
-        i += 1
-        r_name = f"{name}__{i}"
-    return r_name
-
-
-class _FilterUserFunc(Protocol):
+class _FilterUserFunc(t.Protocol):
     """Defines the signature of filters callables (for static type checkers).
 
     See `<https://mypy.readthedocs.io/en/stable/protocols.html#callback-protocols>`__
@@ -36,11 +28,11 @@ class _FilterUserFunc(Protocol):
     """
 
     def __call__(
-        self, finder: "Finder", filename: str, matches: Matches, **kwargs: Any
+        self, finder: "Finder", filename: str, matches: Matches, **kwargs: t.Any
     ) -> bool: ...
 
 
-FilterPartial = Callable[["Finder", str, Matches], bool]
+FilterPartial = abc.Callable[["Finder", str, Matches], bool]
 
 
 class Finder:
@@ -185,7 +177,7 @@ class Finder:
     def get_files(
         self,
         relative: bool = False,
-        nested: Sequence[str | Sequence[str]] | None = None,
+        nested: abc.Sequence[str | abc.Sequence[str]] | None = None,
     ) -> list:
         """Return files that matches the regex.
 
@@ -266,7 +258,7 @@ class Finder:
         """Get absolute path to filename."""
         return os.path.join(self.root, filename)
 
-    def fix_group(self, key: GroupKey, value: str | Any, fix_discard: bool = False):
+    def fix_group(self, key: GroupKey, value: str | t.Any, fix_discard: bool = False):
         """Fix a group to a string.
 
         Parameters
@@ -293,9 +285,9 @@ class Finder:
 
     def fix_groups(
         self,
-        fixes: dict[Any, str | Any] | None = None,
+        fixes: dict[t.Any, str | t.Any] | None = None,
         fix_discard: bool = False,
-        **fixes_kw: str | Any,
+        **fixes_kw: str | t.Any,
     ):
         """Fix multiple groups at once.
 
@@ -342,7 +334,7 @@ class Finder:
 
         self._void_cache()
 
-    def add_filter(self, func: _FilterUserFunc, name: str = "", **kwargs: Any):
+    def add_filter(self, func: _FilterUserFunc, name: str = "", **kwargs: t.Any):
         """Add a filter with which to select scanned files.
 
         See :doc:`/filtering` for details.
@@ -365,7 +357,7 @@ class Finder:
         if not name:
             name = func.__name__  # type: ignore
             if name in self.filters:
-                name = _get_unique_name(name, self.filters)
+                name = get_unique_name(name, self.filters)
 
         if name in self.filters:
             raise KeyError(f"A filter with the name {name} is already registered.")
@@ -382,7 +374,7 @@ class Finder:
     def fix_by_filter(
         self,
         key: GroupKey,
-        func: Callable[[Any], bool],
+        func: abc.Callable[[t.Any], bool],
         pass_unparsed: bool = False,
         fix_discard: bool = True,
     ):
@@ -417,7 +409,7 @@ class Finder:
 
         # Wrap as a typical filter
         def filt(finder: "Finder", filename: str, matches: Matches, **kwargs) -> bool:
-            values: list[Any] = []
+            values: list[t.Any] = []
             for m in matches.get_matches(key, keep_discard=fix_discard):
                 if not m.can_parse() and pass_unparsed:
                     values.append(m.match_str)
@@ -426,7 +418,7 @@ class Finder:
 
             return all(func(v) for v in values)
 
-        name = _get_unique_name(str(key), self.filters)
+        name = get_unique_name(str(key), self.filters)
         self.add_filter(filt, name=name)
 
     def find_matches(self, filename: str, relative: bool = True) -> Matches | None:
@@ -458,7 +450,7 @@ class Finder:
         self,
         fixes: dict | None = None,
         relative: bool = False,
-        **kw_fixes: Any,
+        **kw_fixes: t.Any,
     ) -> str:
         """Return a filename.
 

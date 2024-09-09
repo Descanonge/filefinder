@@ -12,10 +12,11 @@ import re
 import typing as t
 from collections import abc
 from copy import copy
+from datetime import datetime
 
 from .group import Group, GroupKey
 from .matches import Matches
-from .util import get_groups_indices, get_unique_name
+from .util import get_groups_indices, get_unique_name, datetime_to_value
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,8 @@ class Finder:
     max_scan_depth: int = 32
     """Maximum sub-directory depth to scan when :attr:`scan_everything` is True."""
 
+    date_is_first_class: bool = True
+
     def __init__(
         self,
         root: str,
@@ -93,6 +96,10 @@ class Finder:
         Is reset to False if the cache (of scanned files) is voided, for instance by
         operation like changing fixed values of groups.
         """
+
+        # copy class value, make sur it is transformed into instance attr
+        self.date_is_first_class: bool = self.date_is_first_class
+        """If True, the group name 'date' is considered special."""
 
         self.filters: dict[str, FilterPartial] = {}
         """Mapping of filters to apply to found files.
@@ -280,6 +287,13 @@ class Finder:
         for m in self.get_groups(key):
             if not fix_discard and m.discard:
                 continue
+            if key == "date" and self.date_is_first_class:
+                if not isinstance(value, datetime):
+                    raise TypeError(
+                        "If key is date, value must be a date or datetime object."
+                    )
+                m.fix_value(datetime_to_value(value, m.name))
+                continue
             m.fix_value(value)
         self._void_cache()
 
@@ -308,7 +322,7 @@ class Finder:
         for f in fixes.items():
             self.fix_group(*f, fix_discard=fix_discard)
 
-    def unfix_groups(self, *keys: str):
+    def unfix_groups(self, *keys: GroupKey):
         """Unfix groups, and remove group related filters.
 
         Parameters
@@ -317,20 +331,30 @@ class Finder:
            Keys to find groups to unfix. See :func:`get_groups`.
            If no key is provided, all groups will be unfixed.
         """
+
+        def remove_filters(rgx: str):
+            pattern = re.compile(rgx)
+            self.filters = {
+                name: filt
+                for name, filt in self.filters.items()
+                if pattern.fullmatch(name) is None
+            }
+
         if not keys:
-            for g in self.groups:
+            keys = tuple(range(self.n_groups))
+
+        for key in keys:
+            groups = self.get_groups(key)
+            for g in groups:
                 g.unfix()
-        else:
-            for key in keys:
-                groups = self.get_groups(key)
-                for g in groups:
-                    g.unfix()
-                    pattern = re.compile(rf"({g.idx}|{g.name})__\d+")
-                    self.filters = {
-                        name: filt
-                        for name, filt in self.filters.items()
-                        if pattern.fullmatch(name) is None
-                    }
+
+            # if date only remove 'date' filters, not its elements
+            if key == "date" and self.date_is_first_class:
+                remove_filters(r"date__\d+")
+                continue
+
+            for g in groups:
+                remove_filters(rf"({g.idx}|{g.name})__\d+")
 
         self._void_cache()
 
@@ -684,6 +708,6 @@ class Finder:
         KeyError: No group found.
         TypeError: Key type is not valid.
         """
-        selected = get_groups_indices(self.groups, key)
+        selected = get_groups_indices(self.groups, key, self.date_is_first_class)
         groups = [self.groups[i] for i in selected]
         return groups

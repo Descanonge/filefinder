@@ -2,9 +2,42 @@
 
 import typing as t
 from collections import abc
+from datetime import datetime
 
 if t.TYPE_CHECKING:
     from .group import Group, GroupKey
+
+datetime_keys = "YBmdjHMSFxX"
+
+
+def datetime_to_str(date: datetime, elt: str) -> str:
+    """Return string of formatted element *elt*.
+
+    *elt* must be in :attr:`datetime_keys`.
+    """
+    if elt not in datetime_keys:
+        raise KeyError(f"Element '{elt}' not supported [{datetime_keys}]")
+
+    if elt == "x":
+        fmt = "%Y%m%d"
+    elif elt == "X":
+        fmt = "%H%M%S"
+    elif elt == "F":
+        fmt = "%Y-%m-%d"
+    else:
+        fmt = f"%{elt}"
+
+    return date.strftime(fmt)
+
+
+def datetime_to_value(date: datetime, elt: str) -> int | str:
+    """Return value of element *elt*."""
+    # needed because I don't have access to dayofyear
+    formatted = datetime_to_str(date, elt)
+
+    if elt in "xXFB":
+        return formatted
+    return int(formatted)
 
 
 class Sentinel:
@@ -17,7 +50,9 @@ class Sentinel:
         return self.msg
 
 
-def get_groups_indices(groups: list[Group], key: GroupKey) -> list[int]:
+def get_groups_indices(
+    groups: list[Group], key: GroupKey, date_is_first_class: bool = True
+) -> list[int]:
     """Get sorted list of groups indices corresponding to key.
 
     Key can be an integer index, or a string of a group name. Since multiple
@@ -31,7 +66,12 @@ def get_groups_indices(groups: list[Group], key: GroupKey) -> list[int]:
     if isinstance(key, int):
         return [key]
     if isinstance(key, str):
-        selected = [i for i, group in enumerate(groups) if group.name == key]
+        if key == "date" and date_is_first_class:
+            selected = [
+                i for i, group in enumerate(groups) if group.name in datetime_keys
+            ]
+        else:
+            selected = [i for i, group in enumerate(groups) if group.name == key]
 
         if len(selected) == 0:
             raise IndexError(f"No group found for key '{key}'")

@@ -5,7 +5,6 @@ Presentely, only `library.get_date`.
 
 import os
 from datetime import datetime, timedelta
-import pytest
 
 import pytest
 from hypothesis import HealthCheck, given, settings
@@ -127,6 +126,11 @@ def test_get_date(segments: list[str], date: datetime, default_date: datetime):
     # check each element that could have been set
     # (eg cannot check year if the pattern is X)
 
+    # check if the year has been specified
+    year_set = any(k in "YFx" for k in names)
+    if not year_set:
+        date_ref = date_ref.replace(year=default_date.year)
+
     for key in names:
         for attr in name_to_date[key]:
             assert getattr(date_ref, attr) == getattr(date_parsed, attr)
@@ -140,12 +144,23 @@ def test_invalid_file_differing_elements():
             filefinder.library.get_date(finder.find_matches(f))
 
 
-def test_no_date_matchers():
+def test_no_date_matchers(caplog):
     finder = Finder("", "%(year:fmt=02d)/%(month:fmt=02d)/%(full:fmt=s).ext")
     filenames = ["2005/01/2006-01-02.ext", "2005/01/2005-03-01.ext"]
     for f in filenames:
-        with pytest.raises(ValueError):
-            filefinder.library.get_date(finder.find_matches(f))
+        filefinder.library.get_date(finder.find_matches(f))
+        warnings = any(
+            rec.levelname == "WARNING"
+            and rec.msg.startswith("No date elements could be recovered.")
+            for rec in caplog.records
+        )
+        assert warnings
+
+
+def assert_nfiles(finder, n_files: int):
+    assert len(finder.files) == n_files
+    finder._void_cache()
+    assert len(finder.files) == n_files
 
 
 def test_filter_dates(fs):
@@ -170,7 +185,7 @@ def test_filter_dates(fs):
         filefinder.library.filter_date_range, start="2000-05-10", stop="2000-06-10"
     )
     ndays = 32
-    assert len(finder.files) == ndays * len(params) * 2
+    assert_nfiles(finder, ndays * 2 * len(params))
 
     finder.fix_groups(m=[5, 6])
     finder.clear_filters()
@@ -179,70 +194,13 @@ def test_filter_dates(fs):
         start=datetime(2000, 5, 10),
         stop=datetime(2000, 6, 10),
     )
-    assert len(finder.files) == ndays * len(params) * 2
+    assert_nfiles(finder, ndays * 2 * len(params))
 
     finder.fix_groups(m=2)
-    assert len(finder.files) == 0
+    assert_nfiles(finder, 0)
 
 
-def assert_filter(finder, n_files: int):
-    assert len(finder.files) == n_files
-    finder._void_cache()
-    assert len(finder.files) == n_files
-
-
-def test_filter_values(fs):
-    dates = [datetime(2000, 1, 1) + i * timedelta(days=1) for i in range(60)]
-    params = list(range(20))
-    datadir, files = setup_files(fs, dates, params)
-
-    finder = Finder(
-        datadir,
-        "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
-    )
-
-    finder.add_filter(filefinder.library.filter_by_range, group="param", min=5)
-    nvalues = 19 - 5 + 1
-    assert len(finder.files) == 2 * len(dates) * nvalues
-
-    finder.add_filter(filefinder.library.filter_by_range, group="param", max=10)
-    nvalues = 10 - 5 + 1
-    assert_filter(finder, 2 * len(dates) * nvalues)
-
-    finder.clear_filters()
-    finder.add_filter(filefinder.library.filter_by_range, group="param", min=10, max=15)
-    nvalues = 15 - 10 + 1
-    assert_filter(finder, 2 * len(dates) * nvalues)
-
-
-def test_filter_group(fs):
-    dates = [datetime(2000, 1, 1) + i * timedelta(days=1) for i in range(60)]
-    params = list(range(20))
-    datadir, files = setup_files(fs, dates, params)
-
-    finder = Finder(
-        datadir,
-        "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
-    )
-
-    finder.fix_by_filter("m", lambda m: m == 1)
-    assert len(finder.files) == 2 * 31 * len(params)
-
-    finder.fix_by_filter("option", bool)
-    assert_filter(finder, 31 * len(params))
-
-    # test unfixing
-    finder.unfix_groups("m")
-    assert_filter(finder, len(dates) * len(params))
-
-    finder.fix_by_filter("param", lambda x: x < 10)
-    assert_filter(finder, len(dates) * 10)
-
-    finder.fix_by_filter("param", lambda x: x % 2 == 0)
-    assert_filter(finder, len(dates) * 5)
-
-
-def test_fix_filter_dates(fs):
+def test_fix_by_filter_dates(fs):
     dates = [datetime(2000, 1, 1) + i * timedelta(days=1) for i in range(365)]
     params = list(range(20))
     datadir, files = setup_files(fs, dates, params)
@@ -257,13 +215,14 @@ def test_fix_filter_dates(fs):
         "date", lambda d: datetime(2000, 1, 1) <= d <= datetime(2000, 1, 2)
     )
     ndays = 2
-    assert len(finder.files) == ndays * len(params) * 2
+    assert_nfiles(finder, ndays * len(params) * 2)
 
     finder.clear_filters()
     finder.fix_by_filter(
         "date", lambda d: datetime(2000, 5, 10) <= d <= datetime(2000, 6, 10)
     )
     ndays = 32
+    assert_nfiles(finder, ndays * len(params) * 2)
     assert len(finder.files) == ndays * len(params) * 2
 
     finder.fix_groups(m=[5, 6])
@@ -271,22 +230,16 @@ def test_fix_filter_dates(fs):
     finder.fix_by_filter(
         "date", lambda d: datetime(2000, 5, 10) <= d <= datetime(2000, 6, 10)
     )
-    assert len(finder.files) == ndays * len(params) * 2
+    assert_nfiles(finder, ndays * len(params) * 2)
 
     finder.fix_groups(m=2)
-    assert len(finder.files) == 0
+    assert_nfiles(finder, 0)
 
     finder.clear_filters()
     finder.unfix_groups()
     finder.fix_by_filter("date", lambda d: d.month % 2 == 0)
     ndays = 181
-    assert len(finder.files) == ndays * len(params) * 2
-
-
-def assert_filter(finder, n_files: int):
-    assert len(finder.files) == n_files
-    finder._void_cache()
-    assert len(finder.files) == n_files
+    assert_nfiles(finder, ndays * len(params) * 2)
 
 
 def test_filter_values(fs):
@@ -305,12 +258,12 @@ def test_filter_values(fs):
 
     finder.add_filter(filefinder.library.filter_by_range, group="param", max=10)
     nvalues = 10 - 5 + 1
-    assert_filter(finder, 2 * len(dates) * nvalues)
+    assert_nfiles(finder, 2 * len(dates) * nvalues)
 
     finder.clear_filters()
     finder.add_filter(filefinder.library.filter_by_range, group="param", min=10, max=15)
     nvalues = 15 - 10 + 1
-    assert_filter(finder, 2 * len(dates) * nvalues)
+    assert_nfiles(finder, 2 * len(dates) * nvalues)
 
 
 def test_filter_group(fs):
@@ -327,14 +280,14 @@ def test_filter_group(fs):
     assert len(finder.files) == 2 * 31 * len(params)
 
     finder.fix_by_filter("option", bool)
-    assert_filter(finder, 31 * len(params))
+    assert_nfiles(finder, 31 * len(params))
 
     # test unfixing
     finder.unfix_groups("m")
-    assert_filter(finder, len(dates) * len(params))
+    assert_nfiles(finder, len(dates) * len(params))
 
     finder.fix_by_filter("param", lambda x: x < 10)
-    assert_filter(finder, len(dates) * 10)
+    assert_nfiles(finder, len(dates) * 10)
 
     finder.fix_by_filter("param", lambda x: x % 2 == 0)
-    assert_filter(finder, len(dates) * 5)
+    assert_nfiles(finder, len(dates) * 5)

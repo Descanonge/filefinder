@@ -10,9 +10,10 @@ from collections import abc
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from hypothesis import strategies as st
+
 from filefinder.format import Format, FormatError
 from filefinder.group import Group
-from hypothesis import strategies as st
 
 MAX_CODEPOINT = 1024
 MAX_TEXT_SIZE = 32
@@ -23,6 +24,16 @@ elif sys.platform == "darwin":
     FORBIDDEN_CHAR = set(":")
 else:
     FORBIDDEN_CHAR = set()
+
+
+T = t.TypeVar("T")
+
+
+class Drawer(t.Protocol):
+    def __call__(self, __strat: st.SearchStrategy[T]) -> T: ...
+
+
+# Drawer = abc.Callable[[st.SearchStrategy[T]], T]
 
 
 def setup_files(
@@ -67,16 +78,6 @@ def build_exclude(
         exclude |= FORBIDDEN_CHAR
         exclude.add("/")
     return exclude
-
-
-class FormatChoices:
-    """List of possible values for format specs."""
-
-    align = ["", "<", ">", "=", "^"]
-    sign = ["" "+", "-", " "]
-    alt = ["", "#"]
-    zero = ["" "0"]
-    grouping = ["", ",", "_"]
 
 
 @dataclass
@@ -165,23 +166,23 @@ class StFormat:
 
     @classmethod
     def align(cls) -> st.SearchStrategy[str]:
-        return st.sampled_from(FormatChoices.align)
+        return st.sampled_from(["", "<", ">", "=", "^"])
 
     @classmethod
     def sign(cls) -> st.SearchStrategy[str]:
-        return st.sampled_from(FormatChoices.sign)
+        return st.sampled_from(["", "+", "-", " "])
 
     @classmethod
     def alt(cls) -> st.SearchStrategy[str]:
-        return st.sampled_from(FormatChoices.alt)
+        return st.sampled_from(["", "#"])
 
     @classmethod
     def zero(cls) -> st.SearchStrategy[str]:
-        return st.sampled_from(FormatChoices.zero)
+        return st.sampled_from(["", "0"])
 
     @classmethod
     def grouping(cls) -> st.SearchStrategy[str]:
-        return st.sampled_from(FormatChoices.grouping)
+        return st.sampled_from(["", ",", "_"])
 
     @classmethod
     def width(cls) -> st.SearchStrategy[int | None]:
@@ -230,7 +231,7 @@ class StFormat:
         """
 
         @st.composite
-        def comp(draw) -> FormatSpecs:
+        def comp(draw: Drawer) -> FormatSpecs:
             if len(kind) > 1:
                 k = draw(st.sampled_from(kind))
             else:
@@ -266,14 +267,14 @@ class StFormat:
         for_filename: bool = False,
     ) -> st.SearchStrategy[t.Any]:
         @st.composite
-        def comp(draw) -> t.Any:
+        def strat(draw: Drawer) -> t.Any:
             specs = draw(st_specs)
             strat = specs.get_value_strategy(
                 for_pattern=for_pattern, for_filename=for_filename
             )
             return draw(strat)
 
-        return comp()
+        return strat()
 
     @classmethod
     def format_and_value(
@@ -343,21 +344,17 @@ class GroupSpecs:
     ) -> st.SearchStrategy:
         if "rgx" in self:
             exclude = build_exclude(for_pattern=for_pattern, for_filename=for_filename)
-            alphabet = alphabet = st.characters(
+            alphabet = st.characters(
                 max_codepoint=MAX_CODEPOINT,
                 exclude_categories=["C"],
                 exclude_characters=exclude,
             )
-            return (
-                st.from_regex(
-                    self.rgx,
-                    fullmatch=True,
-                    alphabet=alphabet,
-                )
-                .filter(lambda s: len(s) < MAX_TEXT_SIZE)
-                .map(lambda s: s.strip())
-                .filter(lambda s: re.fullmatch(self.rgx, s))
-            )
+            strat = st.from_regex(self.rgx, fullmatch=True, alphabet=alphabet)
+            strat = strat.filter(lambda s: len(s) < MAX_TEXT_SIZE)
+            strat = strat.map(lambda s: s.strip())
+            strat = strat.filter(lambda s: re.fullmatch(self.rgx, s))
+            return strat
+
         if "bool_elts" in self:
             return st.booleans()
         if "fmt" in self and self.fmt_struct is not None:
@@ -376,6 +373,27 @@ class GroupSpecs:
         if "fmt" in self:
             return form(self.fmt, value)
         return ""
+
+
+@dataclass
+class GroupValue(GroupSpecs):
+    value: t.Any = None
+
+    @property
+    def value_str(self) -> str:
+        return self.get_value_str(self.value)
+
+
+@dataclass
+class GroupValues(GroupSpecs):
+    values: list[t.Any] = field(default_factory=list)
+
+    @property
+    def values_str(self) -> list[str]:
+        return [self.get_value_str(v) for v in self.values]
+
+
+G = t.TypeVar("G", bound=GroupSpecs)
 
 
 class StGroup:
@@ -455,12 +473,12 @@ class StGroup:
         )
 
         @st.composite
-        def comp(draw) -> tuple[str, str]:
+        def strat(draw: Drawer) -> tuple[str, str]:
             a = draw(st.text(alphabet=alphabet, max_size=MAX_TEXT_SIZE))
             b = draw(st.text(alphabet=alphabet, max_size=MAX_TEXT_SIZE))
             return a, b
 
-        return comp().filter(lambda ab: ab[0] != ab[1])
+        return strat().filter(lambda ab: ab[0] != ab[1])
 
     @classmethod
     def opt(cls) -> st.SearchStrategy[bool]:
@@ -471,28 +489,14 @@ class StGroup:
         return st.just(True)
 
     @classmethod
-    def group(
+    def _group(
         cls,
+        group_type: type[G],
         ignore: list[str] | None = None,
         fmt_kind: str = "sdfeE",
         parsable: bool = False,
         for_filename: bool = False,
-    ) -> st.SearchStrategy[GroupSpecs]:
-        """Generate group structure.
-
-        Specs (fmt, rgx, bool, opt, discard) are put in any order, and not necessarily
-        drawn.
-
-        Parameters
-        ----------
-        ignore
-            List of specs to not draw
-        fmt_kind
-            Kinds of format to generate.
-        parsable:
-            If true, group is made to be able to generate a value and parse it back.
-            Spec `rgx` is removed if `bool` or `fmt` is present.
-        """
+    ) -> st.SearchStrategy[G]:
         if ignore is None:
             ignore = []
         specs = set(["fmt", "rgx", "bool_elts"]) - set(ignore)
@@ -506,7 +510,7 @@ class StGroup:
             fmt_kind = fmt_kind.replace("s", "")
 
         @st.composite
-        def comp(draw, fmt_kind: str):
+        def strat(draw: Drawer, fmt_kind: str):
             # select the specs to use
             spec_strat = st.lists(
                 st.sampled_from(list(specs)),
@@ -528,7 +532,7 @@ class StGroup:
                     )
                 )
 
-            args = {}
+            args: dict[str, t.Any] = {}
             args["name"] = draw(cls.name(parsable=parsable))
 
             to_draw = list(chosen)
@@ -550,48 +554,51 @@ class StGroup:
             for spec in to_draw:
                 args[spec] = draw(getattr(cls, spec)())
 
-            return GroupSpecs(**args, ordered_specs=chosen)
+            return group_type(**args, ordered_specs=chosen)
 
-        return comp(fmt_kind)
-
-    @classmethod
-    def value(
-        cls, st_specs: st.SearchStrategy[GroupSpecs], for_filename: bool = False
-    ) -> st.SearchStrategy[t.Any]:
-        @st.composite
-        def comp(draw):
-            specs = draw(st_specs)
-            strat = specs.get_value_strategy(for_filename=for_filename)
-            return draw(strat)
-
-        return comp()
+        return strat(fmt_kind)
 
     @classmethod
-    def group_and_value(
+    def group(cls, **kwargs) -> st.SearchStrategy[GroupValue]:
+        """Generate group structure.
+
+        Specs (fmt, rgx, bool, opt, discard) are put in any order, and not necessarily
+        drawn.
+
+        Parameters
+        ----------
+        ignore
+            List of specs to not draw
+        fmt_kind
+            Kinds of format to generate.
+        parsable:
+            If true, group is made to be able to generate a value and parse it back.
+            Spec `rgx` is removed if `bool` or `fmt` is present.
+        """
+        return cls._group(GroupValue, **kwargs)
+
+    @classmethod
+    def group_value(
         cls,
-        ignore: list[str] | None = None,
-        fmt_kind: str = "sdfeE",
-        parsable: bool = False,
         for_filename: bool = False,
-    ) -> tuple[st.SearchStrategy[GroupSpecs], st.SearchStrategy[t.Any]]:
-        specs = st.shared(
-            cls.group(
-                ignore=ignore,
-                fmt_kind=fmt_kind,
-                parsable=parsable,
-                for_filename=for_filename,
-            )
-        )
-        value = cls.value(specs, for_filename=for_filename)
-        return specs, value
+        **kwargs,
+    ) -> st.SearchStrategy[GroupValue]:
+        @st.composite
+        def strat(draw: Drawer) -> GroupValue:
+            specs = draw(cls._group(GroupValue, for_filename=for_filename, **kwargs))
+            value = draw(specs.get_value_strategy(for_filename=for_filename))
+            specs.value = value
+            return specs
+
+        return strat()
 
     @classmethod
-    def values(
-        cls, st_specs: st.SearchStrategy[GroupSpecs], for_filename: bool = False
-    ) -> st.SearchStrategy[list[t.Any]]:
+    def group_values(
+        cls, for_filename: bool = False, **kwargs
+    ) -> st.SearchStrategy[GroupValues]:
         @st.composite
-        def comp(draw) -> list[t.Any]:
-            specs = draw(st_specs)
+        def strat(draw: Drawer) -> GroupValues:
+            specs = draw(cls._group(GroupValues, for_filename=for_filename, **kwargs))
             values = draw(
                 st.lists(
                     specs.get_value_strategy(for_filename=for_filename),
@@ -599,9 +606,10 @@ class StGroup:
                     unique=True,
                 )
             )
-            return values
+            specs.values = values
+            return specs
 
-        return comp()
+        return strat()
 
 
 @dataclass
@@ -617,8 +625,7 @@ class PatternSpecs:
 
 @dataclass
 class PatternValue(PatternSpecs):
-    groups: abc.Sequence[GroupSpecs]
-    values: list[t.Any]
+    groups: abc.Sequence[GroupValue]
 
     @property
     def filename(self) -> str:
@@ -628,15 +635,10 @@ class PatternValue(PatternSpecs):
             segments[2 * i + 1] = grp.value_str
         return "".join(segments).replace("/", os.sep)
 
-    @property
-    def values_str(self) -> list[str]:
-        return [self.groups[i].get_value_str(val) for i, val in enumerate(self.values)]
-
 
 @dataclass
 class PatternValues(PatternSpecs):
-    groups: abc.Sequence[GroupSpecs]
-    values: list[list[t.Any]]
+    groups: abc.Sequence[GroupValues]
 
     @property
     def filenames(self) -> abc.Iterator[str]:
@@ -649,7 +651,7 @@ class PatternValues(PatternSpecs):
             yield "".join(segments).replace("/", os.sep)
 
 
-_P = t.TypeVar("_P", bound=PatternSpecs)
+P = t.TypeVar("P", bound=PatternSpecs)
 
 
 class StPattern:
@@ -658,17 +660,17 @@ class StPattern:
     max_group: int = 4
 
     @classmethod
-    def _pattern_strat(
+    def _pattern(
         cls,
-        st_groupspecs: st.SearchStrategy[GroupSpecs],
-        pattern_type: type[_P],
+        st_groupspecs: st.SearchStrategy[G],
+        pattern_type: type[P],
         min_group: int = 0,
         separate: bool = True,
         for_filename: bool = False,
     ):
         @st.composite
-        def comp(draw) -> _P:
-            groups: list[GroupSpecs] = draw(
+        def strat(draw: Drawer) -> P:
+            groups = draw(
                 st.lists(st_groupspecs, min_size=min_group, max_size=cls.max_group)
             )
 
@@ -699,7 +701,7 @@ class StPattern:
 
             return pattern_type(segments=segments, groups=groups)
 
-        return comp()
+        return strat()
 
     @classmethod
     def pattern(
@@ -730,16 +732,13 @@ class StPattern:
         kwargs
             Passed to StGroup strategy.
         """
-        return cls._pattern_strat(
+        return cls._pattern(
             StGroup.group(for_filename=for_filename, **kwargs),
             PatternSpecs,
             min_group=min_group,
             separate=separate,
             for_filename=for_filename,
         )
-
-    # @classmethod
-    # def values(cls, st_specs: st.SearchStrategy[PatternSpecs]) -> st.SearchStrategy[list[t.Any]]:
 
     @classmethod
     def pattern_value(
@@ -749,7 +748,7 @@ class StPattern:
         for_filename: bool = False,
         **kwargs,
     ) -> st.SearchStrategy[PatternValue]:
-        return cls._pattern_strat(
+        return cls._pattern(
             StGroup.group_value(for_filename=for_filename, **kwargs),
             PatternValue,
             min_group=min_group,
@@ -765,7 +764,7 @@ class StPattern:
         for_filename: bool = False,
         **kwargs,
     ) -> st.SearchStrategy[PatternValues]:
-        return cls._pattern_strat(
+        return cls._pattern(
             StGroup.group_values(for_filename=for_filename, **kwargs),
             PatternValues,
             min_group=min_group,

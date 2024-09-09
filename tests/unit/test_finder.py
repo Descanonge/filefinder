@@ -7,19 +7,20 @@ from datetime import datetime, timedelta
 from os import path
 
 import pytest
-from filefinder import Finder
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from pyfakefs.fake_filesystem import FakeFilesystem
 from util import (
     MAX_CODEPOINT,
     MAX_TEXT_SIZE,
-    Pattern,
+    PatternSpecs,
     PatternValue,
     PatternValues,
     StPattern,
     setup_files,
 )
+
+from filefinder import Finder
 
 log = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ def assert_pattern(pattern: str, regex: str):
 
 
 @given(ref=StPattern.pattern(separate=False))
-def test_group_names(ref: Pattern):
+def test_group_names(ref: PatternSpecs):
     """Test that we retain group names, and the correct number of groups."""
     f = Finder("", ref.pattern)
     assert f.n_groups == len(f.groups) == len(ref.groups)
@@ -41,7 +42,7 @@ def test_group_names(ref: Pattern):
 
 
 @given(ref=StPattern.pattern(separate=False))
-def test_get_groups(ref: Pattern):
+def test_get_groups(ref: PatternSpecs):
     """Test that Finder.get_groups return the correct indices given a group name."""
     f = Finder("", ref.pattern)
 
@@ -63,7 +64,7 @@ def test_get_groups(ref: Pattern):
         max_size=MAX_TEXT_SIZE,
     ),
 )
-def test_finder_str(ref: Pattern, root: str):
+def test_finder_str(ref: PatternSpecs, root: str):
     f = Finder(root, ref.pattern)
     lines = str(f).splitlines()
     assert lines[0] == f"root: {root}"
@@ -318,7 +319,7 @@ def test_file_scan(fs: FakeFilesystem, ref: PatternValues):
     log.info("n_files: %d", len(files))
     finder = Finder(basedir, ref.pattern)
     assert len(finder.files) == len(files)
-    for f, f_ref in zip(finder.get_files(relative=True), files):
+    for f, f_ref in zip(finder.get_files(relative=True), files, strict=False):
         assert f == f_ref
 
     # Check str/repr
@@ -340,7 +341,7 @@ def test_file_scan_manual(fs):
         "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
     )
     assert len(finder.files) == len(files)
-    for f, f_ref in zip(finder.get_files(relative=True), files):
+    for f, f_ref in zip(finder.get_files(relative=True), files, strict=False):
         assert f == f_ref
 
 
@@ -386,33 +387,33 @@ def test_file_scan_nested(fs):
     # Nest by param
     nested_param = finder.get_files(relative=True, nested=["param"])
     assert len(nested_param) == len(params)
-    for param_ref, nested_inner in zip(params, nested_param):
+    for param_ref, nested_inner in zip(params, nested_param, strict=False):
         nest_files_ref = make_filenames(dates, [param_ref], options)
         assert len(nested_inner) == len(nest_files_ref)
-        for f, f_ref in zip(nested_inner, nest_files_ref):
+        for f, f_ref in zip(nested_inner, nest_files_ref, strict=False):
             assert f == f_ref
 
     # Nest by year
     nested_y = finder.get_files(relative=True, nested=["Y"])
     years = sorted(list(set(d.year for d in dates)))
     assert len(nested_y) == len(years)
-    for year_ref, nested_inner in zip(years, nested_y):
+    for year_ref, nested_inner in zip(years, nested_y, strict=False):
         nested_inner_ref = make_filenames(
             [d for d in dates if d.year == year_ref], params, options
         )
         assert len(nested_inner) == len(nested_inner_ref)
-        for f, f_ref in zip(nested_inner, nested_inner_ref):
+        for f, f_ref in zip(nested_inner, nested_inner_ref, strict=False):
             assert f == f_ref
 
     # Nest by option then param
     nested_option = finder.get_files(relative=True, nested=["option", "param"])
     assert len(nested_option) == len(options)
-    for option_ref, nested_param in zip(options, nested_option):
+    for option_ref, nested_param in zip(options, nested_option, strict=False):
         assert len(nested_param) == len(params)
-        for param_ref, nested_inner in zip(params, nested_param):
+        for param_ref, nested_inner in zip(params, nested_param, strict=False):
             assert len(nested_inner) == len(dates)
             nested_inner_ref = make_filenames(dates, [param_ref], [option_ref])
-            for f, f_ref in zip(nested_inner, nested_inner_ref):
+            for f, f_ref in zip(nested_inner, nested_inner_ref, strict=False):
                 assert f == f_ref
 
     # Nest by everything
@@ -420,20 +421,20 @@ def test_file_scan_nested(fs):
         relative=True, nested=["param", "option", "Y", "m", "d"]
     )
     assert len(nested_param) == len(params)
-    for param_ref, nested_option in zip(params, nested_param):
+    for param_ref, nested_option in zip(params, nested_param, strict=False):
         assert len(nested_option) == len(options)
-        for option_ref, nested_y in zip(options, nested_option):
+        for option_ref, nested_y in zip(options, nested_option, strict=False):
             years = sorted(list(set(d.year for d in dates)))
             assert len(nested_y) == len(years)
-            for y_ref, nested_m in zip(years, nested_y):
+            for y_ref, nested_m in zip(years, nested_y, strict=False):
                 dates_y = [d for d in dates if d.year == y_ref]
                 months = sorted(list(set(d.month for d in dates_y)))
                 assert len(nested_m) == len(months)
-                for m_ref, nested_d in zip(months, nested_m):
+                for m_ref, nested_d in zip(months, nested_m, strict=False):
                     dates_m = [d for d in dates_y if d.month == m_ref]
                     days = sorted(list(set(d.day for d in dates_m)))
                     assert len(nested_d) == len(dates_m)
-                    for d_ref, nested_inner in zip(days, nested_d):
+                    for d_ref, nested_inner in zip(days, nested_d, strict=False):
                         assert len(nested_inner) == 1
                         filename = make_filename(
                             datetime(y_ref, m_ref, d_ref), param_ref, option_ref
@@ -463,5 +464,5 @@ def test_opt_directory(fs):
         scan_everything=True,
     )
     assert len(finder.get_files()) == len(files)
-    for f, f_ref in zip(finder.get_files(relative=True), files):
+    for f, f_ref in zip(finder.get_files(relative=True), files, strict=False):
         assert f == f_ref

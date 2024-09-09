@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 class Sentinel:
+    """Sentinel objects."""
+
     def __init__(self, msg: str = ""):
         self.msg = msg
 
@@ -24,7 +26,9 @@ class Sentinel:
 
 
 PARSE_FAIL = Sentinel("Could not parse")
+"""The match string could not be parsed successfully."""
 NOT_PARSED = Sentinel("Not yet parsed")
+"""The match string has not been parsed yet."""
 
 
 class Match:
@@ -38,26 +42,17 @@ class Match:
         Match object for the complete filename.
     idx
         Index of the group in the match object.
-
-    Attributes
-    ----------
-    group:
-        Group used to get this match.
-    match_str:
-        String matched in the filename.
-    start:
-        Start index of match in the filename.
-    end:
-        End index of match in the filename.
-    match_parsed:
-        Parsed value. None if parsing was not successful.
     """
 
     def __init__(self, group: Group, match: re.Match, idx: int):
         self.group: Group = group
+        """Group used to get this match."""
         self.match_str: str = match.group(idx + 1)
+        """String matched in the filename."""
         self.start: int = match.start(idx + 1)
+        """Start index of match in the filename."""
         self.end: int = match.end(idx + 1)
+        """End index of match in the filename."""
         self._parsed: t.Any | Sentinel = NOT_PARSED
 
     def __repr__(self):
@@ -70,6 +65,11 @@ class Match:
 
     @property
     def match_parsed(self) -> t.Any | Sentinel:
+        """Return value or Sentinel value if failing to parse.
+
+        Returns :attr:`PARSE_FAIL` if an exception is thrown when trying to parse the
+        match.
+        """
         if self._parsed is NOT_PARSED:
             try:
                 self._parsed = self.group.parse(self.match_str)
@@ -87,14 +87,15 @@ class Match:
 
         Parameters
         ----------
-        parse:
+        parse
             If True (default) return the parsed value instead of the matched string.
         raise_on_unparsed
             If True (default), will raise an error if the parsed value was asked but the
             parsing failed. If False, return the string match instead.
         Raises
         ------
-        ValueError: Could not parse the match.
+        ValueError
+            Could not parse the match.
         """
         if parse:
             if self.can_parse():
@@ -163,7 +164,7 @@ class Matches:
     def __init__(self, match: re.Match, groups: abc.Sequence[Group]):
         self.matches: list[Match] = []
         """Matches for a single filename."""
-        self.groups = list(groups)
+        self.groups: list[Group] = list(groups)
         """Groups used."""
 
         assert len(match.groups()) == len(groups)

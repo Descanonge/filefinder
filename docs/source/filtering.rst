@@ -4,13 +4,9 @@
 Filtering
 =========
 
-After the files are found on disk in :meth:`Finder.find_files`, filters can be
-applied to keep or discard those files.
-
-.. note::
-
-   This has nothing to do with :ref:`fixing groups<fix-groups>`! The files found
-   at this point are already restricted by the different fixed groups.
+When the files are found on disk when scanning with :meth:`Finder.find_files`,
+we can select files by fixing groups, but we can also apply filters. These are
+user-defined functions that can tell to keep or discard a file.
 
 Each filter is a function (or any callable) that will receive the finder object,
 a filename, the associated matches, and should return True if the file is to be
@@ -40,12 +36,35 @@ the next filters won't run).
      finder.add_filter(some_filter, value=1.)
      finder.add_filter(some_filter, value=3.5)
 
+This can be useful if multiple matches values are needed (see below for dates),
+but often we only want add a filter acting on a single group.
+:meth:`Finder.fix_by_filter` allows to do that easily. Here the function only
+takes the parsed value of a given group.
+
+.. note::
+
+   By giving the argument *pass_unparsed=True* to *fix_by_filter*, if the
+   parsing fails, the matched string will still be passed to the filter, instead
+   of being ignored.
+
+For instance, let's say we only need days that are even::
+
+    finder.fix_by_filter("d", lambda d: d % 2 == 0)
+
+or only where some parameters starts with a specific value::
+
+    finder.fix_by_filter("param", lambda s: s.startswith("useful_"))
+
+In the background, this creates a "normal" filter, added to
+:attr:`Finder.filters` and executed like others. Any number of filters can be
+added for a specific group. When unfixing a group, related filters will also be
+removed.
 
 .. currentmodule:: filefinder
 
 
-Examples of filter
-------------------
+Examples of filters
+-------------------
 
 The package provides two filters. The first one,
 :func:`library.filter_by_range`, allows to keep filename which have values
@@ -61,6 +80,8 @@ parsed for one of the group that fall within a certain range::
     f.clean_filters()
     f.add_filter(filter_by_range, group="x", min=5, max=10)
 
+This is equivalent to::
+    f.fix_by_filter("x", lambda x: 5 <= x <= 10)
 
 :func:`library.filter_date_range`
 will only keep files that correspond to a date which falls within a specified

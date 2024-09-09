@@ -351,10 +351,10 @@ class Finder:
 
         Parameters
         ----------
-        func ~collections.abc.Callable[[Finder, str, Matches, ...], bool]
+        func: ~collections.abc.Callable[[Finder, str, Matches, ...], bool]
             Callable that returns True if the file is to be kept, False otherwise.
         name
-            Name of the filter, if not specified, the function name of `func` will be
+            Name of the filter, if not specified, the function name of *func* will be
             used. In this case, if the same filter is already registered the name will
             be changed. If the name is provided as an argument however, any double will
             raise an error.

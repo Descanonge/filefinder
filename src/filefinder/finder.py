@@ -16,7 +16,7 @@ from datetime import datetime
 
 from .group import Group, GroupKey
 from .matches import Matches
-from .util import get_groups_indices, get_unique_name, datetime_to_value
+from .util import datetime_to_value, get_groups_indices, get_unique_name
 
 logger = logging.getLogger(__name__)
 
@@ -401,6 +401,7 @@ class Finder:
         func: abc.Callable[[t.Any], bool],
         pass_unparsed: bool = False,
         fix_discard: bool = True,
+        **kwargs,
     ):
         """Fix a group value by using a filter, or predicate.
 
@@ -429,10 +430,14 @@ class Finder:
             be kept if the group cannot parse the string. Default is False.
         fix_discard
             If True, also use groups values with the *discard* flag. Default is False.
+        kwargs
+            Can be passed to some intermediary function, like library.get_date if the
+            key is 'date'.
         """
+        from .library import get_date
 
         # Wrap as a typical filter
-        def filt(finder: "Finder", filename: str, matches: Matches, **kwargs) -> bool:
+        def filt(finder: "Finder", filename: str, matches: Matches, **kwargs):
             values: list[t.Any] = []
             for m in matches.get_matches(key, keep_discard=fix_discard):
                 if not m.can_parse() and pass_unparsed:
@@ -442,8 +447,15 @@ class Finder:
 
             return all(func(v) for v in values)
 
+        def filt_date(finder: "Finder", filename: str, matches: Matches, **kwargs):
+            date = get_date(matches, **kwargs)
+            return func(date)
+
         name = get_unique_name(str(key), self.filters)
-        self.add_filter(filt, name=name)
+        if key == "date" and self.date_is_first_class:
+            self.add_filter(filt_date, name=name)
+        else:
+            self.add_filter(filt, name=name)
 
     def _make_matches(
         self, filename: str, pattern: str | re.Pattern | None = None
@@ -574,7 +586,9 @@ class Finder:
             self.groups.append(Group(pattern[start + 1 : end], idx))
             splits += [start - 1, end + 1]  # -1 removes the %
 
-        self._segments = [pattern[i:j] for i, j in zip(splits, splits[1:] + [None])]
+        self._segments = [
+            pattern[i:j] for i, j in zip(splits, splits[1:] + [None], strict=False)
+        ]
 
     def _get_regex(self) -> str:
         segments = self._segments.copy()

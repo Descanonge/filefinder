@@ -114,9 +114,8 @@ def get_date(matches: Matches, default_date: dict | None = None) -> dt.datetime:
     for name in "YmdHMS":
         process(name, process_simple)
 
-    elts_needed = set("xXYmdBjHMSF")
-    if len(set(elts.keys()) & elts_needed) == 0:
-        logger.warning("No matchers to retrieve a date from. Returning default date.")
+    if len(elts) == 0:
+        logger.warning("No date elements could be recovered. Returning default date.")
 
     for elt, values in elts.items():
         if any(v != values[0] for v in values):

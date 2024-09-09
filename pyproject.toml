@@ -55,7 +55,11 @@ disable_error_code = ['annotation-unchecked']
 # allow_untyped_defs = true
 ignore_missing_imports = true
 
-[tool.lint.ruff]
+[tool.ruff]
+line-length = 88
+target-version = 'py311'
+
+[tool.ruff.lint]
 select = [
        'E',  # pycodestyle
        'W',  # pycodestyle
@@ -68,8 +72,6 @@ select = [
        'D',  #pydocstyle
        'PL', #pylint
 ]
-line-length = 88
-target-version = 'py311'
 
 ignore = [
        'E226', # missing whitespace around arithmetic operator

@@ -13,9 +13,7 @@ from util import FORBIDDEN_CHAR, MAX_CODEPOINT, MAX_TEXT_SIZE, setup_files
 
 import filefinder.library
 from filefinder.finder import Finder
-
-group_names: list[str] = list("FxXYmdBjHMS")
-"""List of group names that are understood as date by filefinder."""
+from filefinder.util import datetime_keys
 
 name_to_date = {
     "F": ["year", "month", "day"],
@@ -38,10 +36,9 @@ def segments(draw) -> list[str]:
     """Generate pattern segments with date elements."""
     names = draw(
         st.lists(
-            st.sampled_from(group_names),
+            st.sampled_from(datetime_keys),
             min_size=1,
-            max_size=len(group_names),
-            unique=True,
+            max_size=len(datetime_keys),
         )
     )
 
@@ -57,7 +54,13 @@ def segments(draw) -> list[str]:
 
     segments = ["" for _ in range(2 * len(names) + 1)]
     segments[1::2] = names
-    segments[::2] = [draw(text) for _ in range(len(names) + 1)]
+    for i in range(len(names) + 1):
+        strat = text
+        # force at least one char after written month name, otherwise parsing
+        # is impossible
+        if names[i - 1] == "B":
+            strat = strat.filter(lambda s: len(s) > 0)
+        segments[2 * i] = draw(strat)
 
     return segments
 
@@ -77,19 +80,18 @@ def test_get_date(segments: list[str], date: datetime, default_date: datetime):
     default_date
         Random default date for `library.get_date`.
     """
-    # start from the default date
-    default_elements = {
-        attr: getattr(default_date, attr)
-        for attr in ["year", "month", "day", "hour", "minute", "second"]
-    }
+    ELEMENTS = ["year", "month", "day", "hour", "minute", "second"]
+    # Construct a reference date that will mix appropriately with the default_date
+    # based on what elements are present in the pattern
+    default_elements = {attr: getattr(default_date, attr) for attr in ELEMENTS}
     elements = dict(default_elements)
-    # fill in elements present in pattern
-    names = segments[1::2]
+
+    group_names = segments[1::2]
+    elements_specified = set()
     for name in group_names:
-        if name not in names:
-            continue
         for elt in name_to_date[name]:
             elements[elt] = getattr(date, elt)
+            elements_specified.add(elt)
 
     try:
         date_ref = datetime(**elements)
@@ -99,7 +101,7 @@ def test_get_date(segments: list[str], date: datetime, default_date: datetime):
         return
 
     # format ourselves, datetime.strftime does not always zero pad for some reason
-    for i, name in enumerate(names):
+    for i, name in enumerate(group_names):
         if name == "F":
             seg = f"{date_ref.year:04d}-{date_ref.month:02d}-{date_ref.day:02d}"
         elif name == "x":
@@ -114,7 +116,7 @@ def test_get_date(segments: list[str], date: datetime, default_date: datetime):
 
     filename = "".join(segments).replace("/", os.sep)
 
-    for i, name in enumerate(names):
+    for i, name in enumerate(group_names):
         segments[2 * i + 1] = f"%({name})"
     pattern = "".join(segments)
 
@@ -123,17 +125,10 @@ def test_get_date(segments: list[str], date: datetime, default_date: datetime):
     assert matches is not None
     date_parsed = filefinder.library.get_date(matches, default_elements)
 
-    # check each element that could have been set
-    # (eg cannot check year if the pattern is X)
-
-    # check if the year has been specified
-    year_set = any(k in "YFx" for k in names)
-    if not year_set:
-        date_ref = date_ref.replace(year=default_date.year)
-
-    for key in names:
-        for attr in name_to_date[key]:
-            assert getattr(date_ref, attr) == getattr(date_parsed, attr)
+    for elt in elements_specified:
+        assert getattr(date_ref, elt) == getattr(date_parsed, elt)
+    for elt in set(ELEMENTS) - elements_specified:
+        assert getattr(default_date, elt) == getattr(date_parsed, elt)
 
 
 def test_invalid_file_differing_elements():

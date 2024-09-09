@@ -354,7 +354,7 @@ class Finder:
                 continue
 
             for g in groups:
-                remove_filters(rf"({g.idx}|{g.name})__\d+")
+                remove_filters(rf"({g.idx}|{re.escape(g.name)})__\d+")
 
         self._void_cache()
 

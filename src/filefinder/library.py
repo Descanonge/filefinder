@@ -38,14 +38,14 @@ def get_date(matches: Matches, default_date: dict | None = None) -> dt.datetime:
     if default_date is None:
         default_date = {}
     # fill missing inputs
-    default_date |= {
+    default_date = {
         "year": 1970,
         "month": 1,
         "day": 1,
         "hour": 0,
         "minute": 0,
         "second": 0,
-    }
+    } | default_date
 
     # list of values found in the matches: year, month, ...
     elts: dict[str, list[int]] = {}
@@ -98,7 +98,7 @@ def get_date(matches: Matches, default_date: dict | None = None) -> dt.datetime:
             year = elts["year"][0]
         else:
             year = default_date["year"]
-        day = dt.datetime(year, 1, 1) + dt.timedelta(days=int(doy) - 1)
+        day = dt.datetime(year, 1, 1) + dt.timedelta(days=doy - 1)
         return dict(month=day.month, day=day.day)
 
     def process_simple(m: Match):
@@ -109,10 +109,12 @@ def get_date(matches: Matches, default_date: dict | None = None) -> dt.datetime:
     process("F", process_F)
     process("x", process_x)
     process("X", process_X)
-    process("j", process_j)
 
     for name in "YmdHMS":
         process(name, process_simple)
+
+    # process j last, it needs month and year set
+    process("j", process_j)
 
     if len(elts) == 0:
         logger.warning("No date elements could be recovered. Returning default date.")

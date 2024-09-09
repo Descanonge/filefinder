@@ -5,6 +5,7 @@ Presentely, only `library.get_date`.
 
 import os
 from datetime import datetime, timedelta
+import pytest
 
 import filefinder.library
 import pyfakefs
@@ -122,7 +123,28 @@ def test_get_date(segments: list[str], date: datetime, default_date: datetime):
     assert matches is not None
     date_parsed = filefinder.library.get_date(matches, default_elements)
 
-    assert date_ref == date_parsed
+    # check each element that could have been set
+    # (eg cannot check year if the pattern is X)
+
+    for key in names:
+        for attr in name_to_date[key]:
+            assert getattr(date_ref, attr) == getattr(date_parsed, attr)
+
+
+def test_invalid_file_differing_elements():
+    finder = Finder("", "%(Y)/%(m)/%(F).ext")
+    filenames = ["2005/01/2006-01-02.ext", "2005/01/2005-03-01.ext"]
+    for f in filenames:
+        with pytest.raises(ValueError):
+            filefinder.library.get_date(finder.find_matches(f))
+
+
+def test_no_date_matchers():
+    finder = Finder("", "%(year:fmt=02d)/%(month:fmt=02d)/%(full:fmt=s).ext")
+    filenames = ["2005/01/2006-01-02.ext", "2005/01/2005-03-01.ext"]
+    for f in filenames:
+        with pytest.raises(ValueError):
+            filefinder.library.get_date(finder.find_matches(f))
 
 
 def test_filter_dates(fs):

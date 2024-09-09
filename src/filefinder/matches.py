@@ -11,7 +11,7 @@ import typing as t
 from collections import abc
 
 from .group import Group, GroupKey
-from .util import Sentinel
+from .util import Sentinel, get_groups_indices
 
 logger = logging.getLogger(__name__)
 
@@ -257,7 +257,7 @@ class Matches:
         -------
         List of Match corresponding to the key.
         """
-        selected = get_groups_indices(self.groups, key)
+        selected = get_groups_indices(self.groups, key, self.date_is_first_class)
         matches = [self.matches[k] for k in selected]
         if not keep_discard:
             matches = [m for m in matches if not m.group.discard]

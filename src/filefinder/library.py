@@ -7,10 +7,10 @@
 
 import datetime as dt
 import logging
-from collections.abc import Callable
+from collections import abc
 
 from .finder import Finder
-from .matches import Matches
+from .matches import Match, Matches
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +18,11 @@ logger = logging.getLogger(__name__)
 def get_date(matches: Matches, default_date: dict | None = None) -> dt.datetime:
     """Retrieve date from matched elements.
 
-    If a matcher is *not* found in the filename, it will be replaced by the
-    element of the default date argument.
-    Matchers that can be used are (in order of increasing priority):
-    YBmdjHMSFxX. If two matchers have the same name, the last one in the
-    pre-regex will get priority.
+    Matches that can be used are : YBmdjHMSFxX. If a matcher is *not* found in the
+    filename, it will be replaced by the element of the default date argument. All
+    values deduced from these matches will be compared. If different matchers give
+    different values (for instance the group Y and F give a different year), an
+    exception will be raised.
 
     Parameters
     ----------
@@ -31,70 +31,100 @@ def get_date(matches: Matches, default_date: dict | None = None) -> dt.datetime:
     default_date:
         Default date. Dictionnary with keys: year, month, day, hour, minute,
         and second. Defaults to 1970-01-01 00:00:00
+
     """
-    name_to_datetime = dict(
-        Y="year", m="month", d="day", H="hour", M="minute", S="second"
-    )
-
-    def get_elts(elts: dict[str, str], names: str, callback: Callable):
-        for name in names:
-            elt = elts.pop(name, None)
-            if elt is not None:
-                date.update(callback(elt, name))
-
-    def process_int(elt: str, name: str) -> dict[str, int]:
-        return {name_to_datetime[name]: int(elt)}
-
-    def process_month_name(elt: str, name: str) -> dict[str, int]:
-        return dict(month=_find_month_number(elt))
-
-    def process_doy(elt: str, name: str) -> dict[str, int]:
-        d = dt.datetime(date["year"], 1, 1) + dt.timedelta(days=int(elt) - 1)
-        return dict(month=d.month, day=d.day)
-
-    date = {"year": 1970, "month": 1, "day": 1, "hour": 0, "minute": 0, "second": 0}
+    key_to_elt = dict(Y="year", m="month", d="day", H="hour", M="minute", S="second")
 
     if default_date is None:
         default_date = {}
-    date.update(default_date)
-
-    elts = {
-        m.group.name: m.get_match(parse=False) for m in matches if not m.group.discard
+    # fill missing inputs
+    default_date |= {
+        "year": 1970,
+        "month": 1,
+        "day": 1,
+        "hour": 0,
+        "minute": 0,
+        "second": 0,
     }
+
+    # list of values found in the matches: year, month, ...
+    elts: dict[str, list[int]] = {}
+
+    def process(key: str, callback: abc.Callable[[Match], dict[str, int]]):
+        """Run *callback* on matches selected by *key*.
+
+        The callback returns a dictionnary with the datetime arguments (elements) it
+        found. Each new value is added to the list of values found for that element.
+        """
+        for m in matches:
+            if m.group.name != key or m.group.discard:
+                continue
+            for elt, val in callback(m).items():
+                if elt not in elts:
+                    elts[elt] = []
+                elts[elt].append(val)
+
+    def process_B(m: Match):
+        return dict(month=_find_month_number(m.match_str))
+
+    def process_F(m: Match):
+        # YYYY-mm-dd
+        # 0123456789
+        value = m.match_str
+        out = dict(year=value[:4], month=value[5:7], day=value[8:10])
+        return {elt: int(val) for elt, val in out.items()}
+
+    def process_x(m: Match):
+        # YYYYmmdd
+        # 012345678
+        value = m.match_str
+        out = dict(year=value[:4], month=value[4:6], day=value[6:8])
+        return {elt: int(val) for elt, val in out.items()}
+
+    def process_X(m: Match):
+        # HHMMSS (seconds optional)
+        # 0123456
+        value = m.match_str
+        out = dict(hour=value[:2], minute=value[2:4])
+        if len(value) > 4:
+            out["second"] = value[4:6]
+        return {elt: int(val) for elt, val in out.items()}
+
+    def process_j(m: Match):
+        doy = m.get_match(parse=True)
+        # This depend on the value of year, we take the first one discovered, or from
+        # the default one if none was processed yet
+        if "year" in elts:
+            year = elts["year"][0]
+        else:
+            year = default_date["year"]
+        day = dt.datetime(year, 1, 1) + dt.timedelta(days=int(doy) - 1)
+        return dict(month=day.month, day=day.day)
+
+    def process_simple(m: Match):
+        value = m.get_match(parse=True)
+        return {key_to_elt[m.group.name]: value}
+
+    process("B", process_B)
+    process("F", process_F)
+    process("x", process_x)
+    process("X", process_X)
+    process("j", process_j)
+
+    for name in "YmdHMS":
+        process(name, process_simple)
 
     elts_needed = set("xXYmdBjHMSF")
     if len(set(elts.keys()) & elts_needed) == 0:
-        logger.warning(
-            "No matchers to retrieve a date from." " Returning default date."
-        )
+        logger.warning("No matchers to retrieve a date from. Returning default date.")
 
-    # Process month name first to keep element priorities simples
-    get_elts(elts, "B", process_month_name)
+    for elt, values in elts.items():
+        if any(v != values[0] for v in values):
+            raise ValueError(f"Different values found for {elt}: {values}")
 
-    # Decompose elements
-    elt = elts.pop("F", None)
-    if elt is not None:
-        elts["Y"] = elt[:4]
-        elts["m"] = elt[5:7]
-        elts["d"] = elt[8:10]
-
-    elt = elts.pop("x", None)
-    if elt is not None:
-        elts["Y"] = elt[:4]
-        elts["m"] = elt[4:6]
-        elts["d"] = elt[6:8]
-
-    elt = elts.pop("X", None)
-    if elt is not None:
-        elts["H"] = elt[:2]
-        elts["M"] = elt[2:4]
-        if len(elt) > 4:  # noqa: PLR2004
-            elts["S"] = elt[4:6]
-
-    # Process elements
-    get_elts(elts, "Ymd", process_int)
-    get_elts(elts, "j", process_doy)
-    get_elts(elts, "HMS", process_int)
+    date = default_date
+    for elt, values in elts.items():
+        date[elt] = values[0]
 
     return dt.datetime(**date)  # type: ignore
 

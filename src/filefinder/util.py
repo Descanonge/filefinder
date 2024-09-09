@@ -1,11 +1,9 @@
 """General utilities."""
 
-import typing as t
 from collections import abc
 from datetime import datetime
 
-if t.TYPE_CHECKING:
-    from .group import Group, GroupKey
+from .group import Group, GroupKey
 
 datetime_keys = "YBmdjHMSFxX"
 

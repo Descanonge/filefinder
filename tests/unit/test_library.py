@@ -22,10 +22,67 @@ from filefinder.util import (
 )
 
 
+def test_datetime_to_str():
+    date = datetime(2086, 3, 2, 1, 34, 6)
+    assert datetime_to_str(date, "Y") == "2086"
+    assert datetime_to_str(date, "m") == "03"
+    assert datetime_to_str(date, "d") == "02"
+    assert datetime_to_str(date, "B") == "March"
+    assert datetime_to_str(date, "x") == "20860302"
+    assert datetime_to_str(date, "F") == "2086-03-02"
+    assert datetime_to_str(date, "H") == "01"
+    assert datetime_to_str(date, "M") == "34"
+    assert datetime_to_str(date, "S") == "06"
+    assert datetime_to_str(date, "X") == "013406"
+
+
+@given(date=st.datetimes())
+def test_datetime_to_value(date: datetime):
+    assert datetime_to_value(date, "Y") == date.year
+    assert datetime_to_value(date, "m") == date.month
+    assert datetime_to_value(date, "d") == date.day
+    assert datetime_to_value(date, "H") == date.hour
+    assert datetime_to_value(date, "M") == date.minute
+    assert datetime_to_value(date, "S") == date.second
+
+    for name in "FxXB":
+        assert datetime_to_value(date, name) == datetime_to_str(date, name)
+
+
+def test_get_doy():
+    assert get_doy(datetime(2004, 1, 1)) == 1
+    assert get_doy(datetime(2004, 1, 2)) == 2
+    assert get_doy(datetime(2004, 2, 1)) == 32
+    assert get_doy(datetime(2004, 3, 1)) == 61
+    assert get_doy(datetime(2005, 3, 1)) == 60
+
+
+def test_date_from_doy():
+    assert date_from_doy(1, 2004) == dict(month=1, day=1)
+    assert date_from_doy(2, 2004) == dict(month=1, day=2)
+    assert date_from_doy(32, 2004) == dict(month=2, day=1)
+    assert date_from_doy(61, 2004) == dict(month=3, day=1)
+    assert date_from_doy(60, 2005) == dict(month=3, day=1)
+
+
+@given(date=st.datetimes())
+def test_date_to_doy_and_back(date: datetime):
+    doy = get_doy(date)
+    back = date_from_doy(doy, date.year)
+    assert back["month"] == date.month
+    assert back["day"] == date.day
+
+
+@given(doy=st.integers(1, 365), year=st.integers(1, 3000))
+def test_doy_to_date_and_back(doy: int, year: int):
+    elts = date_from_doy(doy, year)
+    date = datetime(year, elts["month"], elts["day"])
+    back = get_doy(date)
+    assert doy == back
 
 
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
-@given(segments=segments(), date=st.datetimes(), default_date=st.datetimes())
+@given(segments=time_segments(), date=st.datetimes(), default_date=st.datetimes())
 def test_get_date(segments: list[str], date: datetime, default_date: datetime):
     """Test obtaining a date from a pattern.
 
@@ -61,17 +118,7 @@ def test_get_date(segments: list[str], date: datetime, default_date: datetime):
 
     # format ourselves, datetime.strftime does not always zero pad for some reason
     for i, name in enumerate(group_names):
-        if name == "F":
-            seg = f"{date_ref.year:04d}-{date_ref.month:02d}-{date_ref.day:02d}"
-        elif name == "x":
-            seg = f"{date_ref.year:04d}{date_ref.month:02d}{date_ref.day:02d}"
-        elif name == "X":
-            seg = date_ref.strftime("%H%M%S")
-        elif name == "Y":
-            seg = f"{date_ref.year:04d}"
-        else:
-            seg = date_ref.strftime(f"%{name}")
-        segments[2 * i + 1] = seg
+        segments[2 * i + 1] = datetime_to_str(date, name)
 
     filename = "".join(segments).replace("/", os.sep)
 

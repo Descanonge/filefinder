@@ -675,7 +675,19 @@ class StPattern:
                 st.lists(st_groupspecs, min_size=min_group, max_size=cls.max_group)
             )
 
-            exclude = build_exclude(for_pattern=True, for_filename=for_filename)
+            # Do not allow fill characters in the pattern
+            fills = set()
+            for grp in groups:
+                if "fmt" in grp.ordered_specs:
+                    fmt = grp.fmt_struct
+                    assert fmt is not None
+                    if fmt.width is not None:
+                        if fmt.fill == "":
+                            fills.add(" ")
+                        else:
+                            fills.add(fmt.fill)
+
+            exclude = build_exclude(fills, for_pattern=True, for_filename=for_filename)
             # authorize folder separator in segments
             exclude.discard("/")
             text = st.text(

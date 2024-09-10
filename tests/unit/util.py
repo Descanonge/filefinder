@@ -463,9 +463,17 @@ class StGroup:
 
     @classmethod
     def bool_elts(
-        cls, for_filename: bool = False
+        cls, for_filename: bool = False, allow_empty: bool = True
     ) -> st.SearchStrategy[tuple[str, str]]:
-        """Choose two valid strings. The first one is not empty."""
+        """Choose two valid strings. The first one is not empty.
+
+        Parameters
+        ----------
+        allow_empty
+            True will allow the second element to be empty. An empty element can
+            create ambiguous situations in tests, it won't be allowed in groups and
+            patterns.
+        """
         exclude = build_exclude(set(":/"), for_pattern=True, for_filename=for_filename)
         alphabet = st.characters(
             exclude_characters=exclude,
@@ -473,13 +481,17 @@ class StGroup:
             max_codepoint=MAX_CODEPOINT,
         )
 
+        kwargs: dict[str, t.Any] = dict(alphabet=alphabet, max_size=MAX_TEXT_SIZE)
+
         @st.composite
         def strat(draw: Drawer) -> tuple[str, str]:
-            a = draw(st.text(alphabet=alphabet, max_size=MAX_TEXT_SIZE))
-            b = draw(st.text(alphabet=alphabet, max_size=MAX_TEXT_SIZE))
+            strat_a = st.text(min_size=1, **kwargs)
+            strat_b = st.text(min_size=0 if allow_empty else 1, **kwargs)
+            a = draw(strat_a)
+            b = draw(strat_b.filter(lambda x: x != a))
             return a, b
 
-        return strat().filter(lambda ab: ab[0] != ab[1])
+        return strat()
 
     @classmethod
     def opt(cls) -> st.SearchStrategy[bool]:
@@ -545,7 +557,9 @@ class StGroup:
                 to_draw.remove("fmt")
 
             if "bool_elts" in chosen:
-                args["bool_elts"] = draw(cls.bool_elts(for_filename=for_filename))
+                args["bool_elts"] = draw(
+                    cls.bool_elts(for_filename=for_filename, allow_empty=False)
+                )
                 to_draw.remove("bool_elts")
 
             if "rgx" in chosen:

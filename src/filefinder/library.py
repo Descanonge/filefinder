@@ -11,6 +11,7 @@ from collections import abc
 
 from .finder import Finder
 from .matches import Match, Matches
+from .util import date_from_doy, name_to_date
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,6 @@ def get_date(matches: Matches, default_date: dict | None = None) -> dt.datetime:
         and second. Defaults to 1970-01-01 00:00:00
 
     """
-    key_to_elt = dict(Y="year", m="month", d="day", H="hour", M="minute", S="second")
-
     if default_date is None:
         default_date = {}
     # fill missing inputs
@@ -98,12 +97,13 @@ def get_date(matches: Matches, default_date: dict | None = None) -> dt.datetime:
             year = elts["year"][0]
         else:
             year = default_date["year"]
-        day = dt.datetime(year, 1, 1) + dt.timedelta(days=doy - 1)
-        return dict(month=day.month, day=day.day)
+        return date_from_doy(doy, year)
 
     def process_simple(m: Match):
         value = m.get_match(parse=True)
-        return {key_to_elt[m.group.name]: value}
+        elts = name_to_date[m.group.name]
+        assert len(elts) == 1
+        return {elts[0]: value}
 
     process("B", process_B)
     process("F", process_F)

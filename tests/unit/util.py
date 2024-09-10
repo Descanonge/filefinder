@@ -777,13 +777,15 @@ class StPattern:
         for_filename: bool = False,
         **kwargs,
     ) -> st.SearchStrategy[PatternValues]:
-        return cls._pattern(
+        strat = cls._pattern(
             StGroup.group_values(for_filename=for_filename, **kwargs),
             PatternValues,
             min_group=min_group,
             separate=separate,
             for_filename=for_filename,
         )
+        strat = strat.filter(lambda g: len(g.filenames) == len(set(g.filenames)))
+        return strat
 
 
 @st.composite

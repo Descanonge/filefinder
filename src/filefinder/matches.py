@@ -9,6 +9,7 @@ import logging
 import re
 import typing as t
 from collections import abc
+from datetime import datetime
 
 from .group import Group, GroupKey
 from .util import Sentinel, get_groups_indices
@@ -83,6 +84,7 @@ class Match:
         raise_on_unparsed
             If True (default), will raise an error if the parsed value was asked but the
             parsing failed. If False, return the string match instead.
+
         Raises
         ------
         ValueError
@@ -262,3 +264,29 @@ class Matches:
         if not keep_discard:
             matches = [m for m in matches if not m.group.discard]
         return matches
+
+    def get_date(
+        self, default_date: datetime | abc.Mapping[str, int] | None = None
+    ) -> datetime:
+        """Retrieve date from matched elements.
+
+        Matches that can be used are : YBmdjHMSFxX. If a matcher is *not* found in the
+        filename, it will be replaced by the element of the default date argument. All
+        values deduced from these matches will be compared. If different matchers give
+        different values (for instance the group Y and F give a different year), an
+        exception will be raised.
+
+        Parameters
+        ----------
+        default_date:
+            Default date. Datetime, or a mapping with keys in: year, month, day, hour,
+            minute, and second. Defaults to 1970-01-01 00:00:00
+        """
+        from library import get_date
+
+        if isinstance(default_date, datetime):
+            default_date = {
+                attr: getattr(default_date, attr)
+                for attr in ["year", "month", "day", "hour", "minute", "second"]
+            }
+        return get_date(self, default_date)

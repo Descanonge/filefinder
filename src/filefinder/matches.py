@@ -282,7 +282,7 @@ class Matches:
             Default date. Datetime, or a mapping with keys in: year, month, day, hour,
             minute, and second. Defaults to 1970-01-01 00:00:00
         """
-        from library import get_date
+        from filefinder.library import get_date
 
         if isinstance(default_date, datetime):
             default_date = {

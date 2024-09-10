@@ -156,17 +156,17 @@ won't run).
      finder.add_filter(some_filter, value=1.)
      finder.add_filter(some_filter, value=3.5)
 
+.. important::
+
+   Adding a new filter will filter the files already scanned, and clearing the
+   filters will void the cache.
+
 .. note:: Implementation detail
 
     Filters are kept in a dictionary and can be cleared with
     :meth:`.Finder.clear_filters`. If no explicit name is given to *add_filter*
     the name of the callable is used (``func.__name___``) and made unique to
     avoid key clashes.
-
-.. note::
-
-   Adding a new filter will filter the files already scanned, and clearing the
-   filters will void the cache.
 
 
 Very often, it can suffice to have a filter operate on a single group. To that
@@ -193,17 +193,17 @@ filters will be removed as well.
    *pass_unparsed=True* is passed to *fix_by_filter*, in which case the matched
    string will be passed to the filter.
 
-.. note:: Implementation details
-
-   Group filters are actually wrapped in a "normal" filter. Their name reflect
-   the key they have been fixed to (group index or name), and are made unique.
-
 .. note::
 
    Some filters functions are provided: :func:`.library.filter_by_range` and
    :func:`.library.filter_date_range`. They are kept for compatibility but are
    not as useful since the addition of *fix_by_filter* and "date" as first
    class citizen (see below).
+
+.. note:: Implementation details
+
+   Group filters are actually wrapped in a "normal" filter. Their name reflect
+   the key they have been fixed to (group index or name), and are made unique.
 
 
 .. _dates:
@@ -225,10 +225,10 @@ will receive a datetime object constructed from the matches in the filename::
 
     finder = Finder("", "%(Y)/%(m)/%(var:fmt=s)_%(Y)-%(j).ext")
     finder.fix_groups(Y=2018)
-    finder.fix_by_filter("date", lambda d: datetime(2018, 6, 15) > d)
+    finder.fix_by_filter("date", lambda d: d > datetime(2018, 6, 15))
 
 In this example we only select files corresponding to dates after the 15th of
-june. Note that I still only selected the year with a "traditionnal" value-fix.
+june. We also selected the year 2018 with a "traditionnal" value-fix.
 
 .. note::
 

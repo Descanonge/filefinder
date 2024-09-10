@@ -64,6 +64,7 @@ class Finder:
     """Maximum sub-directory depth to scan when :attr:`scan_everything` is True."""
 
     date_is_first_class: bool = True
+    """If True, the group name 'date' is considered special."""
 
     def __init__(
         self,
@@ -96,10 +97,6 @@ class Finder:
         Is reset to False if the cache (of scanned files) is voided, for instance by
         operation like changing fixed values of groups.
         """
-
-        # copy class value, make sur it is transformed into instance attr
-        self.date_is_first_class: bool = self.date_is_first_class
-        """If True, the group name 'date' is considered special."""
 
         self.filters: dict[str, FilterPartial] = {}
         """Mapping of filters to apply to found files.

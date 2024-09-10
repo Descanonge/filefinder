@@ -145,10 +145,12 @@ def test_invalid_file_differing_elements():
 
 
 def test_no_date_matchers(caplog):
-    finder = Finder("", "%(year:fmt=02d)/%(month:fmt=02d)/%(full:fmt=s).ext")
+    finder = Finder(
+        "", r"%(year:fmt=02d)/%(month:fmt=02d)/%(full:fmt=s:rgx=[^\.]*).ext"
+    )
     filenames = ["2005/01/2006-01-02.ext", "2005/01/2005-03-01.ext"]
     for f in filenames:
-        filefinder.library.get_date(finder.find_matches(f))
+        finder.find_matches(f).get_date()
         warnings = any(
             rec.levelname == "WARNING"
             and rec.msg.startswith("No date elements could be recovered.")

@@ -18,9 +18,11 @@ from util import (
     PatternValues,
     StPattern,
     setup_files,
+    time_segments,
 )
 
 from filefinder import Finder
+from filefinder.util import datetime_to_value, name_to_date
 
 log = logging.getLogger(__name__)
 

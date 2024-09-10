@@ -9,60 +9,19 @@ from datetime import datetime, timedelta
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
-from util import FORBIDDEN_CHAR, MAX_CODEPOINT, MAX_TEXT_SIZE, setup_files
+from util import setup_files, time_segments
 
 import filefinder.library
 from filefinder.finder import Finder
-from filefinder.util import datetime_keys
-
-name_to_date = {
-    "F": ["year", "month", "day"],
-    "x": ["year", "month", "day"],
-    "X": ["hour", "minute", "second"],
-    "Y": ["year"],
-    "m": ["month"],
-    "B": ["month"],
-    "d": ["day"],
-    "j": ["month", "day"],
-    "H": ["hour"],
-    "M": ["minute"],
-    "S": ["second"],
-}
-"""Elements of datetime to set for each group."""
+from filefinder.util import (
+    date_from_doy,
+    datetime_to_str,
+    datetime_to_value,
+    get_doy,
+    name_to_date,
+)
 
 
-@st.composite
-def segments(draw) -> list[str]:
-    """Generate pattern segments with date elements."""
-    names = draw(
-        st.lists(
-            st.sampled_from(datetime_keys),
-            min_size=1,
-            max_size=len(datetime_keys),
-        )
-    )
-
-    text = st.text(
-        alphabet=st.characters(
-            max_codepoint=MAX_CODEPOINT,
-            exclude_categories=["C"],
-            exclude_characters=set("%()\\") | FORBIDDEN_CHAR,
-        ),
-        min_size=0,
-        max_size=MAX_TEXT_SIZE,
-    )
-
-    segments = ["" for _ in range(2 * len(names) + 1)]
-    segments[1::2] = names
-    for i in range(len(names) + 1):
-        strat = text
-        # force at least one char after written month name, otherwise parsing
-        # is impossible
-        if names[i - 1] == "B":
-            strat = strat.filter(lambda s: len(s) > 0)
-        segments[2 * i] = draw(strat)
-
-    return segments
 
 
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)

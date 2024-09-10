@@ -14,6 +14,7 @@ from hypothesis import strategies as st
 
 from filefinder.format import Format, FormatError
 from filefinder.group import Group
+from filefinder.util import datetime_keys
 
 MAX_CODEPOINT = 1024
 MAX_TEXT_SIZE = 32
@@ -771,3 +772,37 @@ class StPattern:
             separate=separate,
             for_filename=for_filename,
         )
+
+
+@st.composite
+def time_segments(draw) -> list[str]:
+    """Generate pattern segments with date elements."""
+    names = draw(
+        st.lists(
+            st.sampled_from(datetime_keys),
+            min_size=1,
+            max_size=len(datetime_keys),
+        )
+    )
+
+    text = st.text(
+        alphabet=st.characters(
+            max_codepoint=MAX_CODEPOINT,
+            exclude_categories=["C"],
+            exclude_characters=set("%()\\") | FORBIDDEN_CHAR,
+        ),
+        min_size=0,
+        max_size=MAX_TEXT_SIZE,
+    )
+
+    segments = ["" for _ in range(2 * len(names) + 1)]
+    segments[1::2] = names
+    for i in range(len(names) + 1):
+        strat = text
+        # force at least one char after written month name, otherwise parsing
+        # is impossible
+        if names[i - 1] == "B":
+            strat = strat.filter(lambda s: len(s) > 0)
+        segments[2 * i] = draw(strat)
+
+    return segments

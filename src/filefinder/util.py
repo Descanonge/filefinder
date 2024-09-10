@@ -1,41 +1,68 @@
 """General utilities."""
 
 from collections import abc
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from .group import Group, GroupKey
 
 datetime_keys = "YBmdjHMSFxX"
 
+name_to_date = {
+    "F": ["year", "month", "day"],
+    "x": ["year", "month", "day"],
+    "X": ["hour", "minute", "second"],
+    "Y": ["year"],
+    "m": ["month"],
+    "B": ["month"],
+    "d": ["day"],
+    "j": ["month", "day"],
+    "H": ["hour"],
+    "M": ["minute"],
+    "S": ["second"],
+}
+"""Elements of datetime to set for each group."""
 
-def datetime_to_str(date: datetime, elt: str) -> str:
-    """Return string of formatted element *elt*.
 
-    *elt* must be in :attr:`datetime_keys`.
-    """
-    if elt not in datetime_keys:
-        raise KeyError(f"Element '{elt}' not supported [{datetime_keys}]")
+def datetime_to_str(date: datetime, name: str) -> str:
+    """Return formatted string  of a date group name (Y, m, d, ...)."""
+    if name not in datetime_keys:
+        raise KeyError(f"Element '{name}' not supported [{datetime_keys}]")
 
-    if elt == "x":
-        fmt = "%Y%m%d"
-    elif elt == "X":
-        fmt = "%H%M%S"
-    elif elt == "F":
-        fmt = "%Y-%m-%d"
-    else:
-        fmt = f"%{elt}"
+    fmt = f"%{name}"
+
+    fmt = fmt.replace("%F", "%Y-%m-%d")
+    fmt = fmt.replace("%x", "%Y%m%d")
+    fmt = fmt.replace("%X", "%H%M%S")
+
+    fmt = fmt.replace("%Y", "%04Y")
+    for k in "mdHMS":
+        fmt = fmt.replace(f"%{k}", f"%02{k}")
 
     return date.strftime(fmt)
 
 
-def datetime_to_value(date: datetime, elt: str) -> int | str:
-    """Return value of element *elt*."""
-    # needed because I don't have access to dayofyear
-    formatted = datetime_to_str(date, elt)
+def datetime_to_value(date: datetime, name: str) -> int | str:
+    """Return value of date group name (Y, m, F, ...)."""
+    if name == "j":
+        return get_doy(date)
 
-    if elt in "xXFB":
-        return formatted
-    return int(formatted)
+    if name in "xXFB":
+        return datetime_to_str(date, name)
+
+    elt = name_to_date[name]
+    assert len(elt) == 1
+    return getattr(date, elt[0])
+
+
+def get_doy(date: datetime) -> int:
+    """Return dayofyear of a date."""
+    return (date - datetime(date.year, 1, 1)).days + 1
+
+
+def date_from_doy(doy: int, year: int) -> dict[str, int]:
+    """Get month and day from a dayofyear value (and its year)."""
+    day = date(year, 1, 1) + timedelta(days=(doy - 1))
+    return dict(month=day.month, day=day.day)
 
 
 class Sentinel:

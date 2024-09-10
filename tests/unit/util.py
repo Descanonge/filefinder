@@ -824,7 +824,7 @@ def time_segments(draw) -> list[str]:
         i = n_seg * 2 + 1
         if seg == "B":
             for j in [i - 1, i + 1]:
-                if segments[j].isalpha():
+                if segments[j].isalpha() or not segments[j]:
                     segments[j] = "_"
 
     return segments

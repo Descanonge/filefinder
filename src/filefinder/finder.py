@@ -358,9 +358,7 @@ class Finder:
     def add_filter(self, func: _FilterUserFunc, name: str = "", **kwargs: t.Any):
         """Add a filter with which to select scanned files.
 
-        See :doc:`/filtering` for details.
-
-        :rtype func: Callable
+        See :ref:`filtering` for details.
 
         Parameters
         ----------

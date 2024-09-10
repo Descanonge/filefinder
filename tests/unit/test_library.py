@@ -116,9 +116,8 @@ def test_get_date(segments: list[str], date: datetime, default_date: datetime):
         # is too high for the month
         return
 
-    # format ourselves, datetime.strftime does not always zero pad for some reason
     for i, name in enumerate(group_names):
-        segments[2 * i + 1] = datetime_to_str(date, name)
+        segments[2 * i + 1] = datetime_to_str(date_ref, name)
 
     filename = "".join(segments).replace("/", os.sep)
 

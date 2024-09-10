@@ -139,16 +139,16 @@ def test_get_date(segments: list[str], date: datetime, default_date: datetime):
 def test_invalid_file_differing_elements():
     finder = Finder("", "%(Y)/%(m)/%(F).ext")
     filenames = ["2005/01/2006-01-02.ext", "2005/01/2005-03-01.ext"]
+    filenames = [f.replace("/", os.sep) for f in filenames]
     for f in filenames:
         with pytest.raises(ValueError):
             filefinder.library.get_date(finder.find_matches(f))
 
 
 def test_no_date_matchers(caplog):
-    finder = Finder(
-        "", r"%(year:fmt=02d)/%(month:fmt=02d)/%(full:fmt=s:rgx=[^\.]*).ext"
-    )
+    finder = Finder("", r"%(year:fmt=02d)/%(month:fmt=02d)/%(full:fmt=s).ext")
     filenames = ["2005/01/2006-01-02.ext", "2005/01/2005-03-01.ext"]
+    filenames = [f.replace("/", os.sep) for f in filenames]
     for f in filenames:
         finder.find_matches(f).get_date()
         warnings = any(

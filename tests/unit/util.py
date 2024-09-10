@@ -784,7 +784,12 @@ class StPattern:
             separate=separate,
             for_filename=for_filename,
         )
-        strat = strat.filter(lambda g: len(g.filenames) == len(set(g.filenames)))
+
+        def filter_duplicate_filenames(pattern: PatternValues) -> bool:
+            filenames = list(pattern.filenames)
+            return len(filenames) == len(set(filenames))
+
+        strat = strat.filter(filter_duplicate_filenames)
         return strat
 
 
@@ -814,8 +819,9 @@ def time_segments(draw) -> list[str]:
     for i in range(len(names) + 1):
         segments[2 * i] = draw(text)
 
-    for i, seg in enumerate(segments[1::2]):
+    for n_seg, seg in enumerate(segments[1::2]):
         # force non-alphabetic char after or before written month name
+        i = n_seg * 2 + 1
         if seg == "B":
             for j in [i - 1, i + 1]:
                 if segments[j].isalpha():

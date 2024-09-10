@@ -812,11 +812,13 @@ def time_segments(draw) -> list[str]:
     segments = ["" for _ in range(2 * len(names) + 1)]
     segments[1::2] = names
     for i in range(len(names) + 1):
-        strat = text
-        # force at least one char after written month name, otherwise parsing
-        # is impossible
-        if names[i - 1] == "B":
-            strat = strat.filter(lambda s: len(s) > 0)
-        segments[2 * i] = draw(strat)
+        segments[2 * i] = draw(text)
+
+    for i, seg in enumerate(segments[1::2]):
+        # force non-alphabetic char after or before written month name
+        if seg == "B":
+            for j in [i - 1, i + 1]:
+                if segments[j].isalpha():
+                    segments[j] = "_"
 
     return segments

@@ -74,6 +74,152 @@ def test_finder_str(ref: PatternSpecs, root: str):
     assert lines[-1] == "not scanned"
 
 
+def test_filter_name_function():
+    def placeholder(*args, **kwargs) -> bool:
+        return True
+
+    f = Finder("", "whatever")
+    f.add_filter(placeholder)
+    assert "placeholder" in f.filters
+
+    # add till the double digits in case
+    for i in range(12):
+        f.add_filter(placeholder)
+        assert f"placeholder__{i}" in f.filters
+
+
+def test_filter_name_group():
+    f = Finder("", "one_%(Y)_two_%(m)")
+    f.fix_by_filter("Y", lambda y: bool(y))
+    assert "Y__0" in f.filters
+
+    # add till the double digits in case
+    for i in range(12):
+        f.fix_by_filter("Y", lambda y: bool(y))
+        assert f"Y__{i+1}" in f.filters
+
+
+def test_filter_same_name():
+    def placeholder(*args, **kwargs) -> bool:
+        return True
+
+    f = Finder("", "whatever")
+    f.add_filter(placeholder, name="ill_fail")
+    assert "ill_fail" in f.filters
+    with pytest.raises(KeyError):
+        f.add_filter(placeholder, name="ill_fail")
+
+
+def test_unfix_group_filters():
+    f = Finder("", "one_%(Y)_two_%(m)")
+    f.fix_by_filter("Y", lambda y: bool(y))
+
+    f.fix_group("m", 5)
+    f.fix_by_filter("m", lambda m: m > 0)
+
+    f.unfix_groups("Y")
+
+    for grp in f.get_groups("m"):
+        assert grp.fixed
+    assert "Y__0" not in f.filters
+    assert "m__0" in f.filters
+
+
+def test_unfix_date_filters():
+    f = Finder("", "%(Y)/%(Y)%(m)%(d)-%(X)_%(param:fmt=.2f)%(option:bool=_yes).ext")
+    f.fix_by_filter("date", bool)
+
+    f.fix_group("m", 5)
+    f.fix_by_filter("m", bool)
+
+    f.fix_group("param", 5.0)
+    f.fix_by_filter("param", bool)
+
+    f.unfix_groups("date")
+    for name in "YmdX":
+        for grp in f.get_groups(name):
+            assert not grp.fixed
+        if name != "m":
+            assert f"{name}__0" not in f.filters
+
+    for name in ["m", "param"]:
+        assert f"{name}__0" in f.filters
+
+
+@given(segments=time_segments(), date=st.datetimes())
+def test_fix_date(segments: list[str], date: datetime):
+    group_names = segments[1::2]
+    for i, name in enumerate(group_names):
+        segments[2 * i + 1] = f"%({name})"
+    pattern = "".join(segments).replace("/", os.sep)
+    finder = Finder("", pattern)
+
+    finder.fix_group("date", date)
+    # check with dedicated function (untested as of yet)
+    for name in group_names:
+        value = datetime_to_value(date, name)
+        for grp in finder.get_groups(name):
+            assert grp.fixed_value == value
+    # check by hand for simple cases
+    for name in set(group_names) & set("YmdHMS"):
+        for grp in finder.get_groups(name):
+            for elt in name_to_date[name]:
+                assert grp.fixed_value == getattr(date, elt)
+
+
+def test_fix_date_wrong():
+    f = Finder("", "%(Y).ext")
+    with pytest.raises(TypeError):
+        f.fix_group("date", 1)
+    with pytest.raises(TypeError):
+        f.fix_group("date", "2010/05/12")
+    with pytest.raises(TypeError):
+        f.fix_group("date", [datetime(2012, 6, 1)])
+
+
+def test_fix_date_collateral():
+    f = Finder("", "%(Y)/%(Y)%(m)%(d)-%(X)_%(param:fmt=.2f)%(option:bool=_yes).ext")
+    f.fix_group("date", datetime(2015, 3, 14, 12, 59, 32))
+    for name in "YmdX":
+        for grp in f.get_groups(name):
+            assert grp.fixed
+    for name in ["param", "option"]:
+        for grp in f.get_groups(name):
+            assert not grp.fixed
+
+    f.fix_groups(option=True)
+    f.unfix_groups("date")
+    for name in list("YmdX") + ["param"]:
+        for grp in f.get_groups(name):
+            assert not grp.fixed
+    for grp in f.get_groups("option"):
+        assert grp.fixed
+
+
+def test_fix_date_no_firstclass():
+    f = Finder("", "%(Y)/%(Y)%(m)%(d)-%(X)_%(param:fmt=.2f)%(option:bool=_yes).ext")
+    f.date_is_first_class = False
+    with pytest.raises(IndexError):
+        f.fix_group("date", datetime(2015, 3, 14, 12, 59, 32))
+
+    f = Finder("", "%(Y)/%(Y)%(m)%(d)-%(X)_%(date:fmt=.2f).ext")
+    f.date_is_first_class = False
+    f.fix_group("date", 5.0)
+    for name in "YmdX":
+        for grp in f.get_groups(name):
+            assert not grp.fixed
+    for grp in f.get_groups("date"):
+        assert grp.fixed
+
+    f.fix_groups(Y=2050)
+    f.unfix_groups("date")
+    for name in "mdX":
+        for grp in f.get_groups(name):
+            assert not grp.fixed
+    for grp in f.get_groups("Y"):
+        assert grp.fixed
+
+
 @given(
     ref=StPattern.pattern_value(
         separate=True, parsable=True, ignore=["opt"], for_filename=True

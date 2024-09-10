@@ -25,20 +25,24 @@ name_to_date = {
 
 def datetime_to_str(date: datetime, name: str) -> str:
     """Return formatted string  of a date group name (Y, m, d, ...)."""
-    if name not in datetime_keys:
-        raise KeyError(f"Element '{name}' not supported [{datetime_keys}]")
+    if name in "mdHMS":
+        elt = name_to_date[name][0]
+        return f"{getattr(date, elt):02d}"
+    if name == "Y":
+        return f"{date.year:04d}"
+    if name == "j":
+        doy = get_doy(date)
+        return f"{doy:03d}"
+    if name == "F":
+        return f"{date.year:04}-{date.month:02d}-{date.day:02d}"
+    if name == "x":
+        return f"{date.year:04}{date.month:02d}{date.day:02d}"
+    if name == "X":
+        return f"{date.hour:02}{date.minute:02d}{date.second:02d}"
+    if name == "B":
+        return date.strftime("%B")
 
-    fmt = f"%{name}"
-
-    fmt = fmt.replace("%F", "%Y-%m-%d")
-    fmt = fmt.replace("%x", "%Y%m%d")
-    fmt = fmt.replace("%X", "%H%M%S")
-
-    fmt = fmt.replace("%Y", f"{date.year:04d}")
-    for k in "mdHMS":
-        fmt = fmt.replace(f"%{k}", f"%02{k}")
-
-    return date.strftime(fmt)
+    raise KeyError(f"Element '{name}' not supported [{datetime_keys}]")
 
 
 def datetime_to_value(date: datetime, name: str) -> int | str:

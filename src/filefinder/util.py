@@ -34,7 +34,7 @@ def datetime_to_str(date: datetime, name: str) -> str:
     fmt = fmt.replace("%x", "%Y%m%d")
     fmt = fmt.replace("%X", "%H%M%S")
 
-    fmt = fmt.replace("%Y", "%04Y")
+    fmt = fmt.replace("%Y", f"{date.year:04d}")
     for k in "mdHMS":
         fmt = fmt.replace(f"%{k}", f"%02{k}")
 

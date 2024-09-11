@@ -20,9 +20,9 @@ MAX_CODEPOINT = 1024
 MAX_TEXT_SIZE = 32
 
 if sys.platform in ["win32", "cygwin"]:
-    FORBIDDEN_CHAR = set('<>:"\\|?')
+    FORBIDDEN_CHAR = set('<>:;"\\|?')
 elif sys.platform == "darwin":
-    FORBIDDEN_CHAR = set(":")
+    FORBIDDEN_CHAR = set(":;")
 else:
     FORBIDDEN_CHAR = set()
 

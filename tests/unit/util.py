@@ -141,10 +141,13 @@ class FormatSpecs:
 
         if self.kind == "s":
             exclude = build_exclude(for_pattern=for_pattern, for_filename=for_filename)
+            exclude_cat = ["C"]
+            if sys.platform in ["win32", "cygwin", "darwin"]:
+                exclude_cat += ["Z", "P", "S", "M"]
             strat = st.text(
                 alphabet=st.characters(
                     max_codepoint=MAX_CODEPOINT,
-                    exclude_categories=["C"],
+                    exclude_categories=exclude_cat,
                     exclude_characters=exclude,
                 ),
                 max_size=MAX_TEXT_SIZE,

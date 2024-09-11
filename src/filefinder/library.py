@@ -32,7 +32,6 @@ def get_date(matches: Matches, default_date: dict | None = None) -> dt.datetime:
     default_date:
         Default date. Dictionnary with keys: year, month, day, hour, minute,
         and second. Defaults to 1970-01-01 00:00:00
-
     """
     if default_date is None:
         default_date = {}

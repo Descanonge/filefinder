@@ -9,17 +9,19 @@ import itertools
 import logging
 import os
 import re
-from collections.abc import Callable, Sequence
+import typing as t
+from collections import abc
 from copy import copy
-from typing import Any, Protocol
+from datetime import datetime
 
-from filefinder.group import Group, GroupKey
-from filefinder.matches import Matches, get_groups_indices
+from .group import Group, GroupKey
+from .matches import Matches
+from .util import datetime_to_value, get_groups_indices, get_unique_name
 
 logger = logging.getLogger(__name__)
 
 
-class _FilterUserFunc(Protocol):
+class _FilterUserFunc(t.Protocol):
     """Defines the signature of filters callables (for static type checkers).
 
     See `<https://mypy.readthedocs.io/en/stable/protocols.html#callback-protocols>`__
@@ -27,12 +29,11 @@ class _FilterUserFunc(Protocol):
     """
 
     def __call__(
-        self, __finder: "Finder", filename: str, matches: Matches, **kwargs: Any
-    ) -> bool:
-        ...
+        self, finder: "Finder", filename: str, matches: Matches, **kwargs: t.Any
+    ) -> bool: ...
 
 
-FilterPartial = Callable[["Finder", str, Matches], bool]
+FilterPartial = abc.Callable[["Finder", str, Matches], bool]
 
 
 class Finder:
@@ -61,6 +62,9 @@ class Finder:
 
     max_scan_depth: int = 32
     """Maximum sub-directory depth to scan when :attr:`scan_everything` is True."""
+
+    date_is_first_class: bool = True
+    """If True, the group name 'date' is considered special."""
 
     def __init__(
         self,
@@ -94,8 +98,8 @@ class Finder:
         operation like changing fixed values of groups.
         """
 
-        self.filters: list[FilterPartial] = []
-        """List of filters to apply to found files.
+        self.filters: dict[str, FilterPartial] = {}
+        """Mapping of filters to apply to found files.
 
         Each value is a :func:`partial function<functools.partial>` with keyword
         arguments applied.
@@ -181,7 +185,7 @@ class Finder:
     def get_files(
         self,
         relative: bool = False,
-        nested: Sequence[str | Sequence[str]] | None = None,
+        nested: abc.Sequence[str | abc.Sequence[str]] | None = None,
     ) -> list:
         """Return files that matches the regex.
 
@@ -262,7 +266,7 @@ class Finder:
         """Get absolute path to filename."""
         return os.path.join(self.root, filename)
 
-    def fix_group(self, key: GroupKey, value: str | Any, fix_discard: bool = False):
+    def fix_group(self, key: GroupKey, value: str | t.Any, fix_discard: bool = False):
         """Fix a group to a string.
 
         Parameters
@@ -284,14 +288,21 @@ class Finder:
         for m in self.get_groups(key):
             if not fix_discard and m.discard:
                 continue
+            if key == "date" and self.date_is_first_class:
+                if not isinstance(value, datetime):
+                    raise TypeError(
+                        "If key is date, value must be a date or datetime object."
+                    )
+                m.fix_value(datetime_to_value(value, m.name))
+                continue
             m.fix_value(value)
         self._void_cache()
 
     def fix_groups(
         self,
-        fixes: dict[Any, str | Any] | None = None,
+        fixes: dict[t.Any, str | t.Any] | None = None,
         fix_discard: bool = False,
-        **fixes_kw: str | Any,
+        **fixes_kw: str | t.Any,
     ):
         """Fix multiple groups at once.
 
@@ -312,8 +323,8 @@ class Finder:
         for f in fixes.items():
             self.fix_group(*f, fix_discard=fix_discard)
 
-    def unfix_groups(self, *keys: str):
-        """Unfix groups.
+    def unfix_groups(self, *keys: GroupKey):
+        """Unfix groups, and remove group related filters.
 
         Parameters
         ----------
@@ -321,15 +332,140 @@ class Finder:
            Keys to find groups to unfix. See :func:`get_groups`.
            If no key is provided, all groups will be unfixed.
         """
+
+        def remove_filters(rgx: str):
+            pattern = re.compile(rgx)
+            self.filters = {
+                name: filt
+                for name, filt in self.filters.items()
+                if pattern.fullmatch(name) is None
+            }
+
         if not keys:
-            for g in self.groups:
+            keys = tuple(range(self.n_groups))
+
+        for key in keys:
+            groups = self.get_groups(key)
+            for g in groups:
                 g.unfix()
-        else:
-            for key in keys:
-                groups = self.get_groups(key)
-                for g in groups:
-                    g.unfix()
+
+            # if date only remove 'date' filters, not its elements
+            if key == "date" and self.date_is_first_class:
+                remove_filters(r"date__\d+")
+                continue
+
+            for g in groups:
+                remove_filters(rf"({g.idx}|{re.escape(g.name)})__\d+")
+
         self._void_cache()
+
+    def add_filter(self, func: _FilterUserFunc, name: str = "", **kwargs: t.Any):
+        """Add a filter with which to select scanned files.
+
+        See :ref:`filtering` for details.
+
+        Parameters
+        ----------
+        func: ~collections.abc.Callable[[Finder, str, Matches, ...], bool]
+            Callable that returns True if the file is to be kept, False otherwise.
+        name
+            Name of the filter, if not specified, the function name of *func* will be
+            used. In this case, if the same filter is already registered the name will
+            be changed. If the name is provided as an argument however, any double will
+            raise an error.
+        kwargs
+            Will be passed to the function when executed.
+        """
+        filt: FilterPartial = functools.partial(func, **kwargs)
+        if not name:
+            name = func.__name__  # type: ignore
+            if name in self.filters:
+                name = get_unique_name(name, self.filters)
+
+        if name in self.filters:
+            raise KeyError(f"A filter with the name {name} is already registered.")
+        self.filters[name] = filt
+
+        if self.scanned:
+            self._files = [(f, m) for f, m in self._files if filt(self, f, m)]
+
+    def clear_filters(self) -> None:
+        """Remove all filters."""
+        self.filters.clear()
+        self._void_cache()
+
+    def fix_by_filter(
+        self,
+        key: GroupKey,
+        func: abc.Callable[[t.Any], bool],
+        pass_unparsed: bool = False,
+        fix_discard: bool = True,
+        **kwargs,
+    ):
+        """Fix a group value by using a filter, or predicate.
+
+        When a file is scanned, if it matches the pattern, it will only be kept if
+        `func` returns True when called with the group parsed value. If the group cannot
+        parse the value, if `pass_unparse` is True the unparsed string will be passed to
+        the predicate function nonetheless, otherwise it will not keep the file
+        (default).
+
+        This add a filter (see :meth:`add_filter`) with a name consisting of the `key`
+        and a unique id (this allows multiple filters for a single group).
+
+        Parameters
+        ----------
+        key:
+            Can be the index of a group in the pattern (starts at 0), or the
+            name of a group. If multiple groups share the same name, they are
+            all fixed.
+        func
+            A function that take the parsed value of the group and returns True if the
+            corresponding file should be kept, or False otherwise. If multiple groups
+            correspond to the key, **all** values will be tested.
+        pass_unparsed
+            If True, and if the group cannot parse the string the pass the unparsed
+            string to the predicate function `func` anyway. If False the file will not
+            be kept if the group cannot parse the string. Default is False.
+        fix_discard
+            If True, also use groups values with the *discard* flag. Default is False.
+        kwargs
+            Can be passed to some intermediary function, like library.get_date if the
+            key is 'date'.
+        """
+        from .library import get_date
+
+        # Wrap as a typical filter
+        def filt(finder: "Finder", filename: str, matches: Matches, **kwargs):
+            values: list[t.Any] = []
+            for m in matches.get_matches(key, keep_discard=fix_discard):
+                if not m.can_parse() and pass_unparsed:
+                    values.append(m.match_str)
+                else:
+                    values.append(m.match_parsed)
+
+            return all(func(v) for v in values)
+
+        def filt_date(finder: "Finder", filename: str, matches: Matches, **kwargs):
+            date = get_date(matches, **kwargs)
+            return func(date)
+
+        name = get_unique_name(str(key), self.filters)
+        if key == "date" and self.date_is_first_class:
+            self.add_filter(filt_date, name=name)
+        else:
+            self.add_filter(filt, name=name)
+
+    def _make_matches(
+        self, filename: str, pattern: str | re.Pattern | None = None
+    ) -> Matches | None:
+        if pattern is None:
+            pattern = self.get_regex()
+
+        matches = Matches.from_filename(filename, pattern, self.groups)
+        if matches is not None:
+            matches.date_is_first_class = self.date_is_first_class
+        return matches
 
     def find_matches(self, filename: str, relative: bool = True) -> Matches | None:
         """Find matches for a given filename.
@@ -354,13 +490,13 @@ class Finder:
         if not relative:
             filename = self.get_relative(filename)
 
-        return Matches.from_filename(filename, self.get_regex(), self.groups)
+        return self._make_matches(filename)
 
     def make_filename(
         self,
         fixes: dict | None = None,
         relative: bool = False,
-        **kw_fixes: Any,
+        **kw_fixes: t.Any,
     ) -> str:
         """Return a filename.
 
@@ -449,7 +585,9 @@ class Finder:
             self.groups.append(Group(pattern[start + 1 : end], idx))
             splits += [start - 1, end + 1]  # -1 removes the %
 
-        self._segments = [pattern[i:j] for i, j in zip(splits, splits[1:] + [None])]
+        self._segments = [
+            pattern[i:j] for i, j in zip(splits, splits[1:] + [None], strict=False)
+        ]
 
     def _get_regex(self) -> str:
         segments = self._segments.copy()
@@ -472,37 +610,6 @@ class Finder:
         """Return regexes for each sub-directory."""
         return self._get_regex().split("/")
 
-    def add_filter(self, func: _FilterUserFunc, **kwargs: Any):
-        """Add a filter with which to select scanned files.
-
-        See :doc:`/filtering` for details.
-
-        :rtype func: Callable
-
-        Parameters
-        ----------
-        func: ~collections.abc.Callable[[Finder, str, Matches, ...], bool]
-            Callable that returns True if the file is to be kept, False otherwise.
-        kwargs
-            Will be passed to the function when executed.
-        """
-        filt = functools.partial(func, **kwargs)
-        self.filters.append(filt)
-        self._apply_filters(filt)
-
-    def clear_filters(self) -> None:
-        """Remove all filters."""
-        self.filters.clear()
-        self._void_cache()
-
-    def _apply_filters(self, filter: FilterPartial | None = None) -> None:
-        filters = [filter] if filter is not None else self.filters
-        kept_files = []
-        for filename, matches in self._files:
-            if all(filt(self, filename, matches) for filt in filters):
-                kept_files.append((filename, matches))
-        self._files = kept_files
-
     def find_files(self) -> None:
         """Find files to scan and store them.
 
@@ -514,10 +621,19 @@ class Finder:
         else:
             self._find_files_subdirectories()
 
-        if self.filters:
-            self._apply_filters()
-
         self._files.sort(key=lambda x: x[0])
+
+        logger.debug("Found %d files matching and filtered", len(self._files))
+        if len(self._files) == 0:
+            logger.info("Found no matching files (after filtering)")
+
+    def _add_file(self, filename: str, pattern: re.Pattern):
+        """Add file if it matches pattern and pass filters."""
+        matches = self._make_matches(filename, pattern)
+        if matches is not None and all(
+            filt(self, filename, matches) for filt in self.filters.values()
+        ):
+            self._files.append((filename, matches))
 
     def _find_files_scan_everything(self) -> None:
         """Find files checking every sub-directory.
@@ -530,23 +646,22 @@ class Finder:
         found, which can be significant work in some cases.
         """
         pattern = re.compile(self.get_regex())
-        files_matched = []
 
         for dirpath, dirnames, filenames in os.walk(self.root):
             depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
                 os.sep
             ).count(os.sep)
+            logger.debug(
+                "Scanning in %s (depth %d/%d)", dirpath, depth, self.max_scan_depth
+            )
             if depth > self.max_scan_depth:
                 dirnames.clear()
 
             for f in filenames:
                 to_root = self.get_relative(os.path.join(dirpath, f))
-                matches = Matches.from_filename(to_root, pattern, self.groups)
-                if matches is not None:
-                    files_matched.append((to_root, matches))
+                self._add_file(to_root, pattern)
 
         self.scanned = True
-        self._files = files_matched
 
     def _find_files_subdirectories(self) -> None:
         """Find files checking sub-directories along the way.
@@ -558,57 +673,42 @@ class Finder:
         """
         max_log_lines = 3
 
+        full_pattern = re.compile(self.get_regex())
         subpatterns = [re.compile(rgx) for rgx in self.get_regex_subdirs()]
-        files = []
+        maxdepth = len(subpatterns) - 1
         for dirpath, dirnames, filenames in os.walk(self.root):
             depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
                 os.sep
             ).count(os.sep)
             pattern = subpatterns[depth]
 
-            if depth == len(subpatterns) - 1:
+            logger.debug(
+                "Scanning in %s (depth %d/%d) with pattern %s",
+                dirpath,
+                depth,
+                maxdepth,
+                pattern.pattern,
+            )
+
+            if depth == maxdepth:
                 dirnames.clear()  # look no deeper
-                files += [
-                    self.get_relative(os.path.join(dirpath, f)) for f in filenames
-                ]
-            elif logger.isEnabledFor(logging.DEBUG):
-                dirlogs = dirnames[:max_log_lines]
-                if len(dirnames) > max_log_lines:
-                    dirlogs += ["..."]
-                logger.debug(
-                    "depth: %d, pattern: %s, folders:\n\t%s",
-                    depth,
-                    pattern.pattern,
-                    "\n\t".join(dirlogs),
-                )
+
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("Found %d files in %s", len(filenames), dirpath)
+                    logger.debug("\t%s", "\n\t".join(filenames[:max_log_lines]))
+                    if len(filenames) > max_log_lines:
+                        logger.debug("...")
+
+                for f in filenames:
+                    to_root = self.get_relative(os.path.join(dirpath, f))
+                    self._add_file(to_root, full_pattern)
 
             # Removes directories not matching regex
             to_remove = [d for d in dirnames if not pattern.fullmatch(d)]
             for d in to_remove:
                 dirnames.remove(d)
 
-        logger.debug("Found %s files in sub-directories", len(files))
-
-        # Now only retain files that match the full pattern
-        pattern = re.compile(self.get_regex())
-        files_matched = []
-
-        for f in files:
-            matches = Matches.from_filename(f, pattern, self.groups)
-            if matches is not None:
-                files_matched.append((f, matches))
-
-        if logger.isEnabledFor(logging.DEBUG):
-            filelogs = files[:max_log_lines]
-            if len(files) > max_log_lines:
-                filelogs += ["..."]
-            logger.debug(
-                "regex: %s, files:\n\t%s", pattern.pattern, "\n\t".join(filelogs)
-            )
-            logger.debug("Found %s matching files in %s", len(files_matched), self.root)
-
         self.scanned = True
-        self._files = files_matched
 
     def _void_cache(self) -> None:
         self.scanned = False
@@ -616,6 +716,9 @@ class Finder:
 
     def get_groups(self, key: GroupKey) -> list[Group]:
         """Return list of groups corresponding to key.
+
+        If :attr:`date_is_first_class` is True, for the key 'date' return all time
+        related groups.
 
         Parameters
         ----------
@@ -632,6 +735,6 @@ class Finder:
         KeyError: No group found.
         TypeError: Key type is not valid.
         """
-        selected = get_groups_indices(self.groups, key)
+        selected = get_groups_indices(self.groups, key, self.date_is_first_class)
         groups = [self.groups[i] for i in selected]
         return groups

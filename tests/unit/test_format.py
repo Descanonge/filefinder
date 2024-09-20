@@ -17,26 +17,26 @@ from filefinder.format import (
     FormatError,
 )
 from hypothesis import given
-from util import FormatValue, StFormat
+from util import StFormat, FormatSpecs
 
 
-@given(ref=StFormat.format_value())
-def test_regex_match(ref: FormatValue):
-    fmt = Format(ref.format_string)
+@given(*StFormat.format_and_value())
+def test_regex_match(specs: FormatSpecs, value):
+    fmt = Format(specs.format_string)
 
-    string = fmt.format(ref.value)
+    string = fmt.format(value)
     pattern = fmt.generate_expression()
     m = re.fullmatch(pattern, string)
     assert m is not None, f"Could not parse '{string}' with regex '{pattern}'"
 
 
-@given(ref=StFormat.format_value())
-def test_parse_back(ref: FormatValue):
-    fmt = Format(ref.format_string)
+@given(*StFormat.format_and_value())
+def test_parse_back(specs: FormatSpecs, value):
+    fmt = Format(specs.format_string)
 
-    string = fmt.format(ref.value)
+    string = fmt.format(value)
     parsed = fmt.parse(string)
-    assert ref.value == parsed
+    assert value == parsed
 
 
 @pytest.mark.parametrize(

@@ -51,13 +51,20 @@ Here quickly, for date related parts, we only need to indicate the name:
 filefinder has them as :ref:`default<name>`. For the parameter, indicating a
 :ref:`string format<fmt>` will suffice.
 
+
+Restrict values
+===============
+
+The filenames to keep can be restricted using two main ways: directly fixing
+groups to specific values, or run arbitrary filters on said files.
+
 .. _fix-groups:
 
-Fix groups
-==========
+Fix Groups
+++++++++++
 
-Each group can be fixed to one possible value or a set of possible values.
-This will restrict the filenames that match the pattern when scanning files.
+Each group can be fixed to one value or a set of possible values. This will
+adapt the regular expression used and thus restrict the filenames when scanning.
 
 .. note::
 
@@ -112,6 +119,127 @@ We could also select specific days using a list::
   unless using the keyword argument ``fix_discard`` in :meth:`~Finder.fix_group`
   and :meth:`~Finder.fix_groups`.
 
+
+.. _filtering:
+
+Filtering
++++++++++
+
+Using regular expressions makes for a very efficient way to find files that
+follow a specific pattern. However, they cannot deal with advanced logic with
+which one might want to select the files. Thus, **after** being "validated" by
+the pattern (and its eventual fixed groups) a file can be subjected to any
+number of filters. Each filter is a function (or any other callable) with the
+following signature:
+
+.. py:function:: filter_signature(finder, filename, matches, **kwargs)
+
+    :param Finder finder: The finder object.
+    :param str filename: The filename to keep or discard.
+    :param Matches matches: The matches associated to this filename.
+    :param ~typing.Any kwargs: Additional keywords passed to the filter.
+
+    :returns: True if `filename` is to be kept, False otherwise.
+    :rtype: bool
+
+
+Any number of filters can be added using :meth:`Finder.add_filter`. They will be
+applied to each file, in the order they were added. If any filter discards the
+file (*ie* it returns False), the file will not be kept (and the next filters
+won't run).
+
+.. note::
+
+   The same filter can be applied multiple times with different keyword
+   arguments::
+
+     finder.add_filter(some_filter, value=1.)
+     finder.add_filter(some_filter, value=3.5)
+
+.. important::
+
+   Adding a new filter will filter the files already scanned, and clearing the
+   filters will void the cache.
+
+.. note:: Implementation detail
+
+    Filters are kept in a dictionary and can be cleared with
+    :meth:`.Finder.clear_filters`. If no explicit name is given to *add_filter*
+    the name of the callable is used (``func.__name___``) and made unique to
+    avoid key clashes.
+
+
+Very often, it can suffice to have a filter operate on a single group. To that
+end, one can use :meth:`Finder.fix_by_filter` where the filter is a function
+that act only on the parsed value of a group. If there are multiple groups with
+the same name, all values found in the filename will pass through the filter
+successively.
+
+For instance, let's say we only need days that are even::
+
+    finder.fix_by_filter("d", lambda d: d % 2 == 0)
+
+or only where some parameters starts with a specific value::
+
+    finder.fix_by_filter("param", lambda s: s.startswith("useful_"))
+
+A group can be fixed with any number of filters, and to a value as well as
+described :ref:`above<fix-groups>`. When unfixing a group, its associated
+filters will be removed as well.
+
+.. note::
+
+   If the parsing of a group fails, its filters will be ignored unless
+   *pass_unparsed=True* is passed to *fix_by_filter*, in which case the matched
+   string will be passed to the filter.
+
+.. note::
+
+   Some filters functions are provided: :func:`.library.filter_by_range` and
+   :func:`.library.filter_date_range`. They are kept for compatibility but are
+   not as useful since the addition of *fix_by_filter* and "date" as first
+   class citizen (see below).
+
+.. note:: Implementation details
+
+   Group filters are actually wrapped in a "normal" filter. Their name reflect
+   the key they have been fixed to (group index or name), and are made unique.
+
+
+.. _dates:
+
+Special case: dates
++++++++++++++++++++
+
+When working with dates, it is necessary to deal with different elements. The
+package tries to make it easier by attributing a special meaning to the group
+key **"date"**. For instance, if passed to *fix_group(s)*, all the time-related
+groups will be fixed from a single :class:`~datetime.datetime` object::
+
+    >>> finder = Finder("", "%(Y)/%(m)/%(var:fmt=s)_%(Y)-%(j).ext")
+    >>> finder.fix_group("date", datetime(2018, 2, 1))
+    Will fix Y:2018, m:2, and j:32 (dayofyear)
+
+Similarly, when used as a key in :meth:`~.Finder.fix_by_filter`, the filter
+will receive a datetime object constructed from the matches in the filename::
+
+    finder = Finder("", "%(Y)/%(m)/%(var:fmt=s)_%(Y)-%(j).ext")
+    finder.fix_groups(Y=2018)
+    finder.fix_by_filter("date", lambda d: d > datetime(2018, 6, 15))
+
+In this example we only select files corresponding to dates after the 15th of
+june. We also selected the year 2018 with a "traditionnal" value-fix.
+
+.. note::
+
+   The group names that are impacted are those listed as time-related in the
+   :ref:`default group names<name>`, *ie* Y, m, d, H, M, S, j, B, F, x, and X.
+
+.. important::
+
+   This feature is active by default, but can be deactivated by setting the
+   attribute :attr:`.Finder.date_is_first_class` to False, either on the Finder
+   class or on a specific instance.
 
 .. _find-files:
 
@@ -267,11 +395,11 @@ the list is empty, and warn if the values are not all equal.
 
 As date/time values are scattered among multiple groups, the package supply the
 function :func:`library.get_date` to easily retrieve a
-:class:`~datetime.datetime` object from matches::
+:class:`~datetime.datetime` object from matches, accessible directly from the
+:meth:`.Matches.get_date`::
 
-  from filefinder.library import get_date
   matches = finder.get_matches(filename)
-  date = get_date(matches)
+  date = matches.get_date()
 
 .. currentmodule:: filefinder.finder
 

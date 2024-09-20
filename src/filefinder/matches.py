@@ -9,10 +9,18 @@ import logging
 import re
 import typing as t
 from collections import abc
+from datetime import datetime
 
 from .group import Group, GroupKey
+from .util import Sentinel, get_groups_indices
 
 logger = logging.getLogger(__name__)
+
+
+PARSE_FAIL = Sentinel("Could not parse")
+"""The match string could not be parsed successfully."""
+NOT_PARSED = Sentinel("Not yet parsed")
+"""The match string has not been parsed yet."""
 
 
 class Match:
@@ -26,26 +34,18 @@ class Match:
         Match object for the complete filename.
     idx
         Index of the group in the match object.
-
-    Attributes
-    ----------
-    group:
-        Group used to get this match.
-    match_str:
-        String matched in the filename.
-    start:
-        Start index of match in the filename.
-    end:
-        End index of match in the filename.
-    match_parsed:
-        Parsed value. None if parsing was not successful.
     """
 
     def __init__(self, group: Group, match: re.Match, idx: int):
         self.group: Group = group
+        """Group used to get this match."""
         self.match_str: str = match.group(idx + 1)
+        """String matched in the filename."""
         self.start: int = match.start(idx + 1)
+        """Start index of match in the filename."""
         self.end: int = match.end(idx + 1)
+        """End index of match in the filename."""
+        self._parsed: t.Any | Sentinel = NOT_PARSED
 
     def __repr__(self):
         """Human readable information."""
@@ -56,33 +56,49 @@ class Match:
         return f"{self.group!s} = {self.match_str}"
 
     @property
-    def match_parsed(self) -> t.Any | None:
-        """Parsed value, None if parsing was not successful."""
-        try:
-            return self.group.parse(self.match_str)
-        except Exception:
-            logger.debug("Failed to parse for group %s", str(self.group))
-            return None
+    def match_parsed(self) -> t.Any | Sentinel:
+        """Return value or Sentinel value if failing to parse.
 
-    def get_match(self, parse: bool = True) -> t.Any:
+        Returns :attr:`PARSE_FAIL` if an exception is thrown when trying to parse the
+        match.
+        """
+        if self._parsed is NOT_PARSED:
+            try:
+                self._parsed = self.group.parse(self.match_str)
+            except Exception:
+                self._parsed = PARSE_FAIL
+                logger.debug("Failed to parse for group %s", str(self.group))
+        return self._parsed
+
+    def can_parse(self) -> bool:
+        """Return if the match can be parsed."""
+        return self.match_parsed is not PARSE_FAIL
+
+    def get_match(self, parse: bool = True, raise_on_unparsed: bool = True) -> t.Any:
         """Get match string or value.
 
         Parameters
         ----------
-        parse:
+        parse
             If True (default) return the parsed value instead of the matched string.
+        raise_on_unparsed
+            If True (default), will raise an error if the parsed value was asked but the
+            parsing failed. If False, return the string match instead.
 
         Raises
         ------
-        ValueError: Could not parse the match.
+        ValueError
+            Could not parse the match.
         """
         if parse:
-            if self.match_parsed is None:
+            if self.can_parse():
+                return self.match_parsed
+
+            if raise_on_unparsed:
                 raise ValueError(
                     f"Failed to parse value '{self.match_str}' "
                     f"for group '{self.group!s}'."
                 )
-            return self.match_parsed
         return self.match_str
 
 
@@ -141,13 +157,15 @@ class Matches:
     def __init__(self, match: re.Match, groups: abc.Sequence[Group]):
         self.matches: list[Match] = []
         """Matches for a single filename."""
-        self.groups = list(groups)
+        self.groups: list[Group] = list(groups)
         """Groups used."""
 
         assert len(match.groups()) == len(groups)
 
         for i in range(len(groups)):
             self.matches.append(Match(groups[i], match, i))
+
+        self.date_is_first_class: bool = True
 
     def __repr__(self) -> str:
         """Human readable information."""
@@ -241,31 +259,34 @@ class Matches:
         -------
         List of Match corresponding to the key.
         """
-        selected = get_groups_indices(self.groups, key)
+        selected = get_groups_indices(self.groups, key, self.date_is_first_class)
         matches = [self.matches[k] for k in selected]
         if not keep_discard:
             matches = [m for m in matches if not m.group.discard]
         return matches
 
+    def get_date(
+        self, default_date: datetime | abc.Mapping[str, int] | None = None
+    ) -> datetime:
+        """Retrieve date from matched elements.
 
-def get_groups_indices(groups: list[Group], key: GroupKey) -> list[int]:
-    """Get sorted list of groups indices corresponding to key.
+        Matches that can be used are : YBmdjHMSFxX. If a matcher is *not* found in the
+        filename, it will be replaced by the element of the default date argument. All
+        values deduced from these matches will be compared. If different matchers give
+        different values (for instance the group Y and F give a different year), an
+        exception will be raised.
 
-    Key can be an integer index, or a string of a group name. Since multiple
-    groups can share the same name, multiple indices can be returned (sorted).
+        Parameters
+        ----------
+        default_date:
+            Default date. Datetime, or a mapping with keys in: year, month, day, hour,
+            minute, and second. Defaults to 1970-01-01 00:00:00
+        """
+        from filefinder.library import get_date
 
-    Raises
-    ------
-    IndexError: No group found corresponding to the key
-    TypeError: Key is not int or str
-    """
-    if isinstance(key, int):
-        return [key]
-    if isinstance(key, str):
-        selected = [i for i, group in enumerate(groups) if group.name == key]
-
-        if len(selected) == 0:
-            raise IndexError(f"No group found for key '{key}'")
-        return selected
-
-    raise TypeError("Key must be int or str.")
+        if isinstance(default_date, datetime):
+            default_date = {
+                attr: getattr(default_date, attr)
+                for attr in ["year", "month", "day", "hour", "minute", "second"]
+            }
+        return get_date(self, default_date)

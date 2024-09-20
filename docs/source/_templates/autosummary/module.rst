@@ -1,17 +1,14 @@
 
-{{ fullname | escape | underline}}
+{{ name | escape | underline}}
 
 .. automodule:: {{ fullname }}
-   :members:
-   :member-order: groupwise
 
    {% block attributes %}
    {% if attributes %}
    .. rubric:: {{ _('Module Attributes') }}
 
-   .. autosummary::
    {% for item in attributes %}
-      {{ item }}
+   .. autodata:: {{ item }}
    {%- endfor %}
    {% endif %}
    {% endblock %}
@@ -22,7 +19,7 @@
 
    .. autosummary::
    {% for item in functions %}
-      {{ item }}
+   .. autofunction:: {{ item }}
    {%- endfor %}
    {% endif %}
    {% endblock %}
@@ -32,6 +29,7 @@
    .. rubric:: {{ _('Classes') }}
 
    .. autosummary::
+      :toctree:
    {% for item in classes %}
       {{ item }}
    {%- endfor %}
@@ -44,7 +42,7 @@
 
    .. autosummary::
    {% for item in exceptions %}
-      {{ item }}
+   .. autoexception::  {{ item }}
    {%- endfor %}
    {% endif %}
    {% endblock %}

@@ -56,6 +56,10 @@ disable_error_code = ['annotation-unchecked']
 ignore_missing_imports = true
 
 [tool.ruff]
+line-length = 88
+target-version = 'py311'
+
+[tool.ruff.lint]
 select = [
        'E',  # pycodestyle
        'W',  # pycodestyle
@@ -68,8 +72,6 @@ select = [
        'D',  #pydocstyle
        'PL', #pylint
 ]
-line-length = 88
-target-version = 'py311'
 
 ignore = [
        'E226', # missing whitespace around arithmetic operator
@@ -77,11 +79,12 @@ ignore = [
        'D213', # multiline docstring start at 2nd line
        'D417', # not all parameters need doc
 ]
+unfixable = ["F401"]
 
-[too.ruff.pycodestyle]
+[too.ruff.lint.pycodestyle]
 max-line-length = 90
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = 'numpy'
 
 [tool.ruff.format]

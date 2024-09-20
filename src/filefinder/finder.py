@@ -120,12 +120,9 @@ class Finder:
         return self._files
 
     def __repr__(self) -> str:
-        """Human readable information."""
-        return "\n".join([super().__repr__(), self.__str__()])
-
-    def __str__(self) -> str:
-        """Human readable information."""
+        """Human readable information (long)."""
         s = [
+            self.__class__.__qualname__,
             f"root: {self.root}",
             f"pattern: {self._pattern}",
             f"regex: {self.get_regex()}",
@@ -145,6 +142,13 @@ class Finder:
         else:
             s.append(f"scanned: found {len(self._files)} files")
         return "\n".join(s)
+
+    def __str__(self) -> str:
+        """Human readable information (short)."""
+        return (
+            f"{self.__class__.__qualname__}: "
+            f"{self.root.rstrip('/')}/ {self.get_regex()}"
+        )
 
     def set_scan_everything(self, scan_everything: bool, /) -> None:
         """Set value for attribute :attr:`scan_everything`.

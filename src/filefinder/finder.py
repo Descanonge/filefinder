@@ -30,7 +30,8 @@ class _FilterUserFunc(t.Protocol):
 
     def __call__(
         self, finder: "Finder", filename: str, matches: Matches, **kwargs: t.Any
-    ) -> bool: ...
+    ) -> bool:
+        ...
 
 
 FilterPartial = abc.Callable[["Finder", str, Matches], bool]
@@ -149,10 +150,7 @@ class Finder:
 
     def __str__(self) -> str:
         """Human readable information (short)."""
-        return (
-            f"{self.__class__.__qualname__}: "
-            f"{self.root.rstrip('/')}/ {self.get_regex()}"
-        )
+        return f"{self.__class__.__qualname__}: {self.root.rstrip('/')}/ {self.get_regex()}"
 
     def set_scan_everything(self, scan_everything: bool, /) -> None:
         """Set value for attribute :attr:`scan_everything`.

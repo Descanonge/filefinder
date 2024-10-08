@@ -34,9 +34,6 @@ class Drawer(t.Protocol):
     def __call__(self, __strat: st.SearchStrategy[T]) -> T: ...
 
 
-# Drawer = abc.Callable[[st.SearchStrategy[T]], T]
-
-
 def setup_files(
     fs, dates: abc.Sequence[datetime], params: abc.Sequence[float]
 ) -> tuple[str, list[str]]:
@@ -63,6 +60,10 @@ def setup_files(
 
 
 def form(fmt: str, value: t.Any) -> str:
+    """Format a value from a format string.
+
+    The format does not include the starting ':'.
+    """
     return f"{{:{fmt}}}".format(value)
 
 
@@ -71,6 +72,18 @@ def build_exclude(
     for_pattern: bool = False,
     for_filename: bool = False,
 ) -> set[str]:
+    """Build a set of characters to exclude.
+
+    Parameters
+    ----------
+    exclude
+        Base set of characters to exclude. Default (None) is empty.
+    for_pattern
+        If True, exclude group-related characters `%()`.
+    for_filename
+        If True, exclude characters forbidden in filenames on current platform. Also
+        exclude the filefinder default folder separator '/', whatever the platform.
+    """
     if exclude is None:
         exclude = set()
     if for_pattern:
@@ -83,27 +96,44 @@ def build_exclude(
 
 @dataclass
 class FormatSpecs:
-    """Store formt specs and generate format string."""
+    """Store format specs and generate format string."""
 
     align: str = ""
+    """Alignement. Empty or [ <>=^]."""
     fill: str = ""
+    """Fill character. Empty or any character."""
     sign: str = ""
+    """Sign indication. Empty or [ +-]."""
     alt: str = ""
+    """Alternate form. Empty or '#.'"""
     zero: str = ""
+    """Zero fill. Empty or '0'."""
     grouping: str = ""
+    """Thousands grouping character. Empty or [_,]"""
     width: int | None = None
+    """String length (not enforced).
+
+    None is for no width specified.
+    """
     precision: int | None = None
+    """Number of digits after decimal.
+
+    None is for no precision specified.
+    """
     kind: str = "s"
+    """Type of format [sdfeE]."""
 
     def __str__(self) -> str:
         return self.format_string
 
     @property
     def width_str(self) -> str:
+        """Width part of the format string."""
         return "" if self.width is None else f"{self.width:d}"
 
     @property
     def precision_str(self) -> str:
+        """Precision part of the format string."""
         return "" if self.precision is None else f".{self.precision:d}"
 
     @property
@@ -125,6 +155,7 @@ class FormatSpecs:
         return fmt + self.kind
 
     def is_valid(self) -> bool:
+        """Return if format string is valid according to Format object."""
         try:
             Format(self.format_string)
         except FormatError:
@@ -134,11 +165,17 @@ class FormatSpecs:
     def get_value_strategy(
         self, for_pattern: bool = False, for_filename: bool = False
     ) -> st.SearchStrategy[str | int | float]:
+        """Return appropriate strategy for this format instance.
+
+        Take into account precision.
+        """
         strat: st.SearchStrategy
 
+        # Integers
         if self.kind == "d":
             return st.integers()
 
+        # String
         if self.kind == "s":
             exclude = build_exclude(for_pattern=for_pattern, for_filename=for_filename)
             exclude_cat = ["C"]
@@ -147,11 +184,13 @@ class FormatSpecs:
             strat = st.text(
                 alphabet=st.characters(
                     max_codepoint=MAX_CODEPOINT,
-                    exclude_categories=exclude_cat,
+                    exclude_categories=exclude_cat,  # type: ignore[arg-type]
                     exclude_characters=exclude,
                 ),
                 max_size=MAX_TEXT_SIZE,
             )
+            # do not allow fill character (if it exists) on the edges of the string
+            # this gives ambiguous parsing
             fill = self.fill if self.fill and self.align else " "
             strat = strat.map(lambda s: form(self.format_string, s).strip(fill))
             return strat
@@ -200,13 +239,10 @@ class StFormat:
     def fill(
         cls, for_pattern: bool = False, for_filename: bool = False
     ) -> st.SearchStrategy[str]:
-        """Fill characters.
+        """Strategy for fill characters.
 
-        Some characters are excluded to avoid problems:
-
-        * {} for format calls
-        * () for group definitions
-        * /  for file scanning.
+        '{}' characters are excluded to avoid format-calls issues. Other characters are
+        excluded using :func:`build_exclude`.
         """
         exclude = build_exclude(set("{}"), for_pattern, for_filename)
         alph = st.characters(
@@ -223,15 +259,19 @@ class StFormat:
         for_pattern: bool = False,
         for_filename: bool = False,
     ) -> st.SearchStrategy[FormatSpecs]:
-        """Generate a format.
+        """Generate a full format string.
 
         Parameters
         ----------
         kind
-            Type of format is chosen from those listed in this parameter.
+            List of types of format to choose from.
         safe
-            Exclude any format that generate a format error when a Format object is
-            created.
+            If True, exclude any format that generate a format error when a Format
+            object is created.
+        for_pattern
+            If True, make sure the format can be used in a pattern.
+        for_filename
+            If True, make sure the format can be used in a filename.
         """
 
         @st.composite
@@ -270,6 +310,8 @@ class StFormat:
         for_pattern: bool = False,
         for_filename: bool = False,
     ) -> st.SearchStrategy[t.Any]:
+        """Return strategy for value corresponding to a given format-specs strategy."""
+
         @st.composite
         def strat(draw: Drawer) -> t.Any:
             specs = draw(st_specs)
@@ -288,6 +330,7 @@ class StFormat:
         for_pattern: bool = False,
         for_filename: bool = False,
     ) -> tuple[st.SearchStrategy[FormatSpecs], st.SearchStrategy[t.Any]]:
+        """Return a strategy for a format and the corresponding value strategy."""
         specs = st.shared(
             cls.format(
                 kind=kind, safe=safe, for_pattern=for_pattern, for_filename=for_filename
@@ -302,13 +345,21 @@ class GroupSpecs:
     """Store group specs and generate a definition."""
 
     name: str = ""
+    """Group name."""
     fmt: str = ""
+    """Format spec."""
     fmt_struct: FormatSpecs | None = None
+    """Corresponding format specs. None if not format spec is given."""
     rgx: str = ""
+    """Regex spec."""
     bool_elts: tuple[str, str] = ("", "")
+    """Bool elements of a bool spec."""
     opt: bool = False
+    """Option flag."""
     discard: bool = False
+    """Discard flag."""
     ordered_specs: list[str] = field(default_factory=lambda: [])
+    """List of specs and flags received, in order."""
 
     def __str__(self) -> str:
         try:
@@ -320,6 +371,7 @@ class GroupSpecs:
         return key in self.ordered_specs
 
     def is_valid(self) -> bool:
+        """Return if Group object can be constructed."""
         try:
             Group(self.definition, 0)
         except Exception:
@@ -328,6 +380,7 @@ class GroupSpecs:
 
     @property
     def definition(self) -> str:
+        """Return string definition of group, as would be given by user."""
         out = self.name
         for spec in self.ordered_specs:
             value = getattr(self, spec)
@@ -346,6 +399,7 @@ class GroupSpecs:
     def get_value_strategy(
         self, for_pattern: bool = False, for_filename: bool = False
     ) -> st.SearchStrategy:
+        """Return strategy of appropriate values for this group."""
         if "rgx" in self:
             exclude = build_exclude(for_pattern=for_pattern, for_filename=for_filename)
             alphabet = st.characters(
@@ -370,6 +424,10 @@ class GroupSpecs:
         )
 
     def get_value_str(self, value: t.Any) -> str:
+        """Format value into string.
+
+        Take rgx, bool and fmt specs into account.
+        """
         if "rgx" in self:
             return value
         if "bool_elts" in self:
@@ -381,19 +439,25 @@ class GroupSpecs:
 
 @dataclass
 class GroupValue(GroupSpecs):
+    """Store group specs and one accompanying value."""
+
     value: t.Any = None
 
     @property
     def value_str(self) -> str:
+        """Formatted value."""
         return self.get_value_str(self.value)
 
 
 @dataclass
 class GroupValues(GroupSpecs):
+    """Store group specs and multiple accompanying values."""
+
     values: list[t.Any] = field(default_factory=list)
 
     @property
     def values_str(self) -> list[str]:
+        """Formatted values."""
         return [self.get_value_str(v) for v in self.values]
 
 
@@ -405,6 +469,11 @@ class StGroup:
 
     @classmethod
     def name(cls, parsable: bool = False) -> st.SearchStrategy[str]:
+        """Strategy for group name.
+
+        If parsable is True, exclude group defaults names (this generator has no
+        knowledge of them).
+        """
         strat = st.text(
             alphabet=st.characters(
                 exclude_categories=["C"],
@@ -508,7 +577,7 @@ class StGroup:
     def _group(
         cls,
         group_type: type[G],
-        ignore: list[str] | None = None,
+        ignore: abc.Sequence[str] | None = None,
         fmt_kind: str = "sdfeE",
         parsable: bool = False,
         for_filename: bool = False,
@@ -522,7 +591,6 @@ class StGroup:
         flags = set(["opt", "discard"]) - set(ignore)
 
         if parsable:
-            # s format is really that impossible ?
             fmt_kind = fmt_kind.replace("s", "")
 
         @st.composite
@@ -538,20 +606,27 @@ class StGroup:
             chosen = draw(spec_strat)
 
             if parsable:
-                if ("fmt" in chosen or "bool_elts" in chosen) and "rgx" in chosen:
+                # There is no guarantee that the rgx is compatible with values
+                # chosen and formatted by bool or fmt.
+                if "rgx" in chosen and ("fmt" in chosen or "bool_elts" in chosen):
                     chosen.remove("rgx")
 
             if flags:
                 chosen += draw(
                     st.lists(
-                        st.sampled_from(list(flags)), unique=True, max_size=len(flags)
+                        st.sampled_from(list(flags)),
+                        unique=True,
+                        min_size=0,
+                        max_size=len(flags),
                     )
                 )
 
             args: dict[str, t.Any] = {}
             args["name"] = draw(cls.name(parsable=parsable))
 
-            to_draw = list(chosen)
+            chosen_ordered = draw(st.permutations(chosen))
+            to_draw = list(chosen_ordered)
+            # We need to draw some by hand
             if "fmt" in chosen:
                 args["fmt_struct"] = draw(
                     cls.fmt(kind=fmt_kind, for_filename=for_filename)
@@ -572,7 +647,7 @@ class StGroup:
             for spec in to_draw:
                 args[spec] = draw(getattr(cls, spec)())
 
-            return group_type(**args, ordered_specs=chosen)
+            return group_type(**args, ordered_specs=chosen_ordered)
 
         return strat(fmt_kind)
 
@@ -591,7 +666,8 @@ class StGroup:
             Kinds of format to generate.
         parsable:
             If true, group is made to be able to generate a value and parse it back.
-            Spec `rgx` is removed if `bool` or `fmt` is present.
+            Spec `rgx` is removed if `bool` or `fmt` is present. No format of type 's'
+            is generated.
         """
         return cls._group(GroupValue, **kwargs)
 
@@ -632,6 +708,8 @@ class StGroup:
 
 @dataclass
 class PatternSpecs:
+    """Store information on a full pattern."""
+
     segments: list[str]
     groups: abc.Sequence[GroupSpecs]
 
@@ -643,6 +721,8 @@ class PatternSpecs:
 
 @dataclass
 class PatternValue(PatternSpecs):
+    """Store information on a full pattern. Each group hold one value."""
+
     groups: abc.Sequence[GroupValue]
 
     @property
@@ -656,6 +736,8 @@ class PatternValue(PatternSpecs):
 
 @dataclass
 class PatternValues(PatternSpecs):
+    """Store information on a full pattern. Each group hold multiple values."""
+
     groups: abc.Sequence[GroupValues]
 
     @property

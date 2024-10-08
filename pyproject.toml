@@ -75,6 +75,7 @@ select = [
 
 ignore = [
        'E226', # missing whitespace around arithmetic operator
+       'D105', # missing docstring for magical method
        'D204', # one blank line after class
        'D213', # multiline docstring start at 2nd line
        'D417', # not all parameters need doc

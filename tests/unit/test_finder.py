@@ -66,11 +66,12 @@ def test_get_groups(ref: PatternSpecs):
         max_size=MAX_TEXT_SIZE,
     ),
 )
-def test_finder_str(ref: PatternSpecs, root: str):
+def test_finder_repr(ref: PatternSpecs, root: str):
     f = Finder(root, ref.pattern)
-    lines = str(f).splitlines()
-    assert lines[0] == f"root: {root}"
-    assert lines[1] == f"pattern: {ref.pattern}"
+    lines = repr(f).splitlines()
+    assert lines[0] == "Finder"
+    assert lines[1] == f"root: {root}"
+    assert lines[2] == f"pattern: {ref.pattern}"
     assert lines[-1] == "not scanned"
 
 
@@ -471,7 +472,7 @@ def test_file_scan(fs: FakeFilesystem, ref: PatternValues):
         assert f == f_ref
 
     # Check str/repr
-    lines = str(finder).splitlines()
+    lines = repr(finder).splitlines()
     assert lines[-1] == f"scanned: found {len(files)} files"
 
 

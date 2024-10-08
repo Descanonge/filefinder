@@ -30,8 +30,7 @@ class _FilterUserFunc(t.Protocol):
 
     def __call__(
         self, finder: "Finder", filename: str, matches: Matches, **kwargs: t.Any
-    ) -> bool:
-        ...
+    ) -> bool: ...
 
 
 FilterPartial = abc.Callable[["Finder", str, Matches], bool]
@@ -150,7 +149,10 @@ class Finder:
 
     def __str__(self) -> str:
         """Human readable information (short)."""
-        return f"{self.__class__.__qualname__}: {self.root.rstrip('/')}/ {self.get_regex()}"
+        return (
+            f"{self.__class__.__qualname__}: "
+            f"{self.root.rstrip('/')}/ {self.get_regex()}"
+        )
 
     def set_scan_everything(self, scan_everything: bool, /) -> None:
         """Set value for attribute :attr:`scan_everything`.
@@ -646,9 +648,9 @@ class Finder:
         pattern = re.compile(self.get_regex())
 
         for dirpath, dirnames, filenames in os.walk(self.root):
-            depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
+            depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(os.sep).count(
                 os.sep
-            ).count(os.sep)
+            )
             logger.debug(
                 "Scanning in %s (depth %d/%d)", dirpath, depth, self.max_scan_depth
             )
@@ -675,9 +677,9 @@ class Finder:
         subpatterns = [re.compile(rgx) for rgx in self.get_regex_subdirs()]
         maxdepth = len(subpatterns) - 1
         for dirpath, dirnames, filenames in os.walk(self.root):
-            depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
+            depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(os.sep).count(
                 os.sep
-            ).count(os.sep)
+            )
             pattern = subpatterns[depth]
 
             logger.debug(

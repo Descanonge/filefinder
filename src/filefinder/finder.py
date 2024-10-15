@@ -66,6 +66,13 @@ class Finder:
     date_is_first_class: bool = True
     """If True, the group name 'date' is considered special."""
 
+    _group_delimiters: tuple[str, str, str] = ("%", "(", ")")
+    """Delimiter characters of groups in the pattern.
+
+    Tuple of (prefix, start characters, end characters).
+    Start and end character must be balanced within the group.
+    """
+
     def __init__(
         self,
         root: str,
@@ -558,36 +565,64 @@ class Finder:
         """Set pattern and parse for group objects."""
         self._void_cache()
         self._pattern = pattern
-        groups_starts = [m.start() + 1 for m in re.finditer(r"%\(", pattern)]
 
-        # This finds the matching end parenthesis for each group start
+        found_groups = self._find_groups(pattern)
+
         self.groups = []
         splits = [0]  # separation between groups
-        for idx, start in enumerate(groups_starts):
-            end = None
-            level = 1
-            for i, c in enumerate(pattern[start + 1 :]):
-                if c == "(":
-                    level += 1
-                elif c == ")":
-                    level -= 1
-                    if level == 0:  # matching parenthesis
-                        end = start + i + 1
-                        break
-
-            if end is None:  # did not find matching parenthesis :(
-                end = start + 6
-                substr = pattern[start - 1 : end]
-                if end < len(self._pattern):
-                    substr += "..."
-                raise ValueError(f"No group end found for '{substr}'")
-
-            self.groups.append(Group(pattern[start + 1 : end], idx))
-            splits += [start - 1, end + 1]  # -1 removes the %
+        for idx, (specs, start, end) in enumerate(found_groups):
+            self.groups.append(Group(specs, idx))
+            splits += [start, end]
 
         self._segments = [
             pattern[i:j] for i, j in zip(splits, splits[1:] + [None], strict=False)
         ]
+
+    def _find_groups(self, pattern: str) -> list[tuple[str, int, int]]:
+        """Find the groups within pattern and the corresponding string indices.
+
+        * The returned indices should be sorted in order of appearance in the pattern.
+        * The indices should correspond to the first and last character of the group,
+          including the delimiter characters.
+        * On the contrary, the string specification of the group should not include them.
+
+        This implementation finds the matching pair defined by the attribute
+        :attr:`_group_delimiters`. A match of the start of a group that does not have a
+        matching end will raise.
+        """
+        grp_prefix, grp_start, grp_end = self._group_delimiters
+        pattern_starts = re.escape(f"{grp_prefix}{grp_start}")
+        find_next = re.compile(f"({re.escape(grp_start)}|{re.escape(grp_end)})")
+
+        groups_starts = [m.start() for m in re.finditer(pattern_starts, pattern)]
+
+        output = []
+        # This finds the matching end characters for each group start
+        for start in groups_starts:
+            end = None
+            level = 1
+            start_spec = start + len(grp_prefix) + len(grp_start)
+            for m in find_next.finditer(pattern, pos=start_spec):
+                if m.group() == grp_start:
+                    level += 1
+                elif m.group() == grp_end:
+                    level -= 1
+                    if level == 0:  # matching parenthesis
+                        end = m.end()
+                        end_spec = end - len(grp_end)
+                        assert end_spec > 0
+                        break
+
+            if end is None:  # did not find matching parenthesis :(
+                end = start + 6
+                substr = pattern[start:end]
+                if end < len(self._pattern):
+                    substr += "..."
+                raise ValueError(f"No group end found for '{substr}'")
+
+            output.append((pattern[start_spec:end_spec], start, end))
+
+        return output
 
     def _get_regex(self) -> str:
         segments = self._segments.copy()
@@ -648,9 +683,9 @@ class Finder:
         pattern = re.compile(self.get_regex())
 
         for dirpath, dirnames, filenames in os.walk(self.root):
-            depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(os.sep).count(
+            depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
                 os.sep
-            )
+            ).count(os.sep)
             logger.debug(
                 "Scanning in %s (depth %d/%d)", dirpath, depth, self.max_scan_depth
             )
@@ -677,9 +712,9 @@ class Finder:
         subpatterns = [re.compile(rgx) for rgx in self.get_regex_subdirs()]
         maxdepth = len(subpatterns) - 1
         for dirpath, dirnames, filenames in os.walk(self.root):
-            depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(os.sep).count(
+            depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
                 os.sep
-            )
+            ).count(os.sep)
             pattern = subpatterns[depth]
 
             logger.debug(

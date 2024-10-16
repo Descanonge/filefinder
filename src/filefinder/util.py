@@ -1,6 +1,5 @@
 """General utilities."""
 
-from collections import abc
 from datetime import date, datetime, timedelta
 
 from .group import Group, GroupKey

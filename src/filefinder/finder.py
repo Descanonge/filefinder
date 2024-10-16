@@ -4,6 +4,7 @@
 # (http://github.com/Descanonge/filefinder) and subject
 # to the MIT License as defined in the file 'LICENSE',
 # at the root of this project. © 2021 Clément Haëck
+import datetime
 import itertools
 import logging
 import os
@@ -11,11 +12,10 @@ import re
 import typing as t
 from collections import abc
 from copy import copy
-from datetime import datetime
 
-from .filters import FilterDateFunc, FilterFunc, FilterGroupFunc, FilterList
+from .filters import FilterList, UserFunc, UserFuncDate, UserFuncGroup
 from .group import Group, GroupKey
-from .matches import Matches
+from .matches import DefaultDate, Matches
 from .util import datetime_to_value, get_groups_indices
 
 logger = logging.getLogger(__name__)
@@ -277,7 +277,7 @@ class Finder:
             if not fix_discard and m.discard:
                 continue
             if key == "date" and self.date_is_first_class:
-                if not isinstance(value, datetime):
+                if not isinstance(value, datetime.datetime):
                     raise TypeError(
                         "If key is date, value must be a date or datetime object."
                     )
@@ -330,14 +330,15 @@ class Finder:
 
             # if date only remove 'date' filters, not its elements
             if key == "date" and self.date_is_first_class:
-                self.filters.remove_by_group("date")
+                self.filters.remove_by_date()
                 continue
 
-            self.filters.remove_by_group(key)
+            indices = [g.idx for g in groups]
+            self.filters.remove_by_group(indices)
 
         self._void_cache()
 
-    def add_filter(self, func: FilterFunc, name: str | None = None, **kwargs: t.Any):
+    def add_filter(self, func: UserFunc, **kwargs: t.Any):
         """Add a filter with which to select scanned files.
 
         See :ref:`filtering` for details.
@@ -346,13 +347,10 @@ class Finder:
         ----------
         func: ~collections.abc.Callable[[Finder, str, Matches, ...], bool]
             Callable that returns True if the file is to be kept, False otherwise.
-        name
-            Name of the filter, if not specified, the function name of *func* will be
-            used.
         kwargs
             Will be passed to the function when executed.
         """
-        filt = self.filters.add(func, name=name, **kwargs)
+        filt = self.filters.add(func, **kwargs)
 
         if self.scanned:
             self._files = [(f, m) for f, m in self._files if filt.execute(self, f, m)]
@@ -365,9 +363,9 @@ class Finder:
     def fix_by_filter(
         self,
         key: GroupKey,
-        func: FilterGroupFunc | FilterDateFunc,
-        name: str | None = None,
+        func: UserFuncGroup | UserFuncDate,
         fix_discard: bool = False,
+        default_date: DefaultDate = None,
         pass_unparsed: bool = False,
         **kwargs,
     ):
@@ -392,29 +390,29 @@ class Finder:
             A function that take the parsed value of the group and returns True if the
             corresponding file should be kept, or False otherwise. If multiple groups
             correspond to the key, **all** values will be tested.
-        name
-            Name of the filter, if not specified, the function name of *func* will be
-            used.
         fix_discard
             If True, also use groups values with the *discard* flag. Default is False.
         pass_unparsed
             If True, and if the group cannot parse the string the pass the unparsed
             string to the predicate function `func` anyway. If False the file will not
             be kept if the group cannot parse the string. Default is False.
+        default_date
+            Passed to :func:`.library.get_date`.
         kwargs
-            Can be passed to some intermediary function, like library.get_date if the
-            key is 'date'.
+            Will be passed to the function.
         """
         if key == "date" and self.date_is_first_class:
-            self.filters.add_by_date(func, name=name, **kwargs)  # type: ignore[arg-type]
-        else:
-            self.filters.add_by_group(
-                func,  # type: ignore[arg-type]
-                name=name,
-                fix_discard=fix_discard,
-                pass_unparsed=pass_unparsed,
-                **kwargs,
-            )
+            self.filters.add_by_date(func, default_date=default_date, **kwargs)  # type: ignore[arg-type]
+            return
+
+        indices = get_groups_indices(self.groups, key)
+        self.filters.add_by_group(
+            func,
+            indices,
+            fix_discard=fix_discard,
+            pass_unparsed=pass_unparsed,
+            **kwargs,
+        )
 
     def _make_matches(
         self, filename: str, pattern: str | re.Pattern | None = None
@@ -619,9 +617,7 @@ class Finder:
     def _add_file(self, filename: str, pattern: re.Pattern):
         """Add file if it matches pattern and pass filters."""
         matches = self._make_matches(filename, pattern)
-        if matches is not None and all(
-            filt.execute(self, filename, matches) for filt in self.filters
-        ):
+        if matches is not None and self.filters.is_valid(self, filename, matches):
             self._files.append((filename, matches))
 
     def _find_files_scan_everything(self) -> None:
@@ -712,8 +708,7 @@ class Finder:
         Parameters
         ----------
         key: int, str, or list of int
-            Can be group index, name, or group+name combination with the
-            syntax: 'group:name'.
+            Can be group index or name.
 
         Returns
         -------

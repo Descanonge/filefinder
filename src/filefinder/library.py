@@ -16,7 +16,9 @@ from .util import date_from_doy, name_to_date
 logger = logging.getLogger(__name__)
 
 
-def get_date(matches: Matches, default_date: dict | None = None) -> dt.datetime:
+def get_date(
+    matches: Matches, default_date: abc.Mapping[str, int] | None = None
+) -> dt.datetime:
     """Retrieve date from matched elements.
 
     Matches that can be used are : YBmdjHMSFxX. If a matcher is *not* found in the

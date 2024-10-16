@@ -5,11 +5,11 @@
 # to the MIT License as defined in the file 'LICENSE',
 # at the root of this project. © 2021 Clément Haëck
 
+import datetime
 import logging
 import re
 import typing as t
 from collections import abc
-from datetime import datetime
 
 from .group import Group, GroupKey
 from .util import Sentinel, get_groups_indices
@@ -21,6 +21,8 @@ PARSE_FAIL = Sentinel("Could not parse")
 """The match string could not be parsed successfully."""
 NOT_PARSED = Sentinel("Not yet parsed")
 """The match string has not been parsed yet."""
+
+DefaultDate = datetime.datetime | abc.Mapping[str, int] | None
 
 
 class Match:
@@ -265,9 +267,7 @@ class Matches:
             matches = [m for m in matches if not m.group.discard]
         return matches
 
-    def get_date(
-        self, default_date: datetime | abc.Mapping[str, int] | None = None
-    ) -> datetime:
+    def get_date(self, default_date: DefaultDate = None) -> datetime.datetime:
         """Retrieve date from matched elements.
 
         Matches that can be used are : YBmdjHMSFxX. If a matcher is *not* found in the
@@ -284,7 +284,7 @@ class Matches:
         """
         from filefinder.library import get_date
 
-        if isinstance(default_date, datetime):
+        if isinstance(default_date, datetime.datetime):
             default_date = {
                 attr: getattr(default_date, attr)
                 for attr in ["year", "month", "day", "hour", "minute", "second"]

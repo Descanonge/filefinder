@@ -107,13 +107,3 @@ def get_groups_indices(
         return selected
 
     raise TypeError("Key must be int or str.")
-
-
-def get_unique_name(name: str, existing: abc.Container[str]) -> str:
-    """Return string starting with *name* and not contained in *existing*."""
-    i = 0
-    r_name = f"{name}__{i}"
-    while r_name in existing:
-        i += 1
-        r_name = f"{name}__{i}"
-    return r_name

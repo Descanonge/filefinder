@@ -425,7 +425,7 @@ class Finder:
             matches.date_is_first_class = self.date_is_first_class
         return matches
 
-    def find_matches(self, filename: str, relative: bool = True) -> Matches | None:
+    def get_matches(self, filename: str, relative: bool = True) -> Matches | None:
         """Find matches for a given filename.
 
         Apply regex to `filename` and return the results as a :class:`~.matches.Matches`
@@ -449,6 +449,9 @@ class Finder:
             filename = self.get_relative(filename)
 
         return self._make_matches(filename)
+
+    find_matches = get_matches
+    """Alias for :meth:`get_matches`."""
 
     def make_filename(
         self,

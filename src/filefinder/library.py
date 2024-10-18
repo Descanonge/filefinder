@@ -45,7 +45,7 @@ def get_date(
         "hour": 0,
         "minute": 0,
         "second": 0,
-    } | default_date
+    } | dict(default_date)
 
     # list of values found in the matches: year, month, ...
     elts: dict[str, list[int]] = {}

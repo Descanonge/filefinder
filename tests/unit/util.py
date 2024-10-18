@@ -624,6 +624,7 @@ class StGroup:
             args: dict[str, t.Any] = {}
             args["name"] = draw(cls.name(parsable=parsable))
 
+            # Randomize order
             chosen_ordered = draw(st.permutations(chosen))
             to_draw = list(chosen_ordered)
             # We need to draw some by hand

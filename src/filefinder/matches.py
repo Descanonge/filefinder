@@ -26,26 +26,34 @@ DefaultDate = datetime.datetime | abc.Mapping[str, int] | None
 
 
 class Match:
-    """Match extract from a filename.
+    """Match extract from a filename."""
 
-    Parameters
-    ----------
-    group
-        Group used to get this match.
-    match
-        Match object for the complete filename.
-    idx
-        Index of the group in the match object.
-    """
+    @classmethod
+    def from_match(cls, group: Group, match: re.Match, idx: int) -> "Match":
+        """Return Match object from a re.Match object.
 
-    def __init__(self, group: Group, match: re.Match, idx: int):
+        Parameters
+        ----------
+        group
+            Group used to get this match.
+        match
+            Match object for the complete filename.
+        idx
+            Index of the group in the match object.
+        """
+        match_str = match.group(idx + 1)
+        start = match.start(idx + 1)
+        end = match.end(idx + 1)
+        return cls(group, match_str, start, end)
+
+    def __init__(self, group: Group, match_str: str, start: int, end: int):
         self.group: Group = group
         """Group used to get this match."""
-        self.match_str: str = match.group(idx + 1)
+        self.match_str: str = match_str
         """String matched in the filename."""
-        self.start: int = match.start(idx + 1)
+        self.start: int = start
         """Start index of match in the filename."""
-        self.end: int = match.end(idx + 1)
+        self.end: int = end
         """End index of match in the filename."""
         self._parsed: t.Any | Sentinel = NOT_PARSED
 
@@ -154,18 +162,17 @@ class Matches:
                 "Does one of the group regex contains a capturing group ?"
             )
 
-        return cls(m, groups)
+        matches = [Match.from_match(grp, m, i) for i, grp in enumerate(groups)]
 
-    def __init__(self, match: re.Match, groups: abc.Sequence[Group]):
-        self.matches: list[Match] = []
+        return cls(matches, groups)
+
+    def __init__(self, matches: abc.Sequence[Match], groups: abc.Sequence[Group]):
+        assert len(matches) == len(groups)
+
+        self.matches: list[Match] = list(matches)
         """Matches for a single filename."""
         self.groups: list[Group] = list(groups)
         """Groups used."""
-
-        assert len(match.groups()) == len(groups)
-
-        for i in range(len(groups)):
-            self.matches.append(Match(groups[i], match, i))
 
         self.date_is_first_class: bool = True
 

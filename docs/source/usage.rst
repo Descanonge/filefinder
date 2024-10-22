@@ -129,10 +129,16 @@ Using regular expressions makes for a very efficient way to find files that
 follow a specific pattern. However, they cannot deal with advanced logic with
 which one might want to select the files. Thus, **after** being "validated" by
 the pattern (and its eventual fixed groups) a file can be subjected to any
-number of filters. Each filter is a function (or any other callable) with the
-following signature:
+number of filters. They are three kinds of filters available:
 
-.. py:function:: filter_signature(finder, filename, matches, **kwargs)
+- basic filters
+- group filters
+- date filters
+
+A basic filter is a function has the following signature:
+
+.. py:function:: basic_filter(finder, filename, matches, **kwargs)
+    :no-index:
 
     :param Finder finder: The finder object.
     :param str filename: The filename to keep or discard.
@@ -140,13 +146,17 @@ following signature:
     :param ~typing.Any kwargs: Additional keywords passed to the filter.
 
     :returns: True if `filename` is to be kept, False otherwise.
-    :rtype: bool
 
 
 Any number of filters can be added using :meth:`Finder.add_filter`. They will be
 applied to each file, in the order they were added. If any filter discards the
 file (*ie* it returns False), the file will not be kept (and the next filters
 won't run).
+
+.. important::
+
+   Adding a new filter will filter the files already scanned, and removing
+   filters will void the cache.
 
 .. note::
 
@@ -156,24 +166,9 @@ won't run).
      finder.add_filter(some_filter, value=1.)
      finder.add_filter(some_filter, value=3.5)
 
-.. important::
-
-   Adding a new filter will filter the files already scanned, and clearing the
-   filters will void the cache.
-
-.. note:: Implementation detail
-
-    Filters are kept in a dictionary and can be cleared with
-    :meth:`.Finder.clear_filters`. If no explicit name is given to *add_filter*
-    the name of the callable is used (``func.__name___``) and made unique to
-    avoid key clashes.
-
-
-Very often, it can suffice to have a filter operate on a single group. To that
-end, one can use :meth:`Finder.fix_by_filter` where the filter is a function
-that act only on the parsed value of a group. If there are multiple groups with
-the same name, all values found in the filename will pass through the filter
-successively.
+Very often, it can suffice to have a filter operate on the value from a single
+group. To that end, one can use :meth:`Finder.fix_by_filter` that only requires
+a function that act on a single value.
 
 For instance, let's say we only need days that are even::
 
@@ -183,9 +178,21 @@ or only where some parameters starts with a specific value::
 
     finder.fix_by_filter("param", lambda s: s.startswith("useful_"))
 
-A group can be fixed with any number of filters, and to a value as well as
-described :ref:`above<fix-groups>`. When unfixing a group, its associated
+Multiple groups can be tied to a same filter, for instance if there are multiple
+groups with the same name. Its function will successively run for all the values
+parsed from these groups (except those marked as :ref:`discard`).
+
+Conversely a group can be fixed with any number of filters *as well as* to a
+value (see :ref:`above<fix-groups>`). When unfixing a group, its associated
 filters will be removed as well.
+
+If the given group to *fix_by_filter* is "date", then the filter function will
+receive a :class:`~datetime.datetime` object obtained from all relevant matches.
+These filters differ from group filters in that individual groups cannot be
+removed from it, as date filters act on all matches. The whole date filter has
+to be removed.
+
+See the next section for more information on the "date" group exception.
 
 .. note::
 
@@ -200,21 +207,17 @@ filters will be removed as well.
    not as useful since the addition of *fix_by_filter* and "date" as first
    class citizen (see below).
 
-.. note:: Implementation details
-
-   Group filters are actually wrapped in a "normal" filter. Their name reflect
-   the key they have been fixed to (group index or name), and are made unique.
-
 
 .. _dates:
 
 Special case: dates
 +++++++++++++++++++
 
-When working with dates, it is necessary to deal with different elements. The
-package tries to make it easier by attributing a special meaning to the group
-key **"date"**. For instance, if passed to *fix_group(s)*, all the time-related
-groups will be fixed from a single :class:`~datetime.datetime` object::
+When working with dates, it is necessary to deal with multiple individual
+elements: year, month, day, etc. The package tries to make this easier by
+attributing a special meaning to the group key **"date"**. For instance, if
+passed to *fix_group*, all the time-related groups will be fixed from a
+single :class:`~datetime.datetime` object::
 
     >>> finder = Finder("", "%(Y)/%(m)/%(var:fmt=s)_%(Y)-%(j).ext")
     >>> finder.fix_group("date", datetime(2018, 2, 1))
@@ -228,7 +231,7 @@ will receive a datetime object constructed from the matches in the filename::
     finder.fix_by_filter("date", lambda d: d > datetime(2018, 6, 15))
 
 In this example we only select files corresponding to dates after the 15th of
-june. We also selected the year 2018 with a "traditionnal" value-fix.
+june. We also selected the year 2018 with a "traditional" value-fix.
 
 .. note::
 

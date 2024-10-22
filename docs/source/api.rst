@@ -15,6 +15,7 @@ API References
    :toctree: _api
 
    finder
+   filters
    format
    group
    library

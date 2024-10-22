@@ -12,7 +12,18 @@ if t.TYPE_CHECKING:
 
 
 class UserFunc(t.Protocol):
-    """Signature of function that can be supplied to be used as a filter."""
+    """Signature of function that can be supplied to be used as a filter.
+
+    .. py:function:: basic_filter(finder, filename, matches, **kwargs)
+        :no-index:
+
+        :param Finder finder: The finder object.
+        :param str filename: The filename to keep or discard.
+        :param Matches matches: The matches associated to this filename.
+        :param ~typing.Any kwargs: Additional keywords passed to the filter.
+
+        :returns: True if `filename` is to be kept, False otherwise.
+    """
 
     def __call__(  # noqa: D102
         self, finder: "Finder", filename: str, matches: Matches, **kwargs
@@ -20,19 +31,36 @@ class UserFunc(t.Protocol):
 
 
 class UserFuncGroup(t.Protocol):
-    """Signature of function that can used as a filter for specific groups."""
+    """Signature of function that can used as a filter for specific groups.
+
+    .. py:function:: group_filter(value, **kwargs)
+        :no-index:
+
+        :param ~typing.Any value: The value parsed.
+        :param ~typing.Any kwargs: Additional keywords passed to the filter.
+
+        :returns: True if the file is to be kept, False otherwise.
+    """
 
     def __call__(self, __value: t.Any, **kwargs) -> bool: ...  # noqa: D102
 
 
 class UserFuncDate(UserFuncGroup, t.Protocol):
-    """Signature of function that can used as a filter for the date pseudo-group."""
+    """Signature of function that can used as a filter for the date pseudo-group.
+
+    .. py:function:: date_filter(date, default_date=None, **kwargs)
+        :no-index:
+
+        :param datetime.date date: The date parsed.
+        :param datetime.date | ~collections.abc.Mapping[str, int] | None default_date:
+            The date elements to use as defaults.
+        :param ~typing.Any kwargs: Additional keywords passed to the filter.
+
+        :returns: True if the file is to be kept, False otherwise.
+    """
 
     def __call__(  # noqa: D102
-        self,
-        __date: datetime.date,
-        default_date: datetime.datetime | abc.Mapping[str, int] | None = None,
-        **kwargs,
+        self, __date: datetime.date, default_date: DefaultDate = None, **kwargs
     ) -> bool: ...
 
 

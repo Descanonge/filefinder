@@ -353,7 +353,7 @@ class Finder:
         filt = self.filters.add(func, **kwargs)
 
         if self.scanned:
-            self._files = [(f, m) for f, m in self._files if filt.execute(self, f, m)]
+            self._files = [(f, m) for f, m in self._files if filt.is_valid(self, f, m)]
 
     def clear_filters(self) -> None:
         """Remove all filters."""

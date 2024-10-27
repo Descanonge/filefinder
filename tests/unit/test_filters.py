@@ -7,8 +7,6 @@ from filefinder.filters import Filter, FilterByDate, FilterByGroup, FilterList
 from filefinder.group import Group
 from filefinder.matches import Match, Matches
 
-# No unit testing for individual filters
-
 
 def get_filter_func(name: str) -> abc.Callable[..., bool]:
     def user_func(*args, **kwargs):
@@ -20,20 +18,30 @@ def get_filter_func(name: str) -> abc.Callable[..., bool]:
 
 class TestFilterList:
     def test_list(self):
+        """Test containerish methods."""
         filters = FilterList()
         f1 = filters.add(get_filter_func("1"))
         f2 = filters.add(get_filter_func("2"))
         f3 = filters.add(get_filter_func("3"))
 
+        # __len__
         assert len(filters) == 3
 
+        # __getitem__
         assert filters[0] == f1
         assert filters[1] == f2
         assert filters[2] == f3
 
+        # __contains__
+        assert f1 in filters
+        assert f3 in filters
+        assert None not in filters
+
+        # __iter__
         for ref, filt in zip([f1, f2, f3], filters, strict=False):
             assert ref == filt
 
+        # clear
         filters.clear()
         assert len(filters) == 0
 

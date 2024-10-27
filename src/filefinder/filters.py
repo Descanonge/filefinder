@@ -208,7 +208,7 @@ class FilterByDate(Filter):
 class FilterList:
     """Container for filters.
 
-    Has minimal interface: ``__getitem__``, ``__len__``, ``__iter__``.
+    Has minimal interface: ``__getitem__``, ``__len__``, ``__iter__``, ``__contains__``
     """
 
     filters: list[Filter]
@@ -225,6 +225,9 @@ class FilterList:
 
     def __iter__(self) -> abc.Iterator[Filter]:
         return iter(self.filters)
+
+    def __contains__(self, x: t.Any) -> bool:
+        return x in self.filters
 
     def __str__(self) -> str:
         return " ".join(map(str, self.filters))

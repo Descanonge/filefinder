@@ -406,13 +406,15 @@ class Finder:
             return
 
         indices = get_groups_indices(self.groups, key)
-        self.filters.add_by_group(
+        filt = self.filters.add_by_group(
             func,
             indices,
             fix_discard=fix_discard,
             pass_unparsed=pass_unparsed,
             **kwargs,
         )
+        if self.scanned:
+            self._files = [(f, m) for f, m in self._files if filt.is_valid(self, f, m)]
 
     def _make_matches(
         self, filename: str, pattern: str | re.Pattern | None = None

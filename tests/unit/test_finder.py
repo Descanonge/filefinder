@@ -1,9 +1,8 @@
 """Test main features."""
 
-import itertools
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from os import path
 
 import pytest
@@ -13,11 +12,11 @@ from pyfakefs.fake_filesystem import FakeFilesystem
 from util import (
     MAX_CODEPOINT,
     MAX_TEXT_SIZE,
+    FilesDefinition,
     PatternSpecs,
     PatternValue,
     PatternValues,
     StPattern,
-    setup_files,
     time_segments,
 )
 
@@ -33,120 +32,174 @@ def assert_pattern(pattern: str, regex: str):
     assert finder.get_regex() == regex
 
 
-@given(ref=StPattern.pattern(separate=False))
-def test_group_names(ref: PatternSpecs):
-    """Test that we retain group names, and the correct number of groups."""
-    f = Finder("", ref.pattern)
-    assert f.n_groups == len(f.groups) == len(ref.groups)
+class TestFinderStructure:
+    @given(ref=StPattern.pattern(separate=False))
+    def test_group_names(self, ref: PatternSpecs):
+        """Test that we retain group names, and the correct number of groups."""
+        f = Finder("", ref.pattern)
+        assert f.n_groups == len(f.groups) == len(ref.groups)
 
-    for i in range(f.n_groups):
-        assert f.groups[i].name == ref.groups[i].name
+        for i in range(f.n_groups):
+            assert f.groups[i].name == ref.groups[i].name
 
+    @given(ref=StPattern.pattern(separate=False))
+    def test_get_groups(self, ref: PatternSpecs):
+        """Test that Finder.get_groups return the correct indices given a group name."""
+        f = Finder("", ref.pattern)
 
-@given(ref=StPattern.pattern(separate=False))
-def test_get_groups(ref: PatternSpecs):
-    """Test that Finder.get_groups return the correct indices given a group name."""
-    f = Finder("", ref.pattern)
+        names = set(g.name for g in ref.groups)
 
-    names = set(g.name for g in ref.groups)
+        for name in names:
+            indices_ref = [i for i, g in enumerate(ref.groups) if g.name == name]
+            indices = [g.idx for g in f.get_groups(name)]
+            assert indices_ref == indices
 
-    for name in names:
-        indices_ref = [i for i, g in enumerate(ref.groups) if g.name == name]
-        indices = [g.idx for g in f.get_groups(name)]
-        assert indices_ref == indices
-
-
-@given(
-    ref=StPattern.pattern(separate=False),
-    root=st.text(
-        alphabet=st.characters(
-            exclude_categories=["C"],
-            max_codepoint=MAX_CODEPOINT,
+    @given(
+        ref=StPattern.pattern(separate=False),
+        root=st.text(
+            alphabet=st.characters(
+                exclude_categories=["C"],
+                max_codepoint=MAX_CODEPOINT,
+            ),
+            max_size=MAX_TEXT_SIZE,
         ),
-        max_size=MAX_TEXT_SIZE,
-    ),
-)
-def test_finder_repr(ref: PatternSpecs, root: str):
-    f = Finder(root, ref.pattern)
-    lines = repr(f).splitlines()
-    assert lines[0] == "Finder"
-    assert lines[1] == f"root: {root}"
-    assert lines[2] == f"pattern: {ref.pattern}"
-    assert lines[-1] == "not scanned"
+    )
+    def test_finder_repr(self, ref: PatternSpecs, root: str):
+        f = Finder(root, ref.pattern)
+        lines = repr(f).splitlines()
+        assert lines[0] == "Finder"
+        assert lines[1] == f"root: {root}"
+        assert lines[2] == f"pattern: {ref.pattern}"
+        assert lines[-1] == "not scanned"
+
+    def test_group_parenthesis(self):
+        """Test if parenthesis are correctly matched in group definitions.
+
+        Test if unbalanced parentheses in group def raise.
+        Test if adding a group in regex causes issues.
+        """
+
+        def test(pattern: str):
+            Finder("", pattern)
+
+        test("0_%(normal_defintion:fmt=d)")
+        test("0_%(paren(in_name):fmt=0d)")
+        test("0_%(paren_in_bool:bool=(opt1):opt2)")
+        test("0_%(paren_in_rgx:rgx=(?:barr))")
+
+        for pattern in [
+            "0_%(unbalanced(:fmt=d)",
+            "0_%(unbalanced:rgx=(())",
+            "0_%(unbalanced:bool=()",
+        ]:
+            with pytest.raises(ValueError):
+                test(pattern)
+
+        # legal: non-capturing group
+        f = Finder("", "0_%(paren_in_rgx:rgx=(?:barr))")
+        assert f.find_matches("0_barr") is not None
+        # illegal: additional capturing group
+        f = Finder("", "0_%(paren_in_rgx:rgx=(barr))")
+        with pytest.raises(IndexError):
+            f.find_matches("0_barr")
 
 
-@given(segments=time_segments(), date=st.datetimes())
-def test_fix_date(segments: list[str], date: datetime):
-    group_names = segments[1::2]
-    for i, name in enumerate(group_names):
-        segments[2 * i + 1] = f"%({name})"
-    pattern = "".join(segments).replace("/", os.sep)
-    finder = Finder("", pattern)
+class TestFinderRegex:
+    def test_custom_regex(self):
+        """Test that a custom regex is conserved.
 
-    finder.fix_group("date", date)
-    # check with dedicated function (untested as of yet)
-    for name in group_names:
-        value = datetime_to_value(date, name)
-        for grp in finder.get_groups(name):
-            assert grp.fixed_value == value
-    # check by hand for simple cases
-    for name in set(group_names) & set("YmdHMS"):
-        for grp in finder.get_groups(name):
-            for elt in name_to_date[name]:
-                assert grp.fixed_value == getattr(date, elt)
+        Tested systematically for groups in test_group.test_random_definitions.
+        Here with test that it still works at the Finder level.
+        """
+        assert_pattern("test_%(Y:rgx=[a-z]*?)", "test_([a-z]*?)")
+        assert_pattern("test_%(Y:fmt=d:rgx=[a-z]*?)", "test_([a-z]*?)")
 
+    def test_format_regex(self):
+        """Test that the correct regex is generated from a format string.
 
-def test_fix_date_wrong():
-    f = Finder("", "%(Y).ext")
-    with pytest.raises(TypeError):
-        f.fix_group("date", 1)
-    with pytest.raises(TypeError):
-        f.fix_group("date", "2010/05/12")
-    with pytest.raises(TypeError):
-        f.fix_group("date", [datetime(2012, 6, 1)])
+        Tested systematically for groups in test_group.test_random_definitions.
+        Here with test that it still works at the Finder level.
+        """
+        assert_pattern("test_%(Y:fmt=d)", r"test_(-?\d+)")
+        assert_pattern("test_%(Y:fmt=a>5d)", r"test_(a*-?\d+)")
+        assert_pattern("test_%(Y:fmt=a<5d)", r"test_(-?\d+a*)")
+        assert_pattern("test_%(Y:fmt=a^5d)", r"test_(a*-?\d+a*)")
+        assert_pattern("test_%(Y:fmt=05.3f)", r"test_(-?0*\d+\.\d{3})")
+        assert_pattern("test_%(Y:fmt=+05.3f)", r"test_([+-]0*\d+\.\d{3})")
+        assert_pattern("test_%(Y:fmt=.2e)", r"test_(-?\d\.\d{2}e[+-]\d{2,3})")
+        assert_pattern("test_%(Y:fmt=.2E)", r"test_(-?\d\.\d{2}E[+-]\d{2,3})")
 
 
-def test_fix_date_collateral():
-    f = Finder("", "%(Y)/%(Y)%(m)%(d)-%(X)_%(param:fmt=.2f)%(option:bool=_yes).ext")
-    f.fix_group("date", datetime(2015, 3, 14, 12, 59, 32))
-    for name in "YmdX":
-        for grp in f.get_groups(name):
-            assert grp.fixed
-    for name in ["param", "option"]:
-        for grp in f.get_groups(name):
-            assert not grp.fixed
+class TestFixDate:
+    @given(segments=time_segments(), date=st.datetimes())
+    def test_fix_date(self, segments: list[str], date: datetime):
+        group_names = segments[1::2]
+        for i, name in enumerate(group_names):
+            segments[2 * i + 1] = f"%({name})"
+        pattern = "".join(segments).replace("/", os.sep)
+        finder = Finder("", pattern)
 
-    f.fix_groups(option=True)
-    f.unfix_groups("date")
-    for name in list("YmdX") + ["param"]:
-        for grp in f.get_groups(name):
-            assert not grp.fixed
-    for grp in f.get_groups("option"):
-        assert grp.fixed
+        finder.fix_group("date", date)
+        # check with dedicated function (untested as of yet)
+        for name in group_names:
+            value = datetime_to_value(date, name)
+            for grp in finder.get_groups(name):
+                assert grp.fixed_value == value
+        # check by hand for simple cases
+        for name in set(group_names) & set("YmdHMS"):
+            for grp in finder.get_groups(name):
+                for elt in name_to_date[name]:
+                    assert grp.fixed_value == getattr(date, elt)
 
+    def test_fix_date_wrong(self):
+        f = Finder("", "%(Y).ext")
+        with pytest.raises(TypeError):
+            f.fix_group("date", 1)
+        with pytest.raises(TypeError):
+            f.fix_group("date", "2010/05/12")
+        with pytest.raises(TypeError):
+            f.fix_group("date", [datetime(2012, 6, 1)])
 
-def test_fix_date_no_firstclass():
-    f = Finder("", "%(Y)/%(Y)%(m)%(d)-%(X)_%(param:fmt=.2f)%(option:bool=_yes).ext")
-    f.date_is_first_class = False
-    with pytest.raises(IndexError):
+    def test_fix_date_collateral(self):
+        f = Finder("", "%(Y)/%(Y)%(m)%(d)-%(X)_%(param:fmt=.2f)%(option:bool=_yes).ext")
         f.fix_group("date", datetime(2015, 3, 14, 12, 59, 32))
+        for name in "YmdX":
+            for grp in f.get_groups(name):
+                assert grp.fixed
+        for name in ["param", "option"]:
+            for grp in f.get_groups(name):
+                assert not grp.fixed
 
-    f = Finder("", "%(Y)/%(Y)%(m)%(d)-%(X)_%(date:fmt=.2f).ext")
-    f.date_is_first_class = False
-    f.fix_group("date", 5.0)
-    for name in "YmdX":
-        for grp in f.get_groups(name):
-            assert not grp.fixed
-    for grp in f.get_groups("date"):
-        assert grp.fixed
+        f.fix_groups(option=True)
+        f.unfix_groups("date")
+        for name in list("YmdX") + ["param"]:
+            for grp in f.get_groups(name):
+                assert not grp.fixed
+        for grp in f.get_groups("option"):
+            assert grp.fixed
 
-    f.fix_groups(Y=2050)
-    f.unfix_groups("date")
-    for name in "mdX":
-        for grp in f.get_groups(name):
-            assert not grp.fixed
-    for grp in f.get_groups("Y"):
-        assert grp.fixed
+    def test_fix_date_no_firstclass(self):
+        f = Finder("", "%(Y)/%(Y)%(m)%(d)-%(X)_%(param:fmt=.2f)%(option:bool=_yes).ext")
+        f.date_is_first_class = False
+        with pytest.raises(IndexError):
+            f.fix_group("date", datetime(2015, 3, 14, 12, 59, 32))
+
+        f = Finder("", "%(Y)/%(Y)%(m)%(d)-%(X)_%(date:fmt=.2f).ext")
+        f.date_is_first_class = False
+        f.fix_group("date", 5.0)
+        for name in "YmdX":
+            for grp in f.get_groups(name):
+                assert not grp.fixed
+        for grp in f.get_groups("date"):
+            assert grp.fixed
+
+        f.fix_groups(Y=2050)
+        f.unfix_groups("date")
+        for name in "mdX":
+            for grp in f.get_groups(name):
+                assert not grp.fixed
+        for grp in f.get_groups("Y"):
+            assert grp.fixed
 
 
 @given(
@@ -203,100 +256,100 @@ def test_matches_str(ref: PatternValue):
         repr(m)
 
 
-@given(ref=StPattern.pattern_value(for_filename=True))
-def test_make_filename_by_str(ref: PatternValue):
-    """Test filename creation using string as fixes.
+class TestMakeFilename:
+    @given(ref=StPattern.pattern_value(for_filename=True))
+    def test_by_str(self, ref: PatternValue):
+        """Test filename creation using string as fixes.
 
-    Check fixing by value is conserved.
-    Check by index. Only run by name (cannot check the expected filename).
-    """
-    f = Finder("/base/", ref.pattern)
-    fixes = {i: grp.value_str for i, grp in enumerate(ref.groups)}
-    # we won't check the output for those
-    fixes_by_name = {grp.name: grp.value_str for grp in ref.groups}
-    assert f.make_filename(fixes, relative=True) == ref.filename
-    f.make_filename(fixes_by_name)
+        Check fixing by value is conserved.
+        Check by index. Only run by name (cannot check the expected filename).
+        """
+        f = Finder("/base/", ref.pattern)
+        fixes = {i: grp.value_str for i, grp in enumerate(ref.groups)}
+        # we won't check the output for those
+        fixes_by_name = {grp.name: grp.value_str for grp in ref.groups}
+        assert f.make_filename(fixes, relative=True) == ref.filename
+        f.make_filename(fixes_by_name)
 
-    if f.n_groups > 0:
-        with pytest.raises(ValueError):
-            f.make_filename()
+        if f.n_groups > 0:
+            with pytest.raises(ValueError):
+                f.make_filename()
 
+    # No s-type formats, strings are not considered values by filefinder
+    @given(ref=StPattern.pattern_value(for_filename=True, fmt_kind="dfeE"))
+    def test_by_val(self, ref: PatternValue):
+        """Test filename creation using values as fixes."""
+        f = Finder("/base/", ref.pattern)
+        fixes = {i: grp.value_str for i, grp in enumerate(ref.groups)}
+        assert f.make_filename(fixes, relative=True) == ref.filename
 
-# No s-type formats, strings are not considered values by filefinder
-@given(ref=StPattern.pattern_value(for_filename=True, fmt_kind="dfeE"))
-def test_make_filename_by_val(ref: PatternValue):
-    """Test filename creation using values as fixes."""
-    f = Finder("/base/", ref.pattern)
-    fixes = {i: grp.value_str for i, grp in enumerate(ref.groups)}
-    assert f.make_filename(fixes, relative=True) == ref.filename
+        if f.n_groups > 0:
+            with pytest.raises(ValueError):
+                f.make_filename()
 
-    if f.n_groups > 0:
-        with pytest.raises(ValueError):
-            f.make_filename()
+    @given(
+        ref=StPattern.pattern_value(for_filename=True, min_group=1, fmt_kind="dfeE")
+        .filter(lambda p: len(set(g.name for g in p.groups)) == len(p.groups))
+        .filter(lambda p: all(g.name != "relative" for g in p.groups))
+    )
+    def test_by_val_by_name(self, ref: PatternValue):
+        """Test filename creation fixing values by group name.
 
+        Separate test function to make sure all names are differents, otherwise
+        group.fix_value might have different output despite having the same name.
+        Also avoid keyword name relative.
+        """
+        f = Finder("/base/", ref.pattern)
+        fixes_by_name = {grp.name: grp.value for grp in ref.groups}
+        assert f.make_filename(**fixes_by_name, relative=True) == ref.filename
 
-@given(
-    ref=StPattern.pattern_value(for_filename=True, min_group=1, fmt_kind="dfeE")
-    .filter(lambda p: len(set(g.name for g in p.groups)) == len(p.groups))
-    .filter(lambda p: all(g.name != "relative" for g in p.groups))
-)
-def test_make_filename_by_val_by_name(ref: PatternValue):
-    """Test filename creation fixing values by group name.
+    @given(ref=StPattern.pattern_value(for_filename=True, fmt_kind="dfeE"))
+    def test_by_fix(self, ref: PatternValue):
+        """Test filename creating with prior value fixing.
 
-    Separate test function to make sure all names are differents, otherwise
-    group.fix_value might have different output despite having the same name.
-    Also avoid keyword name relative.
-    """
-    f = Finder("/base/", ref.pattern)
-    fixes_by_name = {grp.name: grp.value for grp in ref.groups}
-    assert f.make_filename(**fixes_by_name, relative=True) == ref.filename
+        All formatted values are fixed by index. Filename is checked against expected
+        value. Groups are unfixed, and refixed by name before testing if filename
+        creation runs (no value check against expected filename).
+        """
+        f = Finder("/base/", ref.pattern)
+        fixes = {i: grp.value_str for i, grp in enumerate(ref.groups)}
+        # we won't check the output for those
+        fixes_by_name = {grp.name: grp.value_str for grp in ref.groups}
 
+        # Fix and check output
+        f.fix_groups(fixes, fix_discard=True)
+        assert f.make_filename(relative=True) == ref.filename
+        # check str/repr
+        str(f)
+        repr(f)
 
-@given(ref=StPattern.pattern_value(for_filename=True, fmt_kind="dfeE"))
-def test_make_filename_by_fix(ref: PatternValue):
-    """Test filename creating with prior value fixing.
-
-    All formatted values are fixed by index. Filename is checked against expected value.
-    Groups are unfixed, and refixed by name before testing if filename creation runs
-    (no value check against expected filename).
-    """
-    f = Finder("/base/", ref.pattern)
-    fixes = {i: grp.value_str for i, grp in enumerate(ref.groups)}
-    # we won't check the output for those
-    fixes_by_name = {grp.name: grp.value_str for grp in ref.groups}
-
-    # Fix and check output
-    f.fix_groups(fixes, fix_discard=True)
-    assert f.make_filename(relative=True) == ref.filename
-    # check str/repr
-    str(f)
-    repr(f)
-
-    # Reset, fix by name and check there is no error.
-    f.unfix_groups()
-    f.fix_groups(fixes_by_name, fix_discard=True)
-    f.make_filename()
-
-
-@given(ref=StPattern.pattern_value(for_filename=True, min_group=2, fmt_kind="dfeE"))
-def test_make_filename_half_by_fix(ref: PatternValue):
-    """Test filename creating with prior value fixing (not all groups).
-
-    Same as previous, but half groups are fixed, and second half is given on
-    make_filename call. Formatted values are fixed by index.
-    """
-    f = Finder("/base/", ref.pattern)
-    n_fix = int(f.n_groups / 2)
-    f.fix_groups({i: ref.groups[i].value_str for i in range(n_fix)}, fix_discard=True)
-
-    # As is, not everything is fixed
-    with pytest.raises(ValueError):
+        # Reset, fix by name and check there is no error.
+        f.unfix_groups()
+        f.fix_groups(fixes_by_name, fix_discard=True)
         f.make_filename()
 
-    result = f.make_filename(
-        {i: ref.groups[i].value_str for i in range(n_fix, f.n_groups)}, relative=True
-    )
-    assert result == ref.filename
+    @given(ref=StPattern.pattern_value(for_filename=True, min_group=2, fmt_kind="dfeE"))
+    def test_half_by_fix(self, ref: PatternValue):
+        """Test filename creating with prior value fixing (not all groups).
+
+        Same as previous, but half groups are fixed, and second half is given on
+        make_filename call. Formatted values are fixed by index.
+        """
+        f = Finder("/base/", ref.pattern)
+        n_fix = int(f.n_groups / 2)
+        f.fix_groups(
+            {i: ref.groups[i].value_str for i in range(n_fix)}, fix_discard=True
+        )
+
+        # As is, not everything is fixed
+        with pytest.raises(ValueError):
+            f.make_filename()
+
+        result = f.make_filename(
+            {i: ref.groups[i].value_str for i in range(n_fix, f.n_groups)},
+            relative=True,
+        )
+        assert result == ref.filename
 
 
 @pytest.mark.parametrize("pattern", ["ab%(foo:fmt=d)", "ab%(foo:rgx=.*)"])
@@ -309,237 +362,172 @@ def test_wrong_filename(pattern: str):
     assert f.find_matches("bawhatever") is None
 
 
-def test_group_parenthesis():
-    """Test if parenthesis are correctly matched in group definitions.
-
-    Test if unbalanced parentheses in group def raise.
-    Test if adding a group in regex causes issues.
-    """
-
-    def test(pattern: str):
-        Finder("", pattern)
-
-    test("0_%(normal_defintion:fmt=d)")
-    test("0_%(paren(in_name):fmt=0d)")
-    test("0_%(paren_in_bool:bool=(opt1):opt2)")
-    test("0_%(paren_in_rgx:rgx=(?:barr))")  # note non matching to be legal
-
-    for pattern in [
-        "0_%(unbalanced(:fmt=d)",
-        "0_%(unbalanced:rgx=(())",
-        "0_%(unbalanced:bool=()",
-    ]:
-        with pytest.raises(ValueError):
-            test(pattern)
-
-    # legal: non-capturing group
-    f = Finder("", "0_%(paren_in_rgx:rgx=(?:barr))")
-    assert f.find_matches("0_barr") is not None
-    # illegal: additional capturing group
-    f = Finder("", "0_%(paren_in_rgx:rgx=(barr))")
-    with pytest.raises(IndexError):
-        f.find_matches("0_barr")
-
-
-def test_custom_regex():
-    """Test that a custom regex is conserved.
-
-    Tested systematically for groups in test_group.test_random_definitions.
-    Here with test that it still works at the Finder level.
-    """
-    assert_pattern("test_%(Y:rgx=[a-z]*?)", "test_([a-z]*?)")
-    assert_pattern("test_%(Y:fmt=d:rgx=[a-z]*?)", "test_([a-z]*?)")
-
-
-def test_format_regex():
-    """Test that the correct regex is generated from a format string.
-
-    Tested systematically for groups in test_group.test_random_definitions.
-    Here with test that it still works at the Finder level.
-    """
-    assert_pattern("test_%(Y:fmt=d)", r"test_(-?\d+)")
-    assert_pattern("test_%(Y:fmt=a>5d)", r"test_(a*-?\d+)")
-    assert_pattern("test_%(Y:fmt=a<5d)", r"test_(-?\d+a*)")
-    assert_pattern("test_%(Y:fmt=a^5d)", r"test_(a*-?\d+a*)")
-    assert_pattern("test_%(Y:fmt=05.3f)", r"test_(-?0*\d+\.\d{3})")
-    assert_pattern("test_%(Y:fmt=+05.3f)", r"test_([+-]0*\d+\.\d{3})")
-    assert_pattern("test_%(Y:fmt=.2e)", r"test_(-?\d\.\d{2}e[+-]\d{2,3})")
-    assert_pattern("test_%(Y:fmt=.2E)", r"test_(-?\d\.\d{2}E[+-]\d{2,3})")
-
-
-# It is possible to add random files, but it is difficult to ensure they will not
-# match... It is easy to find counter examples.
-@settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
-@given(ref=StPattern.pattern_values(for_filename=True, min_group=1, parsable=False))
-def test_file_scan(fs: FakeFilesystem, ref: PatternValues):
-    """Test that we scan files generated randomly.
-
-    Each pattern comes with lists of values for each group to generate multiple
-    filenames.
-    Groups are separated by at least one character to avoid ambiguous parsing (for
-    instance two consecutive integers cannot be separated).
-    """
-    try:
-        fs.root_dir.remove_entry("data")
-    except KeyError:
-        pass
-    basedir = path.join(fs.root_dir_name, "data")
-    fs.create_dir(basedir)
-
-    files = list(ref.filenames)
-    files = list(set(files))
-    files.sort()
-    for f in files:
-        fs.create_file(path.join(basedir, f))
-
-    log.info("pattern: %s", ref.pattern)
-    log.info("n_files: %d", len(files))
-    finder = Finder(basedir, ref.pattern)
-    assert len(finder.files) == len(files)
-    for f, f_ref in zip(finder.get_files(relative=True), files, strict=False):
-        assert f == f_ref
-
-    # Check str/repr
-    lines = repr(finder).splitlines()
-    assert lines[-1] == f"scanned: found {len(files)} files"
-
-
-def test_file_scan_manual(fs):
-    dates = [datetime(2000, 1, 1) + i * timedelta(days=15) for i in range(50)]
-    params = [-1.5, 0.0, 1.5]
-
-    datadir, files = setup_files(fs, dates, params)
-
-    for i in range(20):
-        fs.create_file(path.join(datadir, f"invalid_files_{i}.ext"))
-
-    finder = Finder(
-        datadir,
-        "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
+class TestFileScan:
+    # It is possible to add random files, but it is difficult to ensure they will not
+    # match... It is easy to find counter examples.
+    @settings(
+        suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None
     )
-    assert len(finder.files) == len(files)
-    for f, f_ref in zip(finder.get_files(relative=True), files, strict=False):
-        assert f == f_ref
+    @given(ref=StPattern.pattern_values(for_filename=True, min_group=1, parsable=False))
+    def test_random(self, fs: FakeFilesystem, ref: PatternValues):
+        """Test that we scan files generated randomly.
+
+        Each pattern comes with lists of values for each group to generate multiple
+        filenames.
+        Groups are separated by at least one character to avoid ambiguous parsing (for
+        instance two consecutive integers cannot be separated).
+        """
+        try:
+            fs.root_dir.remove_entry("data")
+        except KeyError:
+            pass
+        basedir = path.join(fs.root_dir_name, "data")
+        fs.create_dir(basedir)
+
+        files = list(ref.filenames)
+        files = list(set(files))
+        files.sort()
+        for f in files:
+            fs.create_file(path.join(basedir, f))
+
+        log.info("pattern: %s", ref.pattern)
+        log.info("n_files: %d", len(files))
+        finder = Finder(basedir, ref.pattern)
+        assert len(finder.files) == len(files)
+        for f, f_ref in zip(finder.get_files(relative=True), files, strict=False):
+            assert f == f_ref
+
+        # Check str/repr
+        lines = repr(finder).splitlines()
+        assert lines[-1] == f"scanned: found {len(files)} files"
+
+    def test_manual(self, fs):
+        fd = FilesDefinition(fs, create=True)
+        for i in range(20):
+            fs.create_file(path.join(fd.datadir, f"invalid_files_{i}.ext"))
+
+        finder = Finder(
+            fd.datadir,
+            "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
+        )
+        assert len(finder.files) == len(fd.files)
+        for f, f_ref in zip(finder.get_files(relative=True), fd.files, strict=False):
+            assert f == f_ref
+
+    def test_opt_directory(self, fs):
+        """Test having a directory separator in an optional group."""
+        datadir = path.sep + "alpha"
+        fs.create_dir(datadir)
+
+        files = [
+            "0.txt",
+            f"a{os.sep}1.txt",
+            f"b{os.sep}2.txt",
+            f"a{os.sep}c{os.sep}3.txt",
+            f"b{os.sep}d{os.sep}4.txt",
+        ]
+        files.sort()
+        for f in files:
+            fs.create_file(path.join(datadir, f))
+
+        finder = Finder(
+            datadir,
+            "%(folder:rgx=[a-z]/:opt)%(folder:rgx=[a-z]/:opt)%(param:fmt=d).txt",
+            scan_everything=True,
+        )
+        assert len(finder.get_files()) == len(files)
+        for f, f_ref in zip(finder.get_files(relative=True), files, strict=False):
+            assert f == f_ref
 
 
-def test_file_scan_nested(fs):
+class TestFileScanNested:
     """Test simple case of nested filenames output."""
 
-    def make_filename(date: datetime, param: float, option: bool) -> str:
-        filename = (
-            f"{date.year}{os.sep}test"
-            f"_{date.strftime('%Y-%m-%d')}"
-            f"_{param:.1f}{'_yes' if option else ''}.ext"
+    fd: FilesDefinition
+    finder: Finder
+
+    def setup_test(self, fs):
+        self.fd = FilesDefinition(fs, create=True)
+
+        for i in range(20):
+            fs.create_file(path.join(self.fd.datadir, f"invalid_files_{i}.ext"))
+
+        self.finder = Finder(
+            self.fd.datadir,
+            "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
         )
-        return filename
+        assert len(self.finder.files) == len(self.fd.files)
 
-    def make_filenames(
-        dates: list[datetime], params: list[float], options: list[bool]
-    ) -> list[str]:
-        files = []
-        for date, param, option in itertools.product(dates, params, options):
-            files.append(make_filename(date, param, option))
-        files.sort()
-        return files
+        return self.fd.dates, self.fd.params, self.fd.options
 
-    dates = [datetime(2000, 1, 1) + i * timedelta(days=15) for i in range(50)]
-    params = [-1.5, 0.0, 1.5]
-    options = [False, True]
+    def test_nest_by_param(self, fs):
+        dates, params, options = self.setup_test(fs)
 
-    datadir = path.join(fs.root_dir_name + "data")
-    fs.create_dir(datadir)
-    files = make_filenames(dates, params, options)
-    for f in files:
-        fs.create_file(path.join(datadir, f))
-
-    for i in range(20):
-        fs.create_file(path.join(datadir, f"invalid_files_{i}.ext"))
-
-    finder = Finder(
-        datadir,
-        "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
-    )
-    assert len(finder.files) == len(files)
-
-    # Nest by param
-    nested_param = finder.get_files(relative=True, nested=["param"])
-    assert len(nested_param) == len(params)
-    for param_ref, nested_inner in zip(params, nested_param, strict=False):
-        nest_files_ref = make_filenames(dates, [param_ref], options)
-        assert len(nested_inner) == len(nest_files_ref)
-        for f, f_ref in zip(nested_inner, nest_files_ref, strict=False):
-            assert f == f_ref
-
-    # Nest by year
-    nested_y = finder.get_files(relative=True, nested=["Y"])
-    years = sorted(list(set(d.year for d in dates)))
-    assert len(nested_y) == len(years)
-    for year_ref, nested_inner in zip(years, nested_y, strict=False):
-        nested_inner_ref = make_filenames(
-            [d for d in dates if d.year == year_ref], params, options
-        )
-        assert len(nested_inner) == len(nested_inner_ref)
-        for f, f_ref in zip(nested_inner, nested_inner_ref, strict=False):
-            assert f == f_ref
-
-    # Nest by option then param
-    nested_option = finder.get_files(relative=True, nested=["option", "param"])
-    assert len(nested_option) == len(options)
-    for option_ref, nested_param in zip(options, nested_option, strict=False):
+        nested_param = self.finder.get_files(relative=True, nested=["param"])
         assert len(nested_param) == len(params)
+
         for param_ref, nested_inner in zip(params, nested_param, strict=False):
-            assert len(nested_inner) == len(dates)
-            nested_inner_ref = make_filenames(dates, [param_ref], [option_ref])
+            nest_files_ref = self.fd.make_filenames(dates, [param_ref], options)
+            assert len(nested_inner) == len(nest_files_ref)
+            for f, f_ref in zip(nested_inner, nest_files_ref, strict=False):
+                assert f == f_ref
+
+    def test_nest_by_year(self, fs):
+        dates, params, options = self.setup_test(fs)
+
+        nested_y = self.finder.get_files(relative=True, nested=["Y"])
+        years = sorted(list(set(d.year for d in dates)))
+        assert len(nested_y) == len(years)
+
+        for year_ref, nested_inner in zip(years, nested_y, strict=False):
+            nested_inner_ref = self.fd.make_filenames(
+                [d for d in dates if d.year == year_ref],
+                params,
+                options,
+            )
+            assert len(nested_inner) == len(nested_inner_ref)
             for f, f_ref in zip(nested_inner, nested_inner_ref, strict=False):
                 assert f == f_ref
 
-    # Nest by everything
-    nested_param = finder.get_files(
-        relative=True, nested=["param", "option", "Y", "m", "d"]
-    )
-    assert len(nested_param) == len(params)
-    for param_ref, nested_option in zip(params, nested_param, strict=False):
+    def test_nest_by_option_param(self, fs):
+        dates, params, options = self.setup_test(fs)
+
+        nested_option = self.finder.get_files(relative=True, nested=["option", "param"])
         assert len(nested_option) == len(options)
-        for option_ref, nested_y in zip(options, nested_option, strict=False):
-            years = sorted(list(set(d.year for d in dates)))
-            assert len(nested_y) == len(years)
-            for y_ref, nested_m in zip(years, nested_y, strict=False):
-                dates_y = [d for d in dates if d.year == y_ref]
-                months = sorted(list(set(d.month for d in dates_y)))
-                assert len(nested_m) == len(months)
-                for m_ref, nested_d in zip(months, nested_m, strict=False):
-                    dates_m = [d for d in dates_y if d.month == m_ref]
-                    days = sorted(list(set(d.day for d in dates_m)))
-                    assert len(nested_d) == len(dates_m)
-                    for d_ref, nested_inner in zip(days, nested_d, strict=False):
-                        assert len(nested_inner) == 1
-                        filename = make_filename(
-                            datetime(y_ref, m_ref, d_ref), param_ref, option_ref
-                        )
-                        assert nested_inner[0] == filename
 
+        for option_ref, nested_param in zip(options, nested_option, strict=False):
+            assert len(nested_param) == len(params)
+            for param_ref, nested_inner in zip(params, nested_param, strict=False):
+                assert len(nested_inner) == len(dates)
+                nested_inner_ref = self.fd.make_filenames(
+                    dates, [param_ref], [option_ref]
+                )
+                for f, f_ref in zip(nested_inner, nested_inner_ref, strict=False):
+                    assert f == f_ref
 
-def test_opt_directory(fs):
-    """Test having a directory separator in an optional group."""
-    datadir = path.sep + "alpha"
-    fs.create_dir(datadir)
+    def test_nest_by_everything(self, fs):
+        dates, params, options = self.setup_test(fs)
 
-    files = [
-        "0.txt",
-        f"a{os.sep}1.txt",
-        f"b{os.sep}2.txt",
-        f"a{os.sep}c{os.sep}3.txt",
-        f"b{os.sep}d{os.sep}4.txt",
-    ]
-    files.sort()
-    for f in files:
-        fs.create_file(path.join(datadir, f))
-
-    finder = Finder(
-        datadir,
-        "%(folder:rgx=[a-z]/:opt)%(folder:rgx=[a-z]/:opt)%(param:fmt=d).txt",
-        scan_everything=True,
-    )
-    assert len(finder.get_files()) == len(files)
-    for f, f_ref in zip(finder.get_files(relative=True), files, strict=False):
-        assert f == f_ref
+        nested_param = self.finder.get_files(
+            relative=True, nested=["param", "option", "Y", "m", "d"]
+        )
+        assert len(nested_param) == len(params)
+        for param_ref, nested_option in zip(params, nested_param, strict=False):
+            assert len(nested_option) == len(options)
+            for option_ref, nested_y in zip(options, nested_option, strict=False):
+                years = sorted(list(set(d.year for d in dates)))
+                assert len(nested_y) == len(years)
+                for y_ref, nested_m in zip(years, nested_y, strict=False):
+                    dates_y = [d for d in dates if d.year == y_ref]
+                    months = sorted(list(set(d.month for d in dates_y)))
+                    assert len(nested_m) == len(months)
+                    for m_ref, nested_d in zip(months, nested_m, strict=False):
+                        dates_m = [d for d in dates_y if d.month == m_ref]
+                        days = sorted(list(set(d.day for d in dates_m)))
+                        assert len(nested_d) == len(dates_m)
+                        for d_ref, nested_inner in zip(days, nested_d, strict=False):
+                            assert len(nested_inner) == 1
+                            filename = self.fd.make_filename(
+                                datetime(y_ref, m_ref, d_ref), param_ref, option_ref
+                            )
+                            assert nested_inner[0] == filename

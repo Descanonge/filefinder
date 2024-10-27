@@ -8,7 +8,7 @@ import sys
 import typing as t
 from collections import abc
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from hypothesis import strategies as st
 
@@ -34,9 +34,44 @@ class Drawer(t.Protocol):
     def __call__(self, __strat: st.SearchStrategy[T]) -> T: ...
 
 
-def setup_files(
-    fs, dates: abc.Sequence[datetime], params: abc.Sequence[float]
-) -> tuple[str, list[str]]:
+class FilesDefinition:
+    dates: list[datetime]
+    params: list[float]
+    options: list[bool]
+
+    datadir: str
+
+    files: list[str]
+
+    def __init__(
+        self,
+        fs,
+        dates: abc.Sequence[datetime] | None = None,
+        params: abc.Sequence[float] | None = None,
+        options: abc.Sequence[bool] | None = None,
+        datadir: str | None = None,
+        create: bool = False,
+    ):
+        self.fs = fs
+        if dates is None:
+            dates = [datetime(2000, 1, 1) + i * timedelta(days=15) for i in range(50)]
+        if params is None:
+            params = [-1.5, 0.0, 1.5]
+        if options is None:
+            options = [False, True]
+        if datadir is None:
+            datadir = os.path.join(fs.root_dir_name, "data")
+        self.dates = list(dates)
+        self.params = list(params)
+        self.options = list(options)
+        self.datadir = datadir
+
+        self.files = self.make_filenames()
+
+        if create:
+            self.create_files()
+
+    @staticmethod
     def make_filename(date: datetime, param: float, option: bool) -> str:
         filename = (
             f"{date.year}{os.sep}test"
@@ -45,18 +80,30 @@ def setup_files(
         )
         return filename
 
-    options = [False, True]
+    def make_filenames(
+        self,
+        dates: abc.Sequence[datetime] | None = None,
+        params: abc.Sequence[float] | None = None,
+        options: abc.Sequence[bool] | None = None,
+    ) -> list[str]:
+        if dates is None:
+            dates = self.dates
+        if params is None:
+            params = self.params
+        if options is None:
+            options = self.options
+        files = [
+            self.make_filename(*args)
+            for args in itertools.product(dates, params, options)
+        ]
+        files.sort()
+        return files
 
-    datadir = os.path.join(fs.root_dir_name + "data")
-    fs.create_dir(datadir)
+    def create_files(self):
+        self.fs.create_dir(self.datadir)
 
-    files = [make_filename(*args) for args in itertools.product(dates, params, options)]
-    files.sort()
-
-    for f in files:
-        fs.create_file(os.path.join(datadir, f))
-
-    return datadir, files
+        for f in self.files:
+            self.fs.create_file(os.path.join(self.datadir, f))
 
 
 def form(fmt: str, value: t.Any) -> str:

@@ -39,8 +39,28 @@ class TestFinderStructure:
         f = Finder("", ref.pattern)
         assert f.n_groups == len(f.groups) == len(ref.groups)
 
+        ref_names = [grp.name for grp in ref.groups]
+
         for i in range(f.n_groups):
-            assert f.groups[i].name == ref.groups[i].name
+            assert f.groups[i].name == ref_names[i]
+
+        assert f.get_group_names() == set(ref_names)
+
+        # fix even groups
+        fixed = set()
+        for grp in ref.groups[::2]:
+            if grp.discard:
+                continue
+            f.fix_group(grp.name, "a")
+            fixed.add(grp.name)
+        assert f.get_group_names(fixed=True) == fixed
+
+        f.unfix_groups()
+
+        # fix even groups even when discarded
+        for i in range(0, f.n_groups, 2):
+            f.fix_group(i, "a", fix_discard=True)
+        assert f.get_group_names(fixed=True) == set(ref_names[::2])
 
     @given(ref=StPattern.pattern(separate=False))
     def test_get_groups(self, ref: PatternSpecs):

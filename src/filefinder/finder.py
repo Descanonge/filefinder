@@ -402,17 +402,18 @@ class Finder:
             Will be passed to the function.
         """
         if key == "date" and self.date_is_first_class:
-            self.filters.add_by_date(func, default_date=default_date, **kwargs)  # type: ignore[arg-type]
-            return
+            filt = self.filters.add_by_date(func, default_date=default_date, **kwargs)  # type: ignore[arg-type]
 
-        indices = get_groups_indices(self.groups, key)
-        filt = self.filters.add_by_group(
-            func,
-            indices,
-            fix_discard=fix_discard,
-            pass_unparsed=pass_unparsed,
-            **kwargs,
-        )
+        else:
+            indices = get_groups_indices(self.groups, key)
+            filt = self.filters.add_by_group(
+                func,
+                indices,
+                fix_discard=fix_discard,
+                pass_unparsed=pass_unparsed,
+                **kwargs,
+            )
+
         if self.scanned:
             self._files = [(f, m) for f, m in self._files if filt.is_valid(self, f, m)]
 

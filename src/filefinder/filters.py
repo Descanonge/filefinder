@@ -128,7 +128,7 @@ class FilterByGroup(Filter):
 
     def __init__(
         self,
-        user_func: UserFuncGroup | UserFuncGroupPartial,
+        user_func: abc.Callable[..., bool],
         indices: abc.Sequence[int],
         pass_unparsed: bool = False,
         **kwargs,
@@ -184,12 +184,12 @@ class FilterByDate(Filter):
 
     def __init__(
         self,
-        *args,
+        user_func: abc.Callable[..., bool],
         default_date: DefaultDate = None,
         **kwargs,
     ):
         self.default_date = default_date
-        super().__init__(*args, **kwargs)
+        super().__init__(user_func, **kwargs)
 
     def get_filter_func(self) -> FilterFunc:
         """Return filter function.

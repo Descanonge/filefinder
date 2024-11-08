@@ -13,7 +13,7 @@ import typing as t
 from collections import abc
 from copy import copy
 
-from .filters import FilterList, UserFunc, UserFuncDate, UserFuncGroup
+from .filters import FilterByDate, FilterByGroup, FilterList
 from .group import Group, GroupKey
 from .matches import DefaultDate, Matches
 from .util import datetime_to_value, get_groups_indices
@@ -338,7 +338,7 @@ class Finder:
 
         self._void_cache()
 
-    def add_filter(self, func: UserFunc, **kwargs: t.Any):
+    def add_filter(self, func: abc.Callable[..., bool], **kwargs: t.Any):
         """Add a filter with which to select scanned files.
 
         See :ref:`filtering` for details.
@@ -363,7 +363,7 @@ class Finder:
     def fix_by_filter(
         self,
         key: GroupKey,
-        func: UserFuncGroup | UserFuncDate,
+        func: abc.Callable[..., bool],
         fix_discard: bool = False,
         default_date: DefaultDate = None,
         pass_unparsed: bool = False,
@@ -401,6 +401,7 @@ class Finder:
         kwargs
             Will be passed to the function.
         """
+        filt: FilterByGroup | FilterByDate
         if key == "date" and self.date_is_first_class:
             filt = self.filters.add_by_date(func, default_date=default_date, **kwargs)  # type: ignore[arg-type]
 

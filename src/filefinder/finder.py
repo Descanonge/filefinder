@@ -619,6 +619,8 @@ class Finder:
         if len(self._files) == 0:
             logger.info("Found no matching files (after filtering)")
 
+        self.scanned = True
+
     def _add_file(self, filename: str, pattern: re.Pattern):
         """Add file if it matches pattern and pass filters."""
         matches = self._make_matches(filename, pattern)
@@ -650,8 +652,6 @@ class Finder:
             for f in filenames:
                 to_root = self.get_relative(os.path.join(dirpath, f))
                 self._add_file(to_root, pattern)
-
-        self.scanned = True
 
     def _find_files_subdirectories(self) -> None:
         """Find files checking sub-directories along the way.
@@ -697,8 +697,6 @@ class Finder:
             to_remove = [d for d in dirnames if not pattern.fullmatch(d)]
             for d in to_remove:
                 dirnames.remove(d)
-
-        self.scanned = True
 
     def _void_cache(self) -> None:
         self.scanned = False

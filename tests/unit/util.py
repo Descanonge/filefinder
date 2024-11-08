@@ -282,6 +282,10 @@ class FormatSpecs:
 
         # Floats
         strat = st.floats(allow_nan=False, allow_infinity=False)
+        # f formats can produce very long strings, not good
+        if self.kind == "f":
+            # threshold can be adjusted
+            strat = strat.filter(lambda x: abs(x) < 1e5)
         # take precision into account
         strat = strat.map(lambda x: float(form(self.precision_str + self.kind, x)))
         # truncation can push a very high number above float limit

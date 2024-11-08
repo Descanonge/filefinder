@@ -5,11 +5,12 @@ Presentely, only `library.get_date`.
 
 import os
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
-from util import FilesDefinition, time_segments
+from util import FilesDefinitionAuto, time_segments
 
 import filefinder.library
 from filefinder.finder import Finder
@@ -165,110 +166,140 @@ def assert_nfiles(finder, n_files: int):
 
 
 class TestFilters:
-    def setup_test(self, fs) -> tuple[FilesDefinition, Finder]:
-        dates = [datetime(2000, 1, 1) + i * timedelta(days=1) for i in range(365)]
-        params = list(range(20))
-        fd = FilesDefinition(fs, dates=dates, params=params, create=True)
-        finder = Finder(
-            fd.datadir,
+    fd: FilesDefinitionAuto
+    finder: Finder
+
+    def setup_test(self, tmp_path: Path):
+        self.fd = FilesDefinitionAuto(
+            tmp_path,
+            dates=[datetime(2000, 1, 1) + i * timedelta(days=1) for i in range(365)],
+            params=list(range(20)),
+            create=True,
+        )
+
+        for i in range(20):
+            self.fd.create_file(os.path.join(self.fd.datadir, f"invalid_files_{i}.ext"))
+
+        self.finder = Finder(
+            self.fd.get_absolute(self.fd.datadir),
             "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
         )
-        return fd, finder
+        assert len(self.finder.files) == len(self.fd.files)
 
-    def test_filter_dates(self, fs):
-        fd, finder = self.setup_test(fs)
+        return self.fd.dates, self.fd.params, self.fd.options
 
-        finder.add_filter(
+    def test_filter_dates(self, tmp_path: Path):
+        dates, params, options = self.setup_test(tmp_path)
+        ndays = len(dates)
+        nparams = len(params)
+        noptions = len(options)
+
+        self.finder.add_filter(
             filefinder.library.filter_date_range, start="2000-01-01", stop="2000-01-02"
         )
         ndays = 2
-        assert len(finder.files) == ndays * len(fd.params) * 2
+        assert len(self.finder.files) == ndays * nparams * noptions
 
-        finder.clear_filters()
-        finder.add_filter(
+        self.finder.clear_filters()
+        self.finder.add_filter(
             filefinder.library.filter_date_range, start="2000-05-10", stop="2000-06-10"
         )
         ndays = 32
-        assert_nfiles(finder, ndays * 2 * len(fd.params))
+        assert_nfiles(self.finder, ndays * nparams * noptions)
 
-        finder.fix_groups(m=[5, 6])
-        finder.clear_filters()
-        finder.add_filter(
+        self.finder.fix_groups(m=[5, 6])
+        self.finder.clear_filters()
+        self.finder.add_filter(
             filefinder.library.filter_date_range,
             start=datetime(2000, 5, 10),
             stop=datetime(2000, 6, 10),
         )
-        assert_nfiles(finder, ndays * 2 * len(fd.params))
+        assert_nfiles(self.finder, ndays * nparams * noptions)
 
-        finder.fix_groups(m=2)
-        assert_nfiles(finder, 0)
+        self.finder.fix_groups(m=2)
+        assert_nfiles(self.finder, 0)
 
-    def test_fix_by_filter_dates(self, fs):
-        fd, finder = self.setup_test(fs)
+    def test_fix_by_filter_dates(self, tmp_path: Path):
+        dates, params, options = self.setup_test(tmp_path)
+        ndays = len(dates)
+        nparams = len(params)
+        noptions = len(options)
 
-        finder.fix_by_filter(
+        self.finder.fix_by_filter(
             "date", lambda d: datetime(2000, 1, 1) <= d <= datetime(2000, 1, 2)
         )
         ndays = 2
-        assert_nfiles(finder, ndays * len(fd.params) * 2)
+        assert_nfiles(self.finder, ndays * nparams * noptions)
 
-        finder.clear_filters()
-        finder.fix_by_filter(
+        self.finder.clear_filters()
+        self.finder.fix_by_filter(
             "date", lambda d: datetime(2000, 5, 10) <= d <= datetime(2000, 6, 10)
         )
         ndays = 32
-        assert_nfiles(finder, ndays * len(fd.params) * 2)
-        assert len(finder.files) == ndays * len(fd.params) * 2
+        assert_nfiles(self.finder, ndays * len(params) * 2)
+        assert len(self.finder.files) == ndays * nparams * noptions
 
-        finder.fix_groups(m=[5, 6])
-        finder.clear_filters()
-        finder.fix_by_filter(
+        self.finder.fix_groups(m=[5, 6])
+        self.finder.clear_filters()
+        self.finder.fix_by_filter(
             "date", lambda d: datetime(2000, 5, 10) <= d <= datetime(2000, 6, 10)
         )
-        assert_nfiles(finder, ndays * len(fd.params) * 2)
+        assert_nfiles(self.finder, ndays * nparams * noptions)
 
-        finder.fix_groups(m=2)
-        assert_nfiles(finder, 0)
+        self.finder.fix_groups(m=2)
+        assert_nfiles(self.finder, 0)
 
-        finder.clear_filters()
-        finder.unfix_groups()
-        finder.fix_by_filter("date", lambda d: d.month % 2 == 0)
+        self.finder.clear_filters()
+        self.finder.unfix_groups()
+        self.finder.fix_by_filter("date", lambda d: d.month % 2 == 0)
         ndays = 181
-        assert_nfiles(finder, ndays * len(fd.params) * 2)
+        assert_nfiles(self.finder, ndays * nparams * noptions)
 
-    def test_filter_values(self, fs):
-        fd, finder = self.setup_test(fs)
+    def test_filter_values(self, tmp_path: Path):
+        dates, params, options = self.setup_test(tmp_path)
+        ndays = len(dates)
+        nparams = len(params)
+        noptions = len(options)
 
-        finder.add_filter(filefinder.library.filter_by_range, group="param", min=5)
-        nvalues = 19 - 5 + 1
-        assert len(finder.files) == 2 * len(fd.dates) * nvalues
+        self.finder.add_filter(filefinder.library.filter_by_range, group="param", min=5)
+        nparams = 19 - 5 + 1
+        assert len(self.finder.files) == ndays * nparams * noptions
 
-        finder.add_filter(filefinder.library.filter_by_range, group="param", max=10)
-        nvalues = 10 - 5 + 1
-        assert_nfiles(finder, 2 * len(fd.dates) * nvalues)
+        self.finder.add_filter(
+            filefinder.library.filter_by_range, group="param", max=10
+        )
+        nparams = 10 - 5 + 1
+        assert_nfiles(self.finder, ndays * nparams * noptions)
 
-        finder.clear_filters()
-        finder.add_filter(
+        self.finder.clear_filters()
+        self.finder.add_filter(
             filefinder.library.filter_by_range, group="param", min=10, max=15
         )
-        nvalues = 15 - 10 + 1
-        assert_nfiles(finder, 2 * len(fd.dates) * nvalues)
+        nparams = 15 - 10 + 1
+        assert_nfiles(self.finder, ndays * nparams * noptions)
 
-    def test_filter_group(self, fs):
-        fd, finder = self.setup_test(fs)
+    def test_filter_group(self, tmp_path: Path):
+        dates, params, options = self.setup_test(tmp_path)
+        ndays = len(dates)
+        nparams = len(params)
+        noptions = len(options)
 
-        finder.fix_by_filter("m", lambda m: m == 12)
-        assert len(finder.files) == 30 * len(fd.params) * 2
+        self.finder.fix_by_filter("m", lambda m: m == 12)
+        ndays = 30
+        assert len(self.finder.files) == ndays * nparams * noptions
 
-        finder.fix_by_filter("option", bool)
-        assert_nfiles(finder, 30 * len(fd.params))
+        self.finder.fix_by_filter("option", bool)
+        assert_nfiles(self.finder, ndays * nparams)
 
         # test unfixing
-        finder.unfix_groups("m")
-        assert_nfiles(finder, len(fd.dates) * len(fd.params))
+        self.finder.unfix_groups("m")
+        ndays = len(dates)
+        assert_nfiles(self.finder, ndays * nparams)
 
-        finder.fix_by_filter("param", lambda x: x < 10)
-        assert_nfiles(finder, len(fd.dates) * 10)
+        self.finder.fix_by_filter("param", lambda x: x < 10)
+        nparams = 10
+        assert_nfiles(self.finder, ndays * nparams)
 
-        finder.fix_by_filter("param", lambda x: x % 2 == 0)
-        assert_nfiles(finder, len(fd.dates) * 5)
+        self.finder.fix_by_filter("param", lambda x: x % 2 == 0)
+        nparams = 5
+        assert_nfiles(self.finder, ndays * nparams)

@@ -4,19 +4,21 @@ import logging
 import os
 from datetime import datetime
 from os import path
+from pathlib import Path
 
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
-from pyfakefs.fake_filesystem import FakeFilesystem
 from util import (
     MAX_CODEPOINT,
     MAX_TEXT_SIZE,
     FilesDefinition,
+    FilesDefinitionAuto,
     PatternSpecs,
     PatternValue,
     PatternValues,
     StPattern,
+    TmpDirTest,
     time_segments,
 )
 
@@ -382,14 +384,14 @@ def test_wrong_filename(pattern: str):
     assert f.find_matches("bawhatever") is None
 
 
-class TestFileScan:
+class TestFileScan(TmpDirTest):
     # It is possible to add random files, but it is difficult to ensure they will not
     # match... It is easy to find counter examples.
     @settings(
         suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None
     )
     @given(ref=StPattern.pattern_values(for_filename=True, min_group=1, parsable=False))
-    def test_random(self, fs: FakeFilesystem, ref: PatternValues):
+    def test_random(self, tmp_path: Path, ref: PatternValues):
         """Test that we scan files generated randomly.
 
         Each pattern comes with lists of values for each group to generate multiple
@@ -397,22 +399,19 @@ class TestFileScan:
         Groups are separated by at least one character to avoid ambiguous parsing (for
         instance two consecutive integers cannot be separated).
         """
-        try:
-            fs.root_dir.remove_entry("data")
-        except KeyError:
-            pass
-        basedir = path.join(fs.root_dir_name, "data")
-        fs.create_dir(basedir)
+        fd = FilesDefinition(tmp_path)
+        datadir = "data"
+        fd.create_dir(datadir)
 
         files = list(ref.filenames)
         files = list(set(files))
         files.sort()
         for f in files:
-            fs.create_file(path.join(basedir, f))
+            fd.create_file(path.join(datadir, f))
 
         log.info("pattern: %s", ref.pattern)
         log.info("n_files: %d", len(files))
-        finder = Finder(basedir, ref.pattern)
+        finder = Finder(fd.get_absolute(datadir), ref.pattern)
         assert len(finder.files) == len(files)
         for f, f_ref in zip(finder.get_files(relative=True), files, strict=False):
             assert f == f_ref
@@ -421,23 +420,24 @@ class TestFileScan:
         lines = repr(finder).splitlines()
         assert lines[-1] == f"scanned: found {len(files)} files"
 
-    def test_manual(self, fs):
-        fd = FilesDefinition(fs, create=True)
+    def test_manual(self, tmp_path: Path):
+        fd = FilesDefinitionAuto(tmp_path, create=True)
         for i in range(20):
-            fs.create_file(path.join(fd.datadir, f"invalid_files_{i}.ext"))
+            fd.create_file(path.join(fd.datadir, f"invalid_files_{i}.ext"))
 
         finder = Finder(
-            fd.datadir,
+            fd.get_absolute(fd.datadir),
             "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
         )
         assert len(finder.files) == len(fd.files)
         for f, f_ref in zip(finder.get_files(relative=True), fd.files, strict=False):
             assert f == f_ref
 
-    def test_opt_directory(self, fs):
+    def test_opt_directory(self, tmp_path: Path):
         """Test having a directory separator in an optional group."""
-        datadir = path.sep + "alpha"
-        fs.create_dir(datadir)
+        fd = FilesDefinition(tmp_path)
+        datadir = "data"
+        fd.create_dir(datadir)
 
         files = [
             "0.txt",
@@ -448,10 +448,10 @@ class TestFileScan:
         ]
         files.sort()
         for f in files:
-            fs.create_file(path.join(datadir, f))
+            fd.create_file(path.join(datadir, f))
 
         finder = Finder(
-            datadir,
+            fd.get_absolute(datadir),
             "%(folder:rgx=[a-z]/:opt)%(folder:rgx=[a-z]/:opt)%(param:fmt=d).txt",
             scan_everything=True,
         )
@@ -463,25 +463,26 @@ class TestFileScan:
 class TestFileScanNested:
     """Test simple case of nested filenames output."""
 
-    fd: FilesDefinition
+    fd: FilesDefinitionAuto
     finder: Finder
 
-    def setup_test(self, fs):
-        self.fd = FilesDefinition(fs, create=True)
+    def setup_test(self, tmp_path: Path):
+        self.fd = FilesDefinitionAuto(tmp_path, create=True)
 
         for i in range(20):
-            fs.create_file(path.join(self.fd.datadir, f"invalid_files_{i}.ext"))
+            self.fd.create_file(path.join(self.fd.datadir, f"invalid_files_{i}.ext"))
 
         self.finder = Finder(
-            self.fd.datadir,
+            self.fd.get_absolute(self.fd.datadir),
             "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:bool=_yes).ext",
         )
         assert len(self.finder.files) == len(self.fd.files)
+        self.finder._void_cache()
 
         return self.fd.dates, self.fd.params, self.fd.options
 
-    def test_nest_by_param(self, fs):
-        dates, params, options = self.setup_test(fs)
+    def test_nest_by_param(self, tmp_path: Path):
+        dates, params, options = self.setup_test(tmp_path)
 
         nested_param = self.finder.get_files(relative=True, nested=["param"])
         assert len(nested_param) == len(params)
@@ -492,8 +493,8 @@ class TestFileScanNested:
             for f, f_ref in zip(nested_inner, nest_files_ref, strict=False):
                 assert f == f_ref
 
-    def test_nest_by_year(self, fs):
-        dates, params, options = self.setup_test(fs)
+    def test_nest_by_year(self, tmp_path):
+        dates, params, options = self.setup_test(tmp_path)
 
         nested_y = self.finder.get_files(relative=True, nested=["Y"])
         years = sorted(list(set(d.year for d in dates)))
@@ -509,8 +510,8 @@ class TestFileScanNested:
             for f, f_ref in zip(nested_inner, nested_inner_ref, strict=False):
                 assert f == f_ref
 
-    def test_nest_by_option_param(self, fs):
-        dates, params, options = self.setup_test(fs)
+    def test_nest_by_option_param(self, tmp_path):
+        dates, params, options = self.setup_test(tmp_path)
 
         nested_option = self.finder.get_files(relative=True, nested=["option", "param"])
         assert len(nested_option) == len(options)
@@ -525,8 +526,8 @@ class TestFileScanNested:
                 for f, f_ref in zip(nested_inner, nested_inner_ref, strict=False):
                     assert f == f_ref
 
-    def test_nest_by_everything(self, fs):
-        dates, params, options = self.setup_test(fs)
+    def test_nest_by_everything(self, tmp_path):
+        dates, params, options = self.setup_test(tmp_path)
 
         nested_param = self.finder.get_files(
             relative=True, nested=["param", "option", "Y", "m", "d"]

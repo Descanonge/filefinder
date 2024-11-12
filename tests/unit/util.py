@@ -9,7 +9,11 @@ import typing as t
 from collections import abc
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
+import pytest
+from hypothesis import HealthCheck, settings
 from hypothesis import strategies as st
 
 from filefinder.format import Format, FormatError
@@ -35,6 +39,38 @@ class Drawer(t.Protocol):
 
 
 class FilesDefinition:
+    parent_dir: Path
+    _base_dir: TemporaryDirectory
+    base_dir: Path
+
+    def __init__(self, tmp_path: Path, **kwargs):
+        self.parent_dir = tmp_path
+        self._base_dir = TemporaryDirectory(dir=self.parent_dir)
+        self.base_dir = Path(self._base_dir.name)
+
+    def create_file(self, filename: str | Path) -> str:
+        new_file = self.base_dir / filename
+        parent = new_file.parent
+        if not parent.exists():
+            parent.mkdir(parents=True, exist_ok=True)
+        new_file.touch()
+        return str(new_file)
+
+    def create_dir(self, dirname: str | Path) -> str:
+        new_dir = self.base_dir / dirname
+        new_dir.mkdir()
+        return str(new_dir)
+
+    def get_absolute(self, path: str) -> str:
+        return str(self.base_dir / path)
+
+
+class TmpDirTest:
+    def get_files_def(self, tmp_path: Path, **kwargs) -> FilesDefinition:
+        return FilesDefinition(tmp_path, **kwargs)
+
+
+class FilesDefinitionAuto(FilesDefinition):
     dates: list[datetime]
     params: list[float]
     options: list[bool]
@@ -45,14 +81,16 @@ class FilesDefinition:
 
     def __init__(
         self,
-        fs,
+        tmp_path: Path,
         dates: abc.Sequence[datetime] | None = None,
         params: abc.Sequence[float] | None = None,
         options: abc.Sequence[bool] | None = None,
         datadir: str | None = None,
         create: bool = False,
+        **kwargs,
     ):
-        self.fs = fs
+        super().__init__(tmp_path, **kwargs)
+
         if dates is None:
             dates = [datetime(2000, 1, 1) + i * timedelta(days=15) for i in range(50)]
         if params is None:
@@ -60,7 +98,7 @@ class FilesDefinition:
         if options is None:
             options = [False, True]
         if datadir is None:
-            datadir = os.path.join(fs.root_dir_name, "data")
+            datadir = "data"
         self.dates = list(dates)
         self.params = list(params)
         self.options = list(options)
@@ -100,10 +138,10 @@ class FilesDefinition:
         return files
 
     def create_files(self):
-        self.fs.create_dir(self.datadir)
+        self.create_dir(self.datadir)
 
         for f in self.files:
-            self.fs.create_file(os.path.join(self.datadir, f))
+            self.create_file(os.path.join(self.datadir, f))
 
 
 def form(fmt: str, value: t.Any) -> str:
@@ -244,6 +282,10 @@ class FormatSpecs:
 
         # Floats
         strat = st.floats(allow_nan=False, allow_infinity=False)
+        # f formats can produce very long strings, not good
+        if self.kind == "f":
+            # threshold can be adjusted
+            strat = strat.filter(lambda x: abs(x) < 1e5)
         # take precision into account
         strat = strat.map(lambda x: float(form(self.precision_str + self.kind, x)))
         # truncation can push a very high number above float limit

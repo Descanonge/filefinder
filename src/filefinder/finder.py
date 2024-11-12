@@ -13,7 +13,7 @@ import typing as t
 from collections import abc
 from copy import copy
 
-from .filters import FilterList, UserFunc, UserFuncDate, UserFuncGroup
+from .filters import FilterByDate, FilterByGroup, FilterList
 from .group import Group, GroupKey
 from .matches import DefaultDate, Matches
 from .util import datetime_to_value, get_groups_indices
@@ -338,7 +338,7 @@ class Finder:
 
         self._void_cache()
 
-    def add_filter(self, func: UserFunc, **kwargs: t.Any):
+    def add_filter(self, func: abc.Callable[..., bool], **kwargs: t.Any):
         """Add a filter with which to select scanned files.
 
         See :ref:`filtering` for details.
@@ -363,7 +363,7 @@ class Finder:
     def fix_by_filter(
         self,
         key: GroupKey,
-        func: UserFuncGroup | UserFuncDate,
+        func: abc.Callable[..., bool],
         fix_discard: bool = False,
         default_date: DefaultDate = None,
         pass_unparsed: bool = False,
@@ -401,18 +401,20 @@ class Finder:
         kwargs
             Will be passed to the function.
         """
+        filt: FilterByGroup | FilterByDate
         if key == "date" and self.date_is_first_class:
-            self.filters.add_by_date(func, default_date=default_date, **kwargs)  # type: ignore[arg-type]
-            return
+            filt = self.filters.add_by_date(func, default_date=default_date, **kwargs)  # type: ignore[arg-type]
 
-        indices = get_groups_indices(self.groups, key)
-        filt = self.filters.add_by_group(
-            func,
-            indices,
-            fix_discard=fix_discard,
-            pass_unparsed=pass_unparsed,
-            **kwargs,
-        )
+        else:
+            indices = get_groups_indices(self.groups, key)
+            filt = self.filters.add_by_group(
+                func,
+                indices,
+                fix_discard=fix_discard,
+                pass_unparsed=pass_unparsed,
+                **kwargs,
+            )
+
         if self.scanned:
             self._files = [(f, m) for f, m in self._files if filt.is_valid(self, f, m)]
 
@@ -619,6 +621,8 @@ class Finder:
         if len(self._files) == 0:
             logger.info("Found no matching files (after filtering)")
 
+        self.scanned = True
+
     def _add_file(self, filename: str, pattern: re.Pattern):
         """Add file if it matches pattern and pass filters."""
         matches = self._make_matches(filename, pattern)
@@ -650,8 +654,6 @@ class Finder:
             for f in filenames:
                 to_root = self.get_relative(os.path.join(dirpath, f))
                 self._add_file(to_root, pattern)
-
-        self.scanned = True
 
     def _find_files_subdirectories(self) -> None:
         """Find files checking sub-directories along the way.
@@ -697,8 +699,6 @@ class Finder:
             to_remove = [d for d in dirnames if not pattern.fullmatch(d)]
             for d in to_remove:
                 dirnames.remove(d)
-
-        self.scanned = True
 
     def _void_cache(self) -> None:
         self.scanned = False

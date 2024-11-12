@@ -12,8 +12,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-import pytest
-from hypothesis import HealthCheck, settings
 from hypothesis import strategies as st
 
 from filefinder.format import Format, FormatError

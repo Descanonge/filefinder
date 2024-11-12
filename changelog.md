@@ -1,4 +1,9 @@
 
+- [2024-10-16] Manage filters using custom objects
+- [2024-09-17] Clearer function to retrieve date from matches
+- [2024-09-16] Make "date" a special group name
+- [2024-09-09] Add filters that act on group values
+
 ## v1.2.0
 
 - [2024-06-06] Add method to retrieve group names

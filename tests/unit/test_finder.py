@@ -2,6 +2,7 @@
 
 import logging
 import os
+import sys
 from datetime import datetime
 from os import path
 from pathlib import Path
@@ -387,10 +388,16 @@ def test_wrong_filename(pattern: str):
 class TestFileScan(TmpDirTest):
     # It is possible to add random files, but it is difficult to ensure they will not
     # match... It is easy to find counter examples.
+    # For Windows and Mac, they fail on lots of cases a priori because of the weird
+    # filenames generated through hypothesis. Linux does not mind though.
     @settings(
         suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None
     )
     @given(ref=StPattern.pattern_values(for_filename=True, min_group=1, parsable=False))
+    @pytest.mark.skipif(
+        sys.platform != "linux",
+        reason="Windows and MacOS have too much quirks to make it work easily.",
+    )
     def test_random(self, tmp_path: Path, ref: PatternValues):
         """Test that we scan files generated randomly.
 

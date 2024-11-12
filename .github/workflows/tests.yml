@@ -37,7 +37,7 @@ jobs:
           python -m pip install -e .
 
       - name: Cache Hypothesis database
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         id: cache-hypothesis
         with:
           path: .hypothesis

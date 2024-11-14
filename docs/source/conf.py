@@ -49,7 +49,11 @@ autodoc_type_aliases = {
 
 python_use_unqualified_type_names = True
 
-autodoc_default_options = {"show-inheritance": True, "inherited-members": False}
+autodoc_default_options = {
+    "show-inheritance": True,
+    "inherited-members": False,
+    "private-members": True,
+}
 ## Autosummary config
 autosummary_generate = ["api.rst"]
 

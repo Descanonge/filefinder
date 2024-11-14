@@ -636,8 +636,8 @@ class Finder:
         this allows for more exotic patterns where a folder separator can appear in a
         capturing group, by example for optional sub-directories.
 
-        This will the whole filetree under :attr:`root_directory` and check every file
-        found, which can be significant work in some cases.
+        This will the whole filetree under :attr:`root` and check every file found,
+        which can be significant work in some cases.
         """
         pattern = re.compile(self.get_regex())
 

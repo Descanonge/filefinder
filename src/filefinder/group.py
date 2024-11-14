@@ -54,7 +54,10 @@ class Group:
         "|(?P<bool>:bool=.*?(?::.*?)??)"
         "|(?P<opt>:opt)|(?P<discard>:discard)){,5}"
     )
-    """Pattern used to find properties in group definition."""
+    """Pattern used to find properties in group definition.
+
+    See :meth:`_check_duplicate` for details on the pattern matching.
+    """
 
     DEFAULT_GROUPS = {
         "I": [r"\d+", "d"],  # index
@@ -106,7 +109,10 @@ class Group:
         self._parse_group_definition()
 
     def _parse_group_definition(self) -> None:
-        """Parse group definition against a regex to retrieve specs."""
+        """Parse group definition against a regex to retrieve specs.
+
+        See :meth:`_check_duplicate` for details on the pattern matching.
+        """
         m = self.PATTERN.fullmatch(self.definition)
         if m is None:
             raise GroupParseError("Could not parse the group definition.", self)

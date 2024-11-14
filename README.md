@@ -15,8 +15,7 @@
 
 FileFinder allows to specify the structure of filenames using a simple syntax.
 Parts of the file structure varying from file to file are indicated within named
-groups, either with format strings or regular expressions (with some pre-defined
-values for some names). Once setup, it can:
+groups, similarly to a regular expression. Once setup, it can:
 
 - Find corresponding files in a directory (and sub-directories)
 - Parse values from the filenames

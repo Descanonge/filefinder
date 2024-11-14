@@ -6,8 +6,8 @@ Pattern
 
 The pattern specifies the structure of the filenames relative to the root
 directory. Parts that vary from file to file are indicated by **groups**,
-enclosed by parenthesis and preceded by '%'. They are represented by the
-:class:`~group.Group` class.
+enclosed by parenthesis and preceded by '%' (by default). They are represented
+by the :class:`~group.Group` class.
 
 Each group definition starts with a :ref:`name<name>`, and is then followed by
 multiple optional properties, separated by colons (in no particular order):
@@ -49,22 +49,22 @@ padded with zeros, followed by two possible options::
    functions may return more than one result if they are multiple groups with
    that name.
 
-.. warning::
 
-   Groups are first found in the pattern by looking at matching
-   parentheses. The pattern should thus have balanced parentheses or
-   unexpected behavior can occur.
-
+Groups are found within the pattern by the :meth:`.Finder._find_groups`, which
+can be customized. By default it looks for the opening of a group with
+``<prefix><start>``, and then to the matching symbol ``<end>``. The prefix,
+start, and end are defined in the attribute :attr:`.Finder._group_delimiters`,
+and are by default %, (, and ). This means the start and end symbol must be
+balanced (no parenthesis left open for instance).
 
 .. _name:
 
 Name
 ====
 
-The name of the group will dictate the regex and format string used for that
-group (unless overridden the 'fmt' and 'rgx' properties).
-The :attr:`Group.DEFAULT_GROUPS<group.Group.DEFAULT_GROUPS>`
-class attribute will make the correspondence between name and regex:
+If the group name is present in :attr:`.Group.DEFAULT_GROUPS`, it will dictate
+the regex and format string used for that group (unless overridden by the 'fmt'
+and 'rgx' properties):
 
 +------+-------------------+-----------+--------+
 | Name |                   | Regex     | Format |

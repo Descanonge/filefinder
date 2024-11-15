@@ -388,12 +388,6 @@ def test_wrong_filename(pattern: str):
 class TestFileScan(TmpDirTest):
     # It is possible to add random files, but it is difficult to ensure they will not
     # match... It is easy to find counter examples.
-    # For Windows and Mac, they fail on lots of cases a priori because of the weird
-    # filenames generated through hypothesis. Linux does not mind though.
-    # @pytest.mark.skipif(
-    #     sys.platform != "linux",
-    #     reason="Windows and MacOS have too much quirks to make it work easily.",
-    # )
     @settings(
         suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None
     )

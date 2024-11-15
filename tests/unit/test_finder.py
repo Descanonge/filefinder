@@ -390,14 +390,14 @@ class TestFileScan(TmpDirTest):
     # match... It is easy to find counter examples.
     # For Windows and Mac, they fail on lots of cases a priori because of the weird
     # filenames generated through hypothesis. Linux does not mind though.
+    # @pytest.mark.skipif(
+    #     sys.platform != "linux",
+    #     reason="Windows and MacOS have too much quirks to make it work easily.",
+    # )
     @settings(
         suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None
     )
     @given(ref=StPattern.pattern_values(for_filename=True, min_group=1, parsable=False))
-    @pytest.mark.skipif(
-        sys.platform != "linux",
-        reason="Windows and MacOS have too much quirks to make it work easily.",
-    )
     def test_random(self, tmp_path: Path, ref: PatternValues):
         """Test that we scan files generated randomly.
 
@@ -413,14 +413,21 @@ class TestFileScan(TmpDirTest):
         files = list(ref.filenames)
         files = list(set(files))
         files.sort()
+        on_disk = []
         for f in files:
-            fd.create_file(path.join(datadir, f))
+            try:
+                fullname = fd.create_file(path.join(datadir, f))
+            except Exception:
+                pass
+            else:
+                if path.exists(fullname):
+                    on_disk.append(f)
 
         log.info("pattern: %s", ref.pattern)
-        log.info("n_files: %d", len(files))
+        log.info("n_files: %d", len(on_disk))
         finder = Finder(fd.get_absolute(datadir), ref.pattern)
-        assert len(finder.files) == len(files)
-        for f, f_ref in zip(finder.get_files(relative=True), files, strict=False):
+        assert len(finder.files) == len(on_disk)
+        for f, f_ref in zip(finder.get_files(relative=True), on_disk, strict=False):
             assert f == f_ref
 
         # Check str/repr

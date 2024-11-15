@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import typing as t
+import unicodedata
 from collections import abc
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -23,10 +24,13 @@ MAX_TEXT_SIZE = 32
 
 if sys.platform in ["win32", "cygwin"]:
     FORBIDDEN_CHAR = set('<>:;"\\|?.*')
+    PLATFORM = "win"
 elif sys.platform == "darwin":
     FORBIDDEN_CHAR = set(":;")
+    PLATFORM = "mac"
 else:
     FORBIDDEN_CHAR = set()
+    PLATFORM = "linux"
 
 
 T = t.TypeVar("T")
@@ -177,6 +181,10 @@ def build_exclude(
     return exclude
 
 
+def decompose(strat: st.SearchStrategy[str]) -> st.SearchStrategy[str]:
+    return strat.map(lambda s: unicodedata.normalize("NFD", s))
+
+
 @dataclass
 class FormatSpecs:
     """Store format specs and generate format string."""
@@ -262,7 +270,7 @@ class FormatSpecs:
         if self.kind == "s":
             exclude = build_exclude(for_pattern=for_pattern, for_filename=for_filename)
             exclude_cat = ["C"]
-            if sys.platform in ["win32", "cygwin", "darwin"]:
+            if PLATFORM in ["win", "mac"]:
                 exclude_cat += ["Z", "P", "S", "M"]
             strat = st.text(
                 alphabet=st.characters(
@@ -276,6 +284,8 @@ class FormatSpecs:
             # this gives ambiguous parsing
             fill = self.fill if self.fill and self.align else " "
             strat = strat.map(lambda s: form(self.format_string, s).strip(fill))
+            if for_filename and PLATFORM == "mac":
+                strat = decompose(strat)
             return strat
 
         # Floats
@@ -332,9 +342,15 @@ class StFormat:
         excluded using :func:`build_exclude`.
         """
         exclude = build_exclude(set("{}"), for_pattern, for_filename)
+
+        if for_filename and PLATFORM == "mac":
+            max_codepoint = 127
+        else:
+            max_codepoint = MAX_CODEPOINT
         alph = st.characters(
             exclude_categories=["Cc", "Cs"],
             exclude_characters=exclude,
+            max_codepoint=max_codepoint,
         )
         return st.text(alphabet=alph, min_size=0, max_size=1)
 
@@ -498,6 +514,8 @@ class GroupSpecs:
             strat = strat.filter(lambda s: len(s) < MAX_TEXT_SIZE)
             strat = strat.map(lambda s: s.strip())
             strat = strat.filter(lambda s: re.fullmatch(self.rgx, s))
+            if for_filename and PLATFORM == "mac":
+                strat = decompose(strat)
             return strat
 
         if "bool_elts" in self:
@@ -610,6 +628,8 @@ class StGroup:
             .filter(lambda rgx: r"\\" not in rgx)
             .filter(lambda rgx: is_valid(rgx))
         )
+        if for_filename and PLATFORM == "mac":
+            strat = decompose(strat)
 
         return strat
 
@@ -646,6 +666,10 @@ class StGroup:
         def strat(draw: Drawer) -> tuple[str, str]:
             strat_a = st.text(min_size=1, **kwargs)
             strat_b = st.text(min_size=0 if allow_empty else 1, **kwargs)
+            if for_filename and PLATFORM == "mac":
+                strat_a = decompose(strat_a)
+                strat_b = decompose(strat_b)
+
             a = draw(strat_a)
             b = draw(strat_b.filter(lambda x: x != a))
             return a, b
@@ -889,6 +913,9 @@ class StPattern:
             # no consecutive folder separator
             consecutive_sep = re.compile("//")
             text = text.map(lambda s: consecutive_sep.sub("/", s))
+
+            if for_filename and PLATFORM == "mac":
+                text = decompose(text)
 
             segments = ["" for _ in range(2 * len(groups) + 1)]
             if len(groups) > 0:

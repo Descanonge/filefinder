@@ -901,6 +901,10 @@ class StPattern:
                 ends = text.filter(
                     lambda s: not s.startswith("/") and not s.endswith("/")
                 )
+                if sys.platform in ["win32", "cygwin"]:
+                    ends = ends.filter(lambda s: not s.isspace())
+                    ends = ends.map(lambda s: s.strip())
+
                 segments[0] = draw(ends)
                 segments[-1] = draw(ends)
 

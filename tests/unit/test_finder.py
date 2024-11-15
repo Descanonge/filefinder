@@ -432,7 +432,7 @@ class TestFileScan(TmpDirTest):
 
         # Check str/repr
         lines = repr(finder).splitlines()
-        assert lines[-1] == f"scanned: found {len(files)} files"
+        assert lines[-1] == f"scanned: found {len(on_disk)} files"
 
     def test_manual(self, tmp_path: Path):
         fd = FilesDefinitionAuto(tmp_path, create=True)

@@ -886,6 +886,9 @@ class StPattern:
                 min_size=1 if separate else 0,
                 max_size=MAX_TEXT_SIZE,
             )
+            # no consecutive folder separator
+            consecutive_sep = re.compile("//")
+            text = text.map(lambda s: consecutive_sep.sub("/", s))
 
             segments = ["" for _ in range(2 * len(groups) + 1)]
             if len(groups) > 0:

@@ -388,6 +388,12 @@ def test_wrong_filename(pattern: str):
 class TestFileScan(TmpDirTest):
     # It is possible to add random files, but it is difficult to ensure they will not
     # match... It is easy to find counter examples.
+    # Mac fails on lots of cases a priori because of the weird
+    # filenames generated through hypothesis.
+    @pytest.mark.skipif(
+        sys.platform == "darwin",
+        reason="MacOS creates too much issues related to filename generation.",
+    )
     @settings(
         suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None
     )

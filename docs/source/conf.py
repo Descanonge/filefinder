@@ -91,7 +91,7 @@ html_theme_options = dict(
         ),
         dict(
             name="PyPI",
-            url="https://pypi.org/filefinder",
+            url="https://pypi.org/project/filefinder",
             icon="fa-brands fa-python",
         ),
     ],

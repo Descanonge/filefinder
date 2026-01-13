@@ -151,7 +151,9 @@ class Finder:
 
     def set_use_regex(self, use_regex: bool, /) -> None:
         """Set value for attribute :attr:`use_regex`."""
-        self.use_regex = use_regex
+        if use_regex != self.use_regex:
+            self.use_regex = use_regex
+            self._void_cache()
 
     def get_group_names(self, fixed: bool | None = None) -> set[str]:
         """Get the names of groups in the pattern.

@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from hypothesis import assume
 from hypothesis import strategies as st
 
 from filefinder.format import Format, FormatError
@@ -646,13 +647,17 @@ class StGroup:
 
         kwargs: dict[str, t.Any] = dict(alphabet=alphabet, max_size=MAX_TEXT_SIZE)
 
+        reserved_kw = ["fmt", "bool", "rgx", "opt", "discard"]
+
         @st.composite
         def strat(draw: Drawer) -> tuple[str, str]:
             strat_a = st.text(min_size=1, **kwargs)
             strat_b = st.text(min_size=0 if allow_empty else 1, **kwargs)
 
             a = draw(strat_a)
+            assume(a not in reserved_kw)
             b = draw(strat_b.filter(lambda x: x != a))
+            assume(b not in reserved_kw)
             return a, b
 
         return strat()

@@ -35,15 +35,18 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    'sphinx==6.2.1',
-    'sphinx-book-theme==1.0.1',
+    'sphinx==8.0.*',
+    'sphinx-book-theme==1.1.*',
     'ruff',
     'mypy>=1.5',
     'pytest>=7.4',
-    'pyfakefs',
     'hypothesis',
-    'coverage',
-    'pytest-cov'
+    'coverage'
+]
+tests = [
+    'pytest>=7.4',
+    'hypothesis',
+    'coverage'
 ]
 
 [project.urls]

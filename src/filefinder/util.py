@@ -88,8 +88,10 @@ def get_groups_indices(
 
     Raises
     ------
-    IndexError: No group found corresponding to the key
-    TypeError: Key is not int or str
+    IndexError
+        No group found corresponding to the key
+    TypeError
+        Key is not int or str
     """
     if isinstance(key, int):
         return [key]

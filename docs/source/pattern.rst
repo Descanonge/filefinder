@@ -20,7 +20,7 @@ multiple optional properties, separated by colons (in no particular order):
 +---------------+--------------------------+--------------------------------+
 |:ref:`Boolean  |``:bool=<true>[:<false>]``|Choose between two alternatives.|
 |format<bool>`  |                          |The second option (false) can be|
-|               |                          |omitted.                        |
+|               |                          |omitted when empty.             |
 +---------------+--------------------------+--------------------------------+
 |:ref:`Custom   |``:rgx=<custom regex>``   |Specify a custom regular        |
 |regex<rgx>`    |                          |expression directly.            |
@@ -37,9 +37,9 @@ multiple optional properties, separated by colons (in no particular order):
 So for instance, we can specify a filename pattern that will match an integer
 padded with zeros, followed by two possible options::
 
-   >>> "parameter_%(param:fmt=04d)_type_%(type:bool=foo:bar).txt"
-   parameter_0012_type_foo.txt
-   parameter_2020_type_bar.txt
+   >>> "parameter_%(param:fmt=04d)_%(type:bool=foo:bar).txt"
+   parameter_0012_foo.txt
+   parameter_2020_bar.txt
 
 
 .. note::
@@ -50,7 +50,7 @@ padded with zeros, followed by two possible options::
    that name.
 
 
-Groups are found within the pattern by the :meth:`.Finder._find_groups`, which
+Groups are found within the pattern by :meth:`.Finder._find_groups`, which
 can be customized. By default it looks for the opening of a group with
 ``<prefix><start>``, and then to the matching symbol ``<end>``. The prefix,
 start, and end are defined in the attribute :attr:`.Finder._group_delimiters`,
@@ -140,7 +140,7 @@ or we can generate a filename::
 In the opposite direction, we can retrieve a value from a filename::
 
   >>> matches = finder.find_matches('scale_2.5')
-  >>> print(matches['scale'].get_match())
+  >>> print(matches['scale'])
   2.5  # a float
 
 If the format is never specified, it defaults to a ``s`` format.
@@ -167,10 +167,10 @@ Boolean format
 
 The boolean format allows to easily select between two *strings*. It is
 specified as ``:bool=<true>[:<false>]``. The second option (false), can be
-omitted.
+omitted if empty.
 
 Here are a couple of examples. ``my_file%(special:bool=_special).txt`` would
-match both ``my_file.txt`` and ``my_file_special.txt``. We could select only
+match both ``my_file.txt`` and ``my_file_special.txt``. We would select only
 'special' files using ``finder.fix_groups(special=True)``.
 
 We can also specify both options with ``my_file_%(kind:bool=good:bad).txt``, and
@@ -204,13 +204,20 @@ It can be done like so::
 
   idx_%(idx:rgx=\d+?)
 
+
+.. important::
+
+   We rely on the indices of matching groups. There must be as many groups in
+   the pattern as matching groups in the final regular expression. Therefore
+   only use non-capturing groups ``(?:...)``.
+
 .. _discard:
 
 Discard keyword
 ===============
 
 :ref:`Information can be retrieved<retrieve-information>` from the matches in
-the filename, but one might discard a group so that it is not used. For example
+the filename, but one can discard a group so that it is not used. For example
 for a file of weekly averages with a filename indicating the start and end dates
 of the average, we might want to only recover the starting date::
 

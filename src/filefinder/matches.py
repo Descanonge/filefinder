@@ -136,8 +136,7 @@ class Matches:
         filename:
             Filename to retrieve matches from.
         pattern
-            Compiled match pattern to use. If left to None, we generate the current
-            regex.
+            Match pattern to use, compiled or not.
 
         Returns
         -------
@@ -240,7 +239,8 @@ class Matches:
 
         Raises
         ------
-        KeyError: No group with no 'discard' option was found.
+        KeyError
+            No group with no 'discard' option was found.
         """
         values = self.get_values(key, parse=parse, keep_discard=keep_discard)
         if len(values) == 0:

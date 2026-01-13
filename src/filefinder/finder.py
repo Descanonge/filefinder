@@ -33,8 +33,7 @@ class Finder:
     root:
         The root directory of the filetree where all files can be found.
     pattern:
-        A regular expression with the addition of 'groups'. See :ref:`find-files` for
-        details.
+        The filename pattern. See :doc:`/pattern` for details.
     use_regex:
         If True, characters outside of groups are considered as valid regex (and
         not escaped). Default is False.
@@ -55,7 +54,7 @@ class Finder:
     """Delimiter characters of groups in the pattern.
 
     Tuple of (prefix, start characters, end characters).
-    Start and end character must be balanced within the group.
+    Start and end character must be balanced within the group. Prefix can be empty.
     """
 
     def __init__(
@@ -70,7 +69,6 @@ class Finder:
         self.use_regex: bool = use_regex
         """If True, characters outside of groups are considered as valid regex
         (and not escaped). Default is False."""
-
         self.scan_everything: bool = scan_everything
         """Whether to scan all subdirectories."""
 
@@ -80,7 +78,7 @@ class Finder:
         self._segments: list[str] = []
         """Segments of the pattern. Used to replace specific groups.
         `['text before group 1', 'group 1',
-        'text before group 2, 'group 2', ...]`
+        'text before group 2, 'group 2', ..., 'text after last group']`
         """
         self._files: list[tuple[str, Matches]] = []
         self.scanned: bool = False
@@ -179,8 +177,6 @@ class Finder:
 
         Lazily scan files: if files were already scanned, just return
         the stored list of files.
-        Scanned files are flushed if the regex is changed (by fixing group
-        for instance).
 
         Parameters
         ----------
@@ -194,7 +190,8 @@ class Finder:
 
         Raises
         ------
-        KeyError: A group name in `nested` is not found in the pattern.
+        KeyError
+            A group name in `nested` is not found in the pattern.
         """
 
         def get_files(files_matches):
@@ -251,11 +248,13 @@ class Finder:
         return os.path.relpath(filename, self.root)
 
     def get_absolute(self, filename: str) -> str:
-        """Get absolute path to filename."""
+        """Concatenate the finder root directory and a filename."""
         return os.path.join(self.root, filename)
 
     def fix_group(self, key: GroupKey, value: str | t.Any, fix_discard: bool = False):
         """Fix a group to a string.
+
+        This will void the cache.
 
         Parameters
         ----------
@@ -264,11 +263,10 @@ class Finder:
             name of a group. If multiple groups share the same name, they are
             all fixed to the same value.
         value:
-            Will replace the match for all files. Can be a string, or a value
-            that will be formatted using the group format string.
-            A list of values will be joined by the regex '|' OR.
-            A string will be interpreted as a regular expression, so all special
+            Can be a string, or a value that will be formatted using the group format
+            string. A string will be interpreted as a regular expression, so all special
             characters should be properly escaped.
+            A list of values will be joined by the regex '|' OR.
         fix_discard:
             If True, groups with the 'discard' option will still be fixed.
             Default is False.
@@ -314,6 +312,8 @@ class Finder:
     def unfix_groups(self, *keys: GroupKey):
         """Unfix groups, and remove group related filters.
 
+        This will void the cache.
+
         Parameters
         ----------
         keys:
@@ -340,6 +340,8 @@ class Finder:
 
     def add_filter(self, func: abc.Callable[..., bool], **kwargs: t.Any):
         """Add a filter with which to select scanned files.
+
+        The filter will be applied to files already in the cache.
 
         See :ref:`filtering` for details.
 
@@ -369,7 +371,7 @@ class Finder:
         pass_unparsed: bool = False,
         **kwargs,
     ):
-        """Fix a group value by using a filter, or predicate.
+        """Fix a group value by using a filter function.
 
         When a file is scanned, if it matches the pattern, it will only be kept if
         `func` returns True when called with the group parsed value. If the group cannot
@@ -377,27 +379,26 @@ class Finder:
         the predicate function nonetheless, otherwise it will not keep the file
         (default).
 
-        This add a filter (see :meth:`add_filter`) with a name consisting of the `key`
+        This adds a filter (see :meth:`add_filter`) with a name consisting of the `key`
         and a unique id (this allows multiple filters for a single group).
 
         Parameters
         ----------
         key:
-            Can be the index of a group in the pattern (starts at 0), or the
-            name of a group. If multiple groups share the same name, they are
-            all fixed.
+            Can be the index of a group in the pattern (starts at 0), or the name of a
+            group. If multiple groups share the same name, they are all fixed.
         func
-            A function that take the parsed value of the group and returns True if the
+            A function that takes the parsed value of the group and returns True if the
             corresponding file should be kept, or False otherwise. If multiple groups
-            correspond to the key, **all** values will be tested.
+            correspond to the key, **all** values will be tested succesively.
         fix_discard
             If True, also use groups values with the *discard* flag. Default is False.
         pass_unparsed
-            If True, and if the group cannot parse the string the pass the unparsed
-            string to the predicate function `func` anyway. If False the file will not
-            be kept if the group cannot parse the string. Default is False.
+            In case the group cannot parse the string, if True pass the unparsed string
+            to the predicate function `func` anyway. If False (default) the file will
+            not be kept.
         default_date
-            Passed to :func:`.library.get_date`.
+            Passed to :func:`.library.get_date` if key is "date".
         kwargs
             Will be passed to the function.
         """
@@ -468,6 +469,8 @@ class Finder:
         Replace groups with provided values.
         All groups must be fixed prior, or with `fixes` argument.
 
+        Only works if :attr:`use_regex` is set to False (default).
+
         Parameters
         ----------
         fixes:
@@ -482,7 +485,8 @@ class Finder:
 
         Raises
         ------
-        ValueError: `use_regex` is activated.
+        ValueError
+            `use_regex` is activated.
         """
         if self.use_regex:
             raise ValueError(
@@ -537,7 +541,7 @@ class Finder:
         ]
 
     def _find_groups(self, pattern: str) -> list[tuple[str, int, int]]:
-        """Find the groups within pattern and the corresponding string indices.
+        """Find the groups within the pattern and their corresponding string indices.
 
         * The returned indices should be sorted in order of appearance in the pattern.
         * The indices should correspond to the first and last character of the group,
@@ -605,7 +609,7 @@ class Finder:
         return self._get_regex().split("/")
 
     def find_files(self) -> None:
-        """Find files to scan and store them.
+        """Find files to scan and store them in cache.
 
         Is automatically called when accessing :attr:`files` or :func:`get_files`. Apply
         all filters and sort files alphabetically.
@@ -624,19 +628,19 @@ class Finder:
         self.scanned = True
 
     def _add_file(self, filename: str, pattern: re.Pattern):
-        """Add file if it matches pattern and pass filters."""
+        """Add file to cache if it matches pattern and pass filters."""
         matches = self._make_matches(filename, pattern)
         if matches is not None and self.filters.is_valid(self, filename, matches):
             self._files.append((filename, matches))
 
     def _find_files_scan_everything(self) -> None:
-        """Find files checking every sub-directory.
+        """Find files in all sub-directories.
 
         Because having to check if a sub-directory matches the pattern is difficult,
         this allows for more exotic patterns where a folder separator can appear in a
         capturing group, by example for optional sub-directories.
 
-        This will the whole filetree under :attr:`root` and check every file found,
+        This will scan the whole filetree under :attr:`root` and check every file found,
         which can be significant work in some cases.
         """
         pattern = re.compile(self.get_regex())
@@ -701,6 +705,7 @@ class Finder:
                 dirnames.remove(d)
 
     def _void_cache(self) -> None:
+        """Clear the cache."""
         self.scanned = False
         self._files.clear()
 
@@ -721,8 +726,10 @@ class Finder:
 
         Raises
         ------
-        KeyError: No group found.
-        TypeError: Key type is not valid.
+        KeyError
+            No group found.
+        TypeError
+            Key type is not valid.
         """
         selected = get_groups_indices(self.groups, key, self.date_is_first_class)
         groups = [self.groups[i] for i in selected]

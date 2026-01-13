@@ -175,6 +175,9 @@ def filter_by_range(
     Keep filename for which the value parsed for `group` fall within a specific range
     defined by `min` and `max`.
 
+    .. deprecated:: 1.3.0
+        You can now use ``finder.fix_by_filter(group, lambda x: min < x < max)``
+
     Parameters
     ----------
     group
@@ -211,6 +214,9 @@ def filter_date_range(
     default_date: dict | None = None,
 ) -> bool:
     """Filter filename to be between two dates.
+
+    .. deprecated:: 1.3.0
+        You can now use ``finder.fix_by_filter("date", lambda x: start < x < stop)``
 
     Parameters
     ----------

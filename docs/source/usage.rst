@@ -13,8 +13,8 @@ The main entry point of this package is the :class:`.Finder` class. Its main
 arguments are the root directory containing the files, and a pattern specifying
 the filename structure. For instance for files contained in the ``/data``
 directory that follow the structure
-``param_[parameter]/[year]/variable_[Y]-[m]-[d].nc``, with the parameter being a
-float with a precision of one decimal::
+``param_[parameter]/[year]/variable_[year]-[month]-[day].nc``, with the
+parameter being a float with a precision of one decimal::
 
     finder = Finder(
         "/data",
@@ -39,8 +39,9 @@ a :ref:`string format<fmt>`.
 Restrict values
 ===============
 
-The filenames to keep can be restricted using two main ways: directly fixing
-groups to specific values, or/and run arbitrary filters on those filenames.
+The filenames to keep when scanning can be restricted using two main ways:
+directly fixing groups to specific values, or/and run arbitrary filters on those
+filenames.
 
 .. _fix-groups:
 
@@ -48,23 +49,24 @@ Fix Groups
 ++++++++++
 
 Each group can be fixed to one value or to a set of possible values. This will
-adapt the regular expression used and thus restrict the filenames when scanning.
+adapt the regular expression used and thus restrict the filenames kept when
+scanning.
 
 .. note::
 
-   Also, when :ref:`creating filenames<create-filenames>`, if a group already
+   When :ref:`creating filenames<create-filenames>`, if a group already
    has a fixed value it will be used by default.
 
 Fixing groups can be done with either the :meth:`.Finder.fix_group` or
 :meth:`.Finder.fix_groups` methods.
 Groups can be selected either by their index in the filename pattern (starting
-from 0), or by their name. If using a group name, multiple groups can be fixed
-to the same value at once.
+from 0), or by their name. If using a name, groups with the same name can be
+fixed to the same value all at once.
 
 The given value can be:
 
 * a **number**: will be formatted to a string according to the group
-  specification. For scanning files, the string will be properly escaped for
+  specification. When scanning files, the string will be properly escaped for
   use in a regular expression.
 * a **boolean**: if the group has two options (specified with the
   :ref:`bool<bool>` keyword), one of the options is selected and used as a
@@ -150,7 +152,7 @@ filters won't run).
 
 Very often, it can suffice to have a filter operate on the value from a single
 group. To that end, one can create a **group** filter by using
-:meth:`.Finder.fix_by_filter`. This requires a function which act on a single
+:meth:`.Finder.fix_by_filter`. This requires a function which acts on a single
 value.
 
 For instance, let's say we only need days that are even::
@@ -182,14 +184,6 @@ See the next section for more information on the "date" group exception.
    If the parsing of a group fails, its filters will be ignored unless
    *pass_unparsed=True* is passed to *fix_by_filter*, in which case the matched
    string will be passed to the filter.
-
-.. note::
-
-   Some filters functions are provided: :func:`.library.filter_by_range` and
-   :func:`.library.filter_date_range`. They are kept for compatibility but are
-   not as useful since the addition of *fix_by_filter* and "date" as first
-   class citizen (see below).
-
 
 .. _dates:
 
@@ -239,14 +233,14 @@ Retrieve files
 
 Files can be retrieved with the :meth:`.Finder.get_files` method, or from the
 :attr:`.Finder.files` attribute. Both will automatically scan the directory for
-matching files and cache the results for future accesses. The files are stored
+matching files and cache the results for future access. The files are stored
 in alphabetical order.
 
 .. note::
 
-    The cache is appropriately voided when using some methods, like for fixing
-    groups. For that reason, avoid setting attributes directly and use set
-    methods.
+    The cache is appropriately voided when using some methods, like when fixing
+    groups. For that reason, avoid setting attributes directly on a Finder
+    instance and use set methods instead.
 
 The method :meth:`~.Finder.get_files` simply returns a sorted list of the
 filenames found when scanning. By default the full path is returned, ie the
@@ -378,7 +372,7 @@ relevant groups present in the pattern.
 Directories in pattern
 ++++++++++++++++++++++
 
-The pattern can contain directory separators. The :class:`~.finder.Finder` can
+The pattern can contain directory separators. The :class:`~.finder.Finder` will
 explore sub-directories to find the files.
 
 .. important::

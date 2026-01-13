@@ -46,7 +46,8 @@ class Group:
 
     Raises
     ------
-    GroupParseError: Invalid group definition.
+    GroupParseError
+        Invalid group definition.
     """
 
     PATTERN = re.compile(
@@ -212,7 +213,8 @@ class Group:
 
         Raises
         ------
-        KeyError: Unknown replacement.
+        KeyError
+            Unknown replacement.
         """
 
         def replace(match: re.Match):

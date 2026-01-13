@@ -57,7 +57,7 @@ class Group:
     )
     """Pattern used to find properties in group definition.
 
-    See :meth:`_check_duplicate` for details on the pattern matching.
+    See :meth:`_check_duplicates` for details on the pattern matching.
     """
 
     DEFAULT_GROUPS = {

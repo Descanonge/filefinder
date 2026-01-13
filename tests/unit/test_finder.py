@@ -126,6 +126,15 @@ class TestFinderStructure:
         with pytest.raises(IndexError):
             f.find_matches("0_barr")
 
+    def test_group_other_delimiters(self):
+        """Test that more complex group delimiters work."""
+        # Using double accolades
+        f = Finder("", "")
+        f._group_delimiters = ("", "{{", "}}")
+        f.set_pattern("0_{{Y}}_{{m}}")
+
+        assert f.get_group_names() == {"Y", "m"}
+
 
 class TestFinderRegex:
     def test_custom_regex(self):

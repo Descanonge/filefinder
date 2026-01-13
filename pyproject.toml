@@ -35,13 +35,12 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    'ruff',
+    'mypy>=1.5'
+]
+docs = [
     'sphinx==8.0.*',
     'sphinx-book-theme==1.1.*',
-    'ruff',
-    'mypy>=1.5',
-    'pytest>=7.4',
-    'hypothesis',
-    'coverage'
 ]
 tests = [
     'pytest>=7.4',

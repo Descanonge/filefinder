@@ -561,11 +561,7 @@ class StGroup:
 
     @classmethod
     def name(cls, parsable: bool = False) -> st.SearchStrategy[str]:
-        """Strategy for group name.
-
-        If parsable is True, exclude group defaults names (this generator has no
-        knowledge of them).
-        """
+        """Strategy for group name."""
         strat = st.text(
             alphabet=st.characters(
                 exclude_categories=["C"],
@@ -575,10 +571,9 @@ class StGroup:
             min_size=1,
             max_size=MAX_TEXT_SIZE,
         )
-        if parsable:
-            strat = strat.filter(lambda s: s not in Group.DEFAULT_GROUPS).filter(
-                lambda s: s != "date"
-            )
+        strat = strat.filter(lambda s: s not in Group.DEFAULT_GROUPS).filter(
+            lambda s: s != "date"
+        )
         return strat
 
     @classmethod

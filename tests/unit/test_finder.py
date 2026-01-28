@@ -24,7 +24,7 @@ from util import (
 )
 
 from filefinder import Finder
-from filefinder.util import datetime_to_value, name_to_date
+from filefinder.util import datetime_attributes, datetime_to_value
 
 log = logging.getLogger(__name__)
 
@@ -180,7 +180,7 @@ class TestFixDate:
         # check by hand for simple cases
         for name in set(group_names) & set("YmdHMS"):
             for grp in finder.get_groups(name):
-                for elt in name_to_date[name]:
+                for elt in datetime_attributes[name]:
                     assert grp.fixed_value == getattr(date, elt)
 
     def test_fix_date_wrong(self):

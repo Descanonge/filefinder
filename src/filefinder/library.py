@@ -11,7 +11,7 @@ from collections import abc
 
 from .finder import Finder
 from .matches import Match, Matches
-from .util import date_from_doy, name_to_date
+from .util import date_from_doy, datetime_attributes
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ def get_date(
 
     def process_simple(m: Match):
         value = m.get_match(parse=True)
-        elts = name_to_date[m.group.name]
+        elts = datetime_attributes[m.group.name]
         assert len(elts) == 1
         return {elts[0]: value}
 

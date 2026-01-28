@@ -3,8 +3,10 @@
 Presentely, only `library.get_date`.
 """
 
+# ruff: noqa: PLR2004
+
+import datetime as dt
 import os
-from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -16,29 +18,56 @@ import filefinder.library
 from filefinder.finder import Finder
 from filefinder.util import (
     date_from_doy,
+    datetime_attributes,
     datetime_to_str,
     datetime_to_value,
     get_doy,
-    name_to_date,
 )
 
 
 class TestDatetimeUtil:
     def test_datetime_to_str(self):
-        date = datetime(2086, 3, 2, 1, 34, 6)
+        date = dt.datetime(2086, 3, 2, 1, 34, 6)
         assert datetime_to_str(date, "Y") == "2086"
         assert datetime_to_str(date, "m") == "03"
         assert datetime_to_str(date, "d") == "02"
         assert datetime_to_str(date, "B") == "March"
-        assert datetime_to_str(date, "x") == "20860302"
-        assert datetime_to_str(date, "F") == "2086-03-02"
+
         assert datetime_to_str(date, "H") == "01"
         assert datetime_to_str(date, "M") == "34"
         assert datetime_to_str(date, "S") == "06"
+
+        assert datetime_to_str(date, "x") == "20860302"
         assert datetime_to_str(date, "X") == "013406"
+        assert datetime_to_str(date, "F") == "2086-03-02"
+
+        with pytest.raises(KeyError):
+            datetime_to_str(date, "NOT_A_KEY")
+        with pytest.raises(TypeError):
+            datetime_to_str(dt.date(2000, 1, 1), "H")
+
+    def test_datetime_to_value_basic(self):
+        date = dt.datetime(2086, 3, 2, 1, 34, 6)
+        assert datetime_to_value(date, "Y") == 2086
+        assert datetime_to_value(date, "m") == 3
+        assert datetime_to_value(date, "d") == 2
+        assert datetime_to_value(date, "B") == "March"
+
+        assert datetime_to_value(date, "H") == 1
+        assert datetime_to_value(date, "M") == 34
+        assert datetime_to_value(date, "S") == 6
+
+        assert datetime_to_value(date, "x") == 20860302
+        assert datetime_to_value(date, "X") == 13406
+        assert datetime_to_value(date, "F") == "2086-03-02"
+
+        with pytest.raises(KeyError):
+            datetime_to_value(date, "NOT_A_KEY")
+        with pytest.raises(TypeError):
+            datetime_to_value(dt.date(2000, 1, 1), "H")
 
     @given(date=st.datetimes())
-    def test_datetime_to_value(self, date: datetime):
+    def test_datetime_to_value(self, date: dt.datetime):
         assert datetime_to_value(date, "Y") == date.year
         assert datetime_to_value(date, "m") == date.month
         assert datetime_to_value(date, "d") == date.day
@@ -46,15 +75,17 @@ class TestDatetimeUtil:
         assert datetime_to_value(date, "M") == date.minute
         assert datetime_to_value(date, "S") == date.second
 
-        for name in "FxXB":
+        for name in "FB":
             assert datetime_to_value(date, name) == datetime_to_str(date, name)
+        for name in "xX":
+            assert datetime_to_value(date, name) == int(datetime_to_str(date, name))
 
     def test_get_doy(self):
-        assert get_doy(datetime(2004, 1, 1)) == 1
-        assert get_doy(datetime(2004, 1, 2)) == 2
-        assert get_doy(datetime(2004, 2, 1)) == 32
-        assert get_doy(datetime(2004, 3, 1)) == 61
-        assert get_doy(datetime(2005, 3, 1)) == 60
+        assert get_doy(dt.datetime(2004, 1, 1)) == 1
+        assert get_doy(dt.datetime(2004, 1, 2)) == 2
+        assert get_doy(dt.datetime(2004, 2, 1)) == 32
+        assert get_doy(dt.datetime(2004, 3, 1)) == 61
+        assert get_doy(dt.datetime(2005, 3, 1)) == 60
 
     def test_date_from_doy(self):
         assert date_from_doy(1, 2004) == dict(month=1, day=1)
@@ -64,7 +95,7 @@ class TestDatetimeUtil:
         assert date_from_doy(60, 2005) == dict(month=3, day=1)
 
     @given(date=st.datetimes())
-    def test_date_to_doy_and_back(self, date: datetime):
+    def test_date_to_doy_and_back(self, date: dt.datetime):
         doy = get_doy(date)
         back = date_from_doy(doy, date.year)
         assert back["month"] == date.month
@@ -73,7 +104,7 @@ class TestDatetimeUtil:
     @given(doy=st.integers(1, 365), year=st.integers(1, 3000))
     def test_doy_to_date_and_back(self, doy: int, year: int):
         elts = date_from_doy(doy, year)
-        date = datetime(year, elts["month"], elts["day"])
+        date = dt.datetime(year, elts["month"], elts["day"])
         back = get_doy(date)
         assert doy == back
 
@@ -84,7 +115,7 @@ class TestDateRecovery:
     )
     @given(segments=time_segments(), date=st.datetimes(), default_date=st.datetimes())
     def test_get_date(
-        self, segments: list[str], date: datetime, default_date: datetime
+        self, segments: list[str], date: dt.datetime, default_date: dt.datetime
     ):
         """Test obtaining a date from a pattern.
 
@@ -107,12 +138,12 @@ class TestDateRecovery:
         group_names = segments[1::2]
         elements_specified = set()
         for name in group_names:
-            for elt in name_to_date[name]:
-                elements[elt] = getattr(date, elt)
-                elements_specified.add(elt)
+            for attr in datetime_attributes[name]:
+                elements[attr] = getattr(date, attr)
+                elements_specified.add(attr)
 
         try:
-            date_ref = datetime(**elements)
+            date_ref = dt.datetime(**elements)
         except ValueError:
             # from combining elements and default date, we might have a day value that
             # is too high for the month
@@ -172,7 +203,9 @@ class TestFilters:
     def setup_test(self, tmp_path: Path):
         self.fd = FilesDefinitionAuto(
             tmp_path,
-            dates=[datetime(2000, 1, 1) + i * timedelta(days=1) for i in range(365)],
+            dates=[
+                dt.datetime(2000, 1, 1) + i * dt.timedelta(days=1) for i in range(365)
+            ],
             params=list(range(20)),
             create=True,
         )
@@ -211,8 +244,8 @@ class TestFilters:
         self.finder.clear_filters()
         self.finder.add_filter(
             filefinder.library.filter_date_range,
-            start=datetime(2000, 5, 10),
-            stop=datetime(2000, 6, 10),
+            start=dt.datetime(2000, 5, 10),
+            stop=dt.datetime(2000, 6, 10),
         )
         assert_nfiles(self.finder, ndays * nparams * noptions)
 
@@ -226,14 +259,14 @@ class TestFilters:
         noptions = len(options)
 
         self.finder.fix_by_filter(
-            "date", lambda d: datetime(2000, 1, 1) <= d <= datetime(2000, 1, 2)
+            "date", lambda d: dt.datetime(2000, 1, 1) <= d <= dt.datetime(2000, 1, 2)
         )
         ndays = 2
         assert_nfiles(self.finder, ndays * nparams * noptions)
 
         self.finder.clear_filters()
         self.finder.fix_by_filter(
-            "date", lambda d: datetime(2000, 5, 10) <= d <= datetime(2000, 6, 10)
+            "date", lambda d: dt.datetime(2000, 5, 10) <= d <= dt.datetime(2000, 6, 10)
         )
         ndays = 32
         assert_nfiles(self.finder, ndays * len(params) * 2)
@@ -242,7 +275,7 @@ class TestFilters:
         self.finder.fix_groups(m=[5, 6])
         self.finder.clear_filters()
         self.finder.fix_by_filter(
-            "date", lambda d: datetime(2000, 5, 10) <= d <= datetime(2000, 6, 10)
+            "date", lambda d: dt.datetime(2000, 5, 10) <= d <= dt.datetime(2000, 6, 10)
         )
         assert_nfiles(self.finder, ndays * nparams * noptions)
 

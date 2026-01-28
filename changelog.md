@@ -1,4 +1,8 @@
 
+### v1.3.1
+
+- [2026-01-28] Fix issues when using a datetime.date (instead of datetime.datetime)
+
 ## v1.3.0
 
 - [2024-10-16] Manage filters using custom objects

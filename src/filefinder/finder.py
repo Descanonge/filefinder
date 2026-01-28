@@ -277,7 +277,7 @@ class Finder:
             if not fix_discard and m.discard:
                 continue
             if key == "date" and self.date_is_first_class:
-                if not isinstance(value, datetime.datetime):
+                if not isinstance(value, datetime.date):
                     raise TypeError(
                         "If key is date, value must be a date or datetime object."
                     )

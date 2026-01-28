@@ -1,70 +1,94 @@
 """General utilities."""
 
-from datetime import date, datetime, timedelta
+import datetime as dt
 
 from .group import Group, GroupKey
 
 datetime_keys = "YBmdjHMSFxX"
+time_keys = "XHMS"
 
-name_to_date = {
+datetime_attributes = {
     "F": ["year", "month", "day"],
     "x": ["year", "month", "day"],
-    "X": ["hour", "minute", "second"],
     "Y": ["year"],
     "m": ["month"],
-    "B": ["month"],
     "d": ["day"],
+    "B": ["month"],
     "j": ["month", "day"],
+    "X": ["hour", "minute", "second"],
     "H": ["hour"],
     "M": ["minute"],
     "S": ["second"],
 }
-"""Elements of datetime to set for each group."""
+"""Attributes of datetime objects for each group name."""
+
+datetime_format = {
+    "F": "{:04d}-{:02d}-{:02d}",
+    "x": "{:04d}{:02d}{:02d}",
+    "Y": "{:04d}",
+    "m": "{:02d}",
+    "d": "{:02d}",
+    "B": "{:s}",
+    "j": "{:03d}",
+    "X": "{:02d}{:02d}{:02d}",
+    "H": "{:02d}",
+    "M": "{:02d}",
+    "S": "{:02d}",
+}
+"""Format for each group name"""
 
 
-def datetime_to_str(date: datetime, name: str) -> str:
-    """Return formatted string  of a date group name (Y, m, d, ...)."""
-    if name in "mdHMS":
-        elt = name_to_date[name][0]
-        return f"{getattr(date, elt):02d}"
-    if name == "Y":
-        return f"{date.year:04d}"
+def _check_input(date: dt.datetime | dt.date, name: str):
+    if name in time_keys and not isinstance(date, dt.datetime):
+        raise TypeError(
+            f"'{name}' group needs time information "
+            f"(received a {type(date)} object)"
+        )
+    if name not in datetime_attributes:
+        raise KeyError(f"'{name}' group name not registered in util.datetime_format")
+
+
+def datetime_to_str(date: dt.datetime | dt.date, name: str) -> str:
+    """Format a group from a date object."""
+    _check_input(date, name)
+
     if name == "j":
-        doy = get_doy(date)
-        return f"{doy:03d}"
-    if name == "F":
-        return f"{date.year:04}-{date.month:02d}-{date.day:02d}"
-    if name == "x":
-        return f"{date.year:04}{date.month:02d}{date.day:02d}"
-    if name == "X":
-        return f"{date.hour:02}{date.minute:02d}{date.second:02d}"
+        return f"{get_doy(date):03d}"
     if name == "B":
         return date.strftime("%B")
 
-    raise KeyError(f"Element '{name}' not supported [{datetime_keys}]")
+    elements = [getattr(date, attr) for attr in datetime_attributes[name]]
+    fmt = datetime_format[name]
+    return fmt.format(*elements)
 
 
-def datetime_to_value(date: datetime, name: str) -> int | str:
+def datetime_to_value(date: dt.datetime | dt.date, name: str) -> int | str:
     """Return value of date group name (Y, m, F, ...)."""
+    _check_input(date, name)
+
     if name == "j":
         return get_doy(date)
 
     if name in "xXFB":
-        return datetime_to_str(date, name)
+        s = datetime_to_str(date, name)
+        # xX can be returned as int, as per their format in DEFAULT_GROUPS
+        return int(s) if name in "xX" else s
 
-    elt = name_to_date[name]
-    assert len(elt) == 1
-    return getattr(date, elt[0])
+    elements = [getattr(date, attr) for attr in datetime_attributes[name]]
+    assert len(elements) == 1
+    return elements[0]
 
 
-def get_doy(date: datetime) -> int:
-    """Return dayofyear of a date."""
-    return (date - datetime(date.year, 1, 1)).days + 1
+def get_doy(date: dt.date | dt.datetime) -> int:
+    """Return the dayofyear of a date."""
+    if isinstance(date, dt.datetime):
+        date = date.date()
+    return (date - dt.date(date.year, 1, 1)).days + 1
 
 
 def date_from_doy(doy: int, year: int) -> dict[str, int]:
     """Get month and day from a dayofyear value (and its year)."""
-    day = date(year, 1, 1) + timedelta(days=(doy - 1))
+    day = dt.date(year, 1, 1) + dt.timedelta(days=(doy - 1))
     return dict(month=day.month, day=day.day)
 
 

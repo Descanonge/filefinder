@@ -129,8 +129,7 @@ class TestFinderStructure:
     def test_group_other_delimiters(self):
         """Test that more complex group delimiters work."""
         # Using double accolades
-        f = Finder("", "")
-        f._group_delimiters = ("", "{{", "}}")
+        f = Finder("", "", group_delimiters=("", "{{", "}}"))
         f.set_pattern("0_{{Y}}_{{m}}")
 
         assert f.get_group_names() == {"Y", "m"}

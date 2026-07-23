@@ -42,6 +42,9 @@ class Finder:
         This is appropriate if the pattern contains optional sub-directories. If false
         (default), check that every sub-directory matches its part of the regular
         expression, thus avoiding some work.
+    group_delimiters
+        Tuple of (prefix, start characters, end characters) that defines how groups are
+        delimited in the pattern. If None, the default `%()` is used.
     """
 
     max_scan_depth: int = 32
@@ -63,6 +66,7 @@ class Finder:
         pattern: str,
         use_regex: bool = False,
         scan_everything: bool = False,
+        group_delimiters: tuple[str, str, str] | None = None,
     ):
         self.root: str = root
         """The root directory of the finder."""
@@ -71,6 +75,9 @@ class Finder:
         (and not escaped). Default is False."""
         self.scan_everything: bool = scan_everything
         """Whether to scan all subdirectories."""
+
+        if group_delimiters is not None:
+            self._group_delimiters = group_delimiters
 
         self._pattern: str
 

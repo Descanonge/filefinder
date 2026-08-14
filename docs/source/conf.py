@@ -52,7 +52,7 @@ python_use_unqualified_type_names = True
 autodoc_default_options = {
     "show-inheritance": True,
     "inherited-members": False,
-    "private-members": True,
+    "private-members": False,
 }
 ## Autosummary config
 autosummary_generate = ["api.rst"]
@@ -70,18 +70,12 @@ intersphinx_mapping = {"python": ("https://docs.python.org/3/", None)}
 
 ## HTML Output
 
-html_theme = "sphinx_book_theme"
+html_theme = "pydata_sphinx_theme"
 # html_static_path = ["_static"]
 html_title = "FileFinder"
 html_theme_options = dict(
     collapse_navigation=False,
-    use_download_button=True,
-    use_fullscreen_button=False,
     show_toc_level=2,
-    repository_url="https://github.com/Descanonge/filefinder",
-    use_source_button=True,
-    repository_branch="master",
-    path_to_docs="doc",
     # Social icons
     icon_links=[
         dict(
@@ -95,12 +89,17 @@ html_theme_options = dict(
             icon="fa-brands fa-python",
         ),
     ],
+    # Navbar
+    navbar_start=["navbar-logo"],
+    navbar_center=["spacer"],
+    navbar_end=["search-button", "theme-switcher", "navbar-icon-links"],
     # Footer
-    article_footer_items=["prev-next"],
+    show_prev_next=False,
+    article_footer_items=[],
     content_footer_items=[],
-    footer_start=["footer-left"],
-    footer_end=["footer-right"],
+    footer_start=["copyright", "last-updated"],
+    footer_end=["sphinx-version", "theme-version"],
 )
 html_last_updated_fmt = "%Y-%m-%d"
 
-html_sidebars = {"**": ["navbar-logo.html", "sbt-sidebar-nav.html", "icon-links.html"]}
+html_sidebars = {"**": ["sidebar-nav.html"]}

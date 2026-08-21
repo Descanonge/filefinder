@@ -33,10 +33,6 @@ multiple optional properties, separated by colons (in no particular order):
    |:ref:`Optional |``:opt``                  |Mark the group as optional.     |
    |flag<opt>`     |                          |                                |
    +---------------+--------------------------+--------------------------------+
-   |:ref:`Discard  |``:discard``              |Discard the value parsed from   |
-   |flag<discard>` |                          |this group when retrieving      |
-   |               |                          |information.                    |
-   +---------------+--------------------------+--------------------------------+
 
 So for instance, we can specify a filename pattern that will match an integer
 padded with zeros, followed by two possible options::

@@ -143,7 +143,7 @@ def get_date(
         found. Each new value is added to the list of values found for that element.
         """
         for m in matches:
-            if m.group.name != key or m.group.discard:
+            if m.group.name != key:
                 continue
             for elt, val in callback(m).items():
                 if elt not in elts:

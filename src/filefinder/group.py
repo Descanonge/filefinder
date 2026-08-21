@@ -54,8 +54,7 @@ class Group:
         "|(?P<rgx>:rgx=.*?)"
         "|(?P<bool>:bool=.*?(?::.*?)??)"
         "|(?P<opt>:opt)"
-        "|(?P<discard>:discard)"
-        "){,5}"
+        "){,4}"
     )
     """Pattern used to find properties in group definition.
 
@@ -92,8 +91,6 @@ class Group:
         """Regex."""
         self.fmt: FormatAbstract = Format("s")
         """Format string object."""
-        self.discard: bool = False
-        """If the group should not be used when retrieving values from matches."""
         self.options: tuple[str, str] | None = None
         """Tuple of the two possibilities indicated by the full ``:bool``
         specification, in order (False, True), so that a simple getitem works."""
@@ -153,7 +150,6 @@ class Group:
         bol = specs["bool"]
 
         # Flags
-        self.discard = specs["discard"] is not None
         self.optional = specs["opt"] is not None
 
         # Override default format

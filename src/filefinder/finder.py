@@ -267,7 +267,6 @@ class Finder:
     def fix(
         self,
         fixes: dict[Any, str | Any] | None = None,
-        fix_discard: bool = False,
         **fixes_kw: str | Any,
     ):
         """Fix groups to a value.
@@ -285,9 +284,6 @@ class Finder:
         ----------
         fixes:
             Dictionnary of `{group key: value}`.
-        fix_discard:
-            If True, groups with the 'discard' option will still be fixed.
-            Default is False.
         fixes_kw:
             Same as `fixes`. Takes precedence.
         """
@@ -297,8 +293,6 @@ class Finder:
         self.void_cache()
         for key, value in fixes.items():
             for group in self.get_groups(key):
-                if not fix_discard and group.discard:
-                    continue
                 group.fix(value)
 
     def unfix(self, *keys: GroupKey):
@@ -342,7 +336,6 @@ class Finder:
         self,
         key: GroupKey,
         func: UserFuncGroup,
-        filter_discard: bool = False,
         default_date: DefaultDate = None,
         pass_unparsed: bool = False,
         **kwargs,
@@ -366,8 +359,6 @@ class Finder:
             A function that takes the parsed value of the group and returns True if the
             corresponding file should be kept, or False otherwise. If multiple groups
             correspond to the key, **all** values will be tested successively.
-        filter_discard
-            If True, also use groups values with the *discard* flag. Default is False.
         pass_unparsed
             In case the group cannot parse the string, if True pass the unparsed string
             to the predicate function `func` anyway. If False (default) the file will
@@ -386,11 +377,7 @@ class Finder:
         else:
             indices = get_groups_indices(self.groups, key)
             filt = self.filters.add_by_group(
-                func,
-                indices,
-                fix_discard=filter_discard,
-                pass_unparsed=pass_unparsed,
-                **kwargs,
+                func, indices, pass_unparsed=pass_unparsed, **kwargs
             )
 
         if self.scanned:

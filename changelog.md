@@ -7,6 +7,7 @@ Breaking changes:
       Fixing, filtering, retrieving matches, making filenames, getting nested
       files have been adapted.
     - Remove % replacement in regex (made obsolete by pseudo-groups).
+    - Remove `:discard` property (made obsolete by pseudo-groups).
     - Renamed `Group.DEFAULT_GROUPS` to `group.DATE_GROUPS`, only kept date-related elements.
 - Matches:
     - Renamed `Matches` into `FileMatch`, `Match` into `GroupMatch`.

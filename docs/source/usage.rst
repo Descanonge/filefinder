@@ -142,11 +142,6 @@ groups will be fixed with the corresponding element::
     finder.add_group_filter("date", lambda d: d in dates)
 
 
-.. warning::
-
-  A group flagged as :ref:`:discard<discard>` will not be fixed by default,
-  unless using the keyword argument ``fix_discard`` in :meth:`~.Finder.fix`.
-
 .. note::
 
    Fixed values can be changed/overwritten at any time, or unfixed using the
@@ -215,7 +210,7 @@ datetime object constructed from the relevant matches in the filename::
 
 Multiple groups can be tied to a same filter, for instance if there are multiple
 groups with the same name. The function will successively run for all the values
-parsed from these groups (except those marked as :ref:`to discard<discard>`).
+parsed from these groups.
 
 Group filters can be removed with :meth:`.Finder.remove_group_filters`.
 
@@ -359,22 +354,19 @@ possible to encounter some issues:
 * When using a group name, the first group in the pattern with that name is
   taken. A warning is issued if there are multiple groups of that name with
   differing values.
-* Only groups not flagged as ':discard' will be selected. If no group can be
-  found, an error will be raised.
 * The parsing of a value from the filename can fail for various reasons, in that
   case an error will be raised.
 
 For more flexibility :meth:`.FileMatch.get_values` will return a list of values
-corresponding to the selected group(s). It has arguments ``keep_discard`` and
-``parse`` to choose whether keep discarded groups and whether to use the parsed
-value or solely the string that matched. :meth:`.FileMatch.get_value` will
-return the first element of that list, raise if the list is empty or warn if the
-values are not all equal.
+corresponding to the selected group(s). It has argument ``parse`` to choose
+whether to use the parsed value or solely the string that matched.
+:meth:`.FileMatch.get_value` will return the first element of that list, raise
+if the list is empty or warn if the values are not all equal.
 
 .. note::
 
    ``matches[key]`` is a thin wrapper around
-   ``matches.get_value(key, parse=True, keep_discard=False)``.
+   ``matches.get_value(key, parse=True)``.
 
 Using the name of a pseudo-group will return a datetime object constructed from
 relevant matches::

@@ -157,11 +157,8 @@ class FileMatch:
         return "\n".join([str(m) for m in self.matches])
 
     def __getitem__(self, key: GroupKey) -> Any:
-        """Get first parsed value corresponding to key.
-
-        Ignore groups with the 'discard' option.
-        """
-        return self.get_value(key, parse=True, keep_discard=False)
+        """Get first parsed value corresponding to key."""
+        return self.get_value(key, parse=True)
 
     def __iter__(self) -> Iterator[GroupMatch]:
         """Iterate over matches."""
@@ -185,7 +182,6 @@ class FileMatch:
         self,
         key: GroupKey,
         parse: bool = True,
-        keep_discard: bool = False,
         default_date: DefaultDate = None,
     ) -> list[Any]:
         """Get matched values corresponding to key.
@@ -199,14 +195,12 @@ class FileMatch:
         parse:
             If True (default), return the parsed value. If False return the
             matched string.
-        keep_discard:
-            If true groups with the 'discard' option are kept. Default is false.
         default_date:
             If key correspond to a date pseudo-group, use this as the default date
             elements. Datetime, or a mapping with keys in: year, month, day, hour,
             minute, and second. Defaults to 1970-01-01 00:00:00
         """
-        matches = self.get_matches(key, keep_discard=keep_discard)
+        matches = self.get_matches(key)
 
         if key in get_date_names(self.groups):
             if isinstance(default_date, datetime.datetime):
@@ -223,7 +217,6 @@ class FileMatch:
         self,
         key: GroupKey,
         parse: bool = True,
-        keep_discard: bool = False,
         default_date: DefaultDate = None,
     ) -> Any:
         """Get matched value corresponding to key.
@@ -238,8 +231,6 @@ class FileMatch:
         parse:
             If True (default), return the parsed value. If False return the
             matched string.
-        keep_discard:
-            If true groups with the 'discard' option are kept. Defauult is false.
         default_date:
             If key correspond to a date pseudo-group, use this as the default date
             elements. Datetime, or a mapping with keys in: year, month, day, hour,
@@ -248,15 +239,11 @@ class FileMatch:
         Raises
         ------
         KeyError
-            No group with no 'discard' option was found.
+            No group with was found.
         """
-        values = self.get_values(
-            key, parse=parse, keep_discard=keep_discard, default_date=default_date
-        )
+        values = self.get_values(key, parse=parse, default_date=default_date)
         if len(values) == 0:
-            raise KeyError(
-                f"No group was found (key: {key}, keep_discard: {keep_discard})"
-            )
+            raise KeyError(f"No group was found for key '{key}'")
         if len(values) > 1:
             if any(v != values[0] for v in values[1:]):
                 logger.warning(
@@ -264,17 +251,13 @@ class FileMatch:
                 )
         return values[0]
 
-    def get_matches(
-        self, key: GroupKey, keep_discard: bool = False
-    ) -> list[GroupMatch]:
+    def get_matches(self, key: GroupKey) -> list[GroupMatch]:
         """Get GroupMatch objects corresponding to key.
 
         Parameters
         ----------
         key:
             Group(s) to select, either by index or name.
-        keep_discard:
-            If true groups with the 'discard' option are kept. Default is false.
 
         Returns
         -------
@@ -282,6 +265,4 @@ class FileMatch:
         """
         selected = get_groups_indices(self.groups, key)
         matches = [self.matches[k] for k in selected]
-        if not keep_discard:
-            matches = [m for m in matches if not m.group.discard]
         return matches

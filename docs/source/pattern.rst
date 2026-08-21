@@ -6,33 +6,37 @@ Pattern
 
 The pattern specifies the structure of the filenames relative to the root
 directory. Parts that vary from file to file are indicated by **groups**,
-enclosed by parenthesis and preceded by '%' (by default). They are represented
-by the :class:`~group.Group` class.
+enclosed by parenthesis and preceded by '%'.
 
 Each group definition starts with a :ref:`name<name>`, and is then followed by
 multiple optional properties, separated by colons (in no particular order):
 
-+---------------+--------------------------+--------------------------------+
-|Property       |Format                    |Description                     |
-+===============+==========================+================================+
-|:ref:`Format   |``:fmt=<format string>``  |Use a python format string to   |
-|string<fmt>`   |                          |match this group in filenames.  |
-+---------------+--------------------------+--------------------------------+
-|:ref:`Boolean  |``:bool=<true>[:<false>]``|Choose between two alternatives.|
-|format<bool>`  |                          |The second option (false) can be|
-|               |                          |omitted when empty.             |
-+---------------+--------------------------+--------------------------------+
-|:ref:`Custom   |``:rgx=<custom regex>``   |Specify a custom regular        |
-|regex<rgx>`    |                          |expression directly.            |
-|               |                          |                                |
-+---------------+--------------------------+--------------------------------+
-|:ref:`Optional |``:opt``                  |Mark the group as optional.     |
-|flag<opt>`     |                          |                                |
-+---------------+--------------------------+--------------------------------+
-|:ref:`Discard  |``:discard``              |Discard the value parsed from   |
-|flag<discard>` |                          |this group when retrieving      |
-|               |                          |information.                    |
-+---------------+--------------------------+--------------------------------+
+
+.. table::
+   :widths: grid
+
+   +---------------+--------------------------+--------------------------------+
+   |Property       |Format                    |Description                     |
+   +===============+==========================+================================+
+   |:ref:`Format   |``:fmt=<format string>``  |Use a python format string to   |
+   |string<fmt>`   |                          |match filenames and format      |
+   |               |                          |values.                         |
+   +---------------+--------------------------+--------------------------------+
+   |:ref:`Boolean  |``:bool=<true>[:<false>]``|Choose between two alternatives.|
+   |format<bool>`  |                          |The second option (false) can be|
+   |               |                          |omitted when empty.             |
+   +---------------+--------------------------+--------------------------------+
+   |:ref:`Custom   |``:rgx=<custom regex>``   |Specify a custom regular        |
+   |regex<rgx>`    |                          |expression directly.            |
+   |               |                          |                                |
+   +---------------+--------------------------+--------------------------------+
+   |:ref:`Optional |``:opt``                  |Mark the group as optional.     |
+   |flag<opt>`     |                          |                                |
+   +---------------+--------------------------+--------------------------------+
+   |:ref:`Discard  |``:discard``              |Discard the value parsed from   |
+   |flag<discard>` |                          |this group when retrieving      |
+   |               |                          |information.                    |
+   +---------------+--------------------------+--------------------------------+
 
 So for instance, we can specify a filename pattern that will match an integer
 padded with zeros, followed by two possible options::
@@ -41,6 +45,20 @@ padded with zeros, followed by two possible options::
    parameter_0012_foo.txt
    parameter_2020_bar.txt
 
+Groups are found within the pattern using the parameter
+:class:`group_delimiters<.Finder>`, a tuple of the form 'prefix, start, end' (by
+default ``('%', '(', ')')``). The *start* and *end* must be balanced (no
+parenthesis left open for instance). The prefix can be empty. For instance, by
+passing ``group_delimiters=('', '{', '}')``, the following pattern becomes
+valid: ``"parameter_{param:fmt=04}_{Y}-{m}-{d}.txt"``.
+
+.. _name:
+
+Name
+====
+
+The name can be anything (excluding colons ':'). It will be used to refer to
+that group when fixing groups or retrieving matches.
 
 .. note::
 
@@ -49,65 +67,46 @@ padded with zeros, followed by two possible options::
    functions may return more than one result if they are multiple groups with
    that name.
 
+Filefinder tries to simplify working with dates (see :ref:`dates`). To create a
+group that correspond to a date element you can use the following name structure
+``<date name>:<date element>`` (for instance ``start:Y``). The date element must
+be contained in the table below. It will dictate the regex and format string
+used for that group (unless overridden by the :ref:`fmt<fmt>` and
+:ref:`rgx<rgx>` properties). By having multiple groups with the same date name
+they can be managed as a single peusdo-group.
 
-Groups are found within the pattern by :meth:`.Finder._find_groups`, which
-can be customized. By default it looks for the opening of a group with
-``<prefix><start>``, and then to the matching symbol ``<end>``. The prefix,
-start, and end are defined in the attribute :attr:`.Finder._group_delimiters`,
-and are by default %, (, and ). This means the start and end symbol must be
-balanced (no parenthesis left open for instance).
+The date name can be omitted, in that case it will default to 'date', but the
+group name will remain unchanged (*ie* "%(Y)" will be not be available as
+"date:Y").
 
-.. _name:
++------+-------------------+---------------------+--------+
+| Name |                   | Regex               | Format |
++======+===================+=====================+========+
+| Y    | Year (YYYY)       | \\d{4}              |    04d |
++------+-------------------+---------------------+--------+
+| m    | Month (MM)        | \\d\\d              |    02d |
++------+-------------------+---------------------+--------+
+| d    | Day of month (DD) | \\d\\d              |    02d |
++------+-------------------+---------------------+--------+
+| j    | Day of year (DDD) | \\d{3}              |    03d |
++------+-------------------+---------------------+--------+
+| B    | Month name        | \\w+                |      s |
++------+-------------------+---------------------+--------+
+| H    | Hour 24 (HH)      | \\d\\d              |    02d |
++------+-------------------+---------------------+--------+
+| M    | Minute (MM)       | \\d\\d              |    02d |
++------+-------------------+---------------------+--------+
+| S    | Seconds (SS)      | \\d\\d              |    02d |
++------+-------------------+---------------------+--------+
+| F    | Date (YYYY-MM-DD) | \\d{4}-\\d\\d-\\d\\d|      s |
++------+-------------------+---------------------+--------+
+| x    | Date (YYYYMMDD)   | \\d{8}              |    08d |
++------+-------------------+---------------------+--------+
+| X    | Time (HHMMSS)     | \\d{6}              |    06d |
++------+-------------------+---------------------+--------+
 
-Name
-====
-
-If the group name is present in :attr:`.Group.DEFAULT_GROUPS`, it will dictate
-the regex and format string used for that group (unless overridden by the 'fmt'
-and 'rgx' properties):
-
-+------+-------------------+-----------+--------+
-| Name |                   | Regex     | Format |
-+======+===================+===========+========+
-| F    | Date (YYYY-MM-DD) | %Y-%m-%d  |      s |
-+------+-------------------+-----------+--------+
-| x    | Date (YYYYMMDD)   | %Y%m%d    |    08d |
-+------+-------------------+-----------+--------+
-| X    | Time (HHMMSS)     | %H%M%S    |    06d |
-+------+-------------------+-----------+--------+
-| Y    | Year (YYYY)       | \\d{4}    |    04d |
-+------+-------------------+-----------+--------+
-| m    | Month (MM)        | \\d\\d    |    02d |
-+------+-------------------+-----------+--------+
-| d    | Day of month (DD) | \\d\\d    |    02d |
-+------+-------------------+-----------+--------+
-| j    | Day of year (DDD) | \\d{3}    |    03d |
-+------+-------------------+-----------+--------+
-| B    | Month name        | [a-zA-Z]* |      s |
-+------+-------------------+-----------+--------+
-| H    | Hour 24 (HH)      | \\d\\d    |    02d |
-+------+-------------------+-----------+--------+
-| M    | Minute (MM)       | \\d\\d    |    02d |
-+------+-------------------+-----------+--------+
-| S    | Seconds (SS)      | \\d\\d    |    02d |
-+------+-------------------+-----------+--------+
-| I    | Index             | \\d+      |      d |
-+------+-------------------+-----------+--------+
-| text | Letters           | \\w       |      s |
-+------+-------------------+-----------+--------+
-| char | Character         | \\S*      |      s |
-+------+-------------------+-----------+--------+
-
-Most of them are related to dates and follow the specification of
-:ref:`strftime-strptime-behavior` and `strftime
+This follow the specification of :ref:`strftime-strptime-behavior` and `strftime
 <https://linux.die.net/man/3/strftime>`__.
-
-A letter preceded by a percent sign '%' in the regex will be recursively
-replaced by the corresponding name in the table. This can be used in the
-custom regex. This still counts as a single group and its name will not
-be changed, only the regex.
-So ``%x`` will be replaced by ``%Y%m%d``, in turn replaced by ``\d{4}\d\d\d\d``.
-A percentage character in the regex is escaped by another percentage ('%%').
 
 
 .. _fmt:
@@ -115,11 +114,10 @@ A percentage character in the regex is escaped by another percentage ('%%').
 Format string
 =============
 
-All the possible use cases are not covered in the table above. A simple way to
-specify a group is by using a format string following the
+A simple way to specify a group is by using a format string following the
 `Format Mini Language Specification
-<https://docs.python.org/3/library/string.html#formatspec>`__.
-This will automatically be transformed into a regular expression.
+<https://docs.python.org/3/library/string.html#formatspec>`__. This will
+automatically be transformed into a regular expression.
 
 Having a format specified has other benefits: it can be used to convert values
 into strings to generate a filename from parameters values (using
@@ -130,7 +128,7 @@ It's easy as ``scale_%(scale:fmt=.1f)`` which will find files such as
 ``scale_15.0`` or ``scale_-5.6``. Because we know how to transform a value into
 a string we can fix the group directly with a value::
 
-  finder.fix_group('scale', 15.)
+  finder.fix(scale=15.)
 
 or we can generate a filename::
 
@@ -154,7 +152,7 @@ If the format is never specified, it defaults to a ``s`` format.
    format object where we can't unambiguously remove the padding character is
    not allowed and will raise a :class:`~format.DangerousFormatError`.
 
-   Similarly, for a string format (s) it can be impossible to separate correctly
+   Similarly, for a string format (s) it can be impossible to correctly separate
    the alignment padding character (the "fill") from the actual value. Here the
    user is entrusted with making sure the format fill character is adapted to
    the expected values to parse.
@@ -166,19 +164,19 @@ Boolean format
 ==============
 
 The boolean format allows to easily select between two *strings*. It is
-specified as ``:bool=<true>[:<false>]``. The second option (false), can be
+specified as ``:bool=<true>[:<false>]``. The second option (false) can be
 omitted if empty.
 
 Here are a couple of examples. ``my_file%(special:bool=_special).txt`` would
 match both ``my_file.txt`` and ``my_file_special.txt``. We would select only
-'special' files using ``finder.fix_groups(special=True)``.
+'special' files using ``finder.fix(special=True)``.
 
-We can also specify both options with ``my_file_%(kind:bool=good:bad).txt``, and
-select either like so ::
+We can also specify both options with ``my_file_%(is_good:bool=good:bad).txt``, and
+select either like so:
 
-    >>> finder.make_filename(kind=True)
+    >>> finder.make_filename(is_good=True)
     my_file_good.txt
-    >>> finder.make_filename(kind=False)
+    >>> finder.make_filename(is_good=False)
     my_file_bad.txt
 
 
@@ -188,9 +186,11 @@ Optional flag
 =============
 
 The optional flag ``:opt`` marks the group as an optional part of the pattern.
-In effect, it appends a ``?`` to the group regular expression. It does not
-affect the group in other ways.
+It can be thought as appending a ``?`` to the group regular expression. It does
+not affect the group in other ways.
 
+For instance, ``A%(param:fmt=d).txt`` would match "A.txt", "A0.txt", etc.
+If the group is not present, its match will be an empty string.
 
 .. _rgx:
 
@@ -210,26 +210,6 @@ It can be done like so::
    We rely on the indices of matching groups. There must be as many groups in
    the pattern as matching groups in the final regular expression. Therefore
    only use non-capturing groups ``(?:...)``.
-
-.. _discard:
-
-Discard keyword
-===============
-
-:ref:`Information can be retrieved<retrieve-information>` from the matches in
-the filename, but one can discard a group so that it is not used. For example
-for a file of weekly averages with a filename indicating the start and end dates
-of the average, we might want to only recover the starting date::
-
-  sst_%(x)-%(x:discard)
-
-
-.. note::
-
-   By default, when :ref:`fixing a group to a value<fix-groups>`, discarded
-   groups will not be fixed. This can be overridden with the ``fix_discard``
-   keyword argument.
-
 
 Regex outside groups
 ====================

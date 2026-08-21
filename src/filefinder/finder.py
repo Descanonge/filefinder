@@ -1,22 +1,22 @@
 """Main class."""
 
-# This file is part of the 'filefinder' project
-# (http://github.com/Descanonge/filefinder) and subject
-# to the MIT License as defined in the file 'LICENSE',
-# at the root of this project. © 2021 Clément Haëck
-import datetime
 import itertools
 import logging
 import os
 import re
-import typing as t
 from collections import abc
 from copy import copy
+from typing import Any
 
-from .filters import FilterByDate, FilterByGroup, FilterList
-from .group import Group, GroupKey
-from .matches import DefaultDate, Matches
-from .util import datetime_to_value, get_groups_indices
+from .filters import (
+    FilterByDate,
+    FilterByGroup,
+    FilterList,
+    UserFunc,
+    UserFuncGroup,
+)
+from .group import Group, GroupKey, get_date_names, get_groups_indices
+from .matches import DefaultDate, FileMatch, GroupMatch
 
 logger = logging.getLogger(__name__)
 
@@ -44,21 +44,15 @@ class Finder:
         expression, thus avoiding some work.
     group_delimiters
         Tuple of (prefix, start characters, end characters) that defines how groups are
-        delimited in the pattern. If None, the default `%()` is used.
+        delimited in the pattern. Start and end character must be balanced within the
+        group. Prefix can be empty. If None, the default `%()` is used.
     """
 
     max_scan_depth: int = 32
     """Maximum sub-directory depth to scan when :attr:`scan_everything` is True."""
 
-    date_is_first_class: bool = True
-    """If True, the group name 'date' is considered special."""
-
     _group_delimiters: tuple[str, str, str] = ("%", "(", ")")
-    """Delimiter characters of groups in the pattern.
-
-    Tuple of (prefix, start characters, end characters).
-    Start and end character must be balanced within the group. Prefix can be empty.
-    """
+    """Delimiter characters of groups in the pattern."""
 
     def __init__(
         self,
@@ -85,14 +79,14 @@ class Finder:
         self._segments: list[str] = []
         """Segments of the pattern. Used to replace specific groups.
         `['text before group 1', 'group 1',
-        'text before group 2, 'group 2', ..., 'text after last group']`
+        'text before group 2, 'group 2', ..., 'last group', 'text after last group']`
         """
-        self._files: list[tuple[str, Matches]] = []
+        self._matches: list[FileMatch] = []
         self.scanned: bool = False
         """True if files have been scanned with current parameters.
 
         Is reset to False if the cache (of scanned files) is voided, for instance by
-        operation like changing fixed values of groups.
+        operations like changing fixed values of groups.
         """
 
         self.filters: FilterList = FilterList()
@@ -106,15 +100,15 @@ class Finder:
         return len(self.groups)
 
     @property
-    def files(self) -> list[tuple[str, Matches]]:
-        """List of filenames and their matches.
+    def matches(self) -> list[FileMatch]:
+        """List of matches objects.
 
-        Will scan files when accessed and cache the result, if it has not
-        already been done.
+        Lazily scan files: if files were already scanned, just return
+        the stored list of matches.
         """
         if not self.scanned:
             self.find_files()
-        return self._files
+        return self._matches
 
     def __repr__(self) -> str:
         """Human readable information (long)."""
@@ -137,7 +131,7 @@ class Finder:
         if not self.scanned:
             s.append("not scanned")
         else:
-            s.append(f"scanned: found {len(self._files)} files")
+            s.append(f"scanned: found {len(self._matches)} files")
         return "\n".join(s)
 
     def __str__(self) -> str:
@@ -148,21 +142,20 @@ class Finder:
         )
 
     def set_scan_everything(self, scan_everything: bool, /) -> None:
-        """Set value for attribute :attr:`scan_everything`.
-
-        Void cache if necessary.
-        """
+        """Set value for attribute :attr:`scan_everything`."""
         if scan_everything != self.scan_everything:
             self.scan_everything = scan_everything
-            self._void_cache()
+            self.void_cache()
 
     def set_use_regex(self, use_regex: bool, /) -> None:
         """Set value for attribute :attr:`use_regex`."""
         if use_regex != self.use_regex:
             self.use_regex = use_regex
-            self._void_cache()
+            self.void_cache()
 
-    def get_group_names(self, fixed: bool | None = None) -> set[str]:
+    def get_group_names(
+        self, fixed: bool | None = None, date: bool = False
+    ) -> set[str]:
         """Get the names of groups in the pattern.
 
         Parameters
@@ -177,12 +170,24 @@ class Finder:
 
         return set(g.name for g in groups)
 
+    def get_date_names(self) -> set[str]:
+        """Get the names of date pseudo-groups.
+
+        Examples
+        --------
+        ::
+
+            "%(start:Y)%(start:j)_%(end:Y)%(end:j)" -> {"start", "end"}
+            "%(Y)-%(m)-%(d)" -> {"date"}
+        """
+        return get_date_names(self.groups)
+
     def get_files(
         self,
         relative: bool = False,
         nested: abc.Sequence[str | abc.Sequence[str]] | None = None,
     ) -> list:
-        """Return files that matches the regex.
+        """Return files that match the regex.
 
         Lazily scan files: if files were already scanned, just return
         the stored list of files.
@@ -203,37 +208,36 @@ class Finder:
             A group name in `nested` is not found in the pattern.
         """
 
-        def get_files(files_matches):
-            if relative:
-                return [f for f, _ in files_matches]
-            return [self.get_absolute(f) for f, _ in files_matches]
+        def get_files(matches):
+            return [m.get_filename(relative=relative) for m in matches]
 
-        def get_key(matches: Matches, level: list[str]) -> str:
+        def get_key(filematch: FileMatch, level: list[str]) -> str:
+            i_groups = []
+            for name in level:
+                i_groups += get_groups_indices(filematch.groups, name)
+            i_groups = list(set(i_groups))
+            i_groups.sort()
             return ":".join(
-                [
-                    match.get_match(parse=False)
-                    for match in matches
-                    if match.group.name in level
-                ]
+                [filematch.matches[i].get_match(parse=False) for i in i_groups]
             )
 
-        def nest(files_matches, levels, relative):
+        def nest(matches, levels, relative):
             if len(levels) == 0:
-                return get_files(files_matches)
+                return get_files(matches)
 
             level = levels[0]
             files_grouped = []
-            matches: dict[str, int] = {}
+            matches_by_value: dict[str, int] = {}
             # We need to sort files by their value.
             # We use all unparsed matches joined in a single string as a key
             # (using get_key). We store it in a dictionnary, the value being
             # the corresponding index
-            for f, m in files_matches:
+            for m in matches:
                 key = get_key(m, level)
-                if key not in matches:
-                    matches[key] = len(matches)
+                if key not in matches_by_value:
+                    matches_by_value[key] = len(matches_by_value)
                     files_grouped.append([])
-                files_grouped[matches[key]].append((f, m))
+                files_grouped[matches_by_value[key]].append(m)
 
             return [nest(grp, levels[1:], relative) for grp in files_grouped]
 
@@ -241,14 +245,14 @@ class Finder:
             self.find_files()
 
         if nested is None:
-            files = get_files(self._files)
+            files = get_files(self._matches)
         else:
             names = set(g.name for g in self.groups)
             nested = [[name] if isinstance(name, str) else name for name in nested]
             for name in itertools.chain(*nested):
                 if name not in names:
                     raise KeyError(f"{name} is not in Finder groups.")
-            files = nest(self._files, nested, relative)
+            files = nest(self._matches, nested, relative)
 
         return files
 
@@ -260,52 +264,27 @@ class Finder:
         """Concatenate the finder root directory and a filename."""
         return os.path.join(self.root, filename)
 
-    def fix_group(self, key: GroupKey, value: str | t.Any, fix_discard: bool = False):
-        """Fix a group to a string.
-
-        This will void the cache.
-
-        Parameters
-        ----------
-        key:
-            Can be the index of a group in the pattern (starts at 0), or the
-            name of a group. If multiple groups share the same name, they are
-            all fixed to the same value.
-        value:
-            Can be a string, or a value that will be formatted using the group format
-            string. A string will be interpreted as a regular expression, so all special
-            characters should be properly escaped.
-            A list of values will be joined by the regex '|' OR.
-        fix_discard:
-            If True, groups with the 'discard' option will still be fixed.
-            Default is False.
-        """
-        for m in self.get_groups(key):
-            if not fix_discard and m.discard:
-                continue
-            if key == "date" and self.date_is_first_class:
-                if not isinstance(value, datetime.date):
-                    raise TypeError(
-                        "If key is date, value must be a date or datetime object."
-                    )
-                m.fix_value(datetime_to_value(value, m.name))
-                continue
-            m.fix_value(value)
-        self._void_cache()
-
-    def fix_groups(
+    def fix(
         self,
-        fixes: dict[t.Any, str | t.Any] | None = None,
+        fixes: dict[Any, str | Any] | None = None,
         fix_discard: bool = False,
-        **fixes_kw: str | t.Any,
+        **fixes_kw: str | Any,
     ):
-        """Fix multiple groups at once.
+        """Fix groups to a value.
+
+        Groups are selected with either their index in the pattern (starts at 0), or
+        their name. If multiple groups share the same name, they are all fixed to the
+        same value.
+
+        Values can be a string, or a value that will be formatted using the group format
+        string. A string will be interpreted as a regular expression, so all special
+        characters should be properly escaped. A list of values will be joined by the
+        regex '|' OR.
 
         Parameters
         ----------
         fixes:
-            Dictionnary of `{group key: value}`. See :func:`fix_group` for
-            details.
+            Dictionnary of `{group key: value}`.
         fix_discard:
             If True, groups with the 'discard' option will still be fixed.
             Default is False.
@@ -315,19 +294,21 @@ class Finder:
         if fixes is None:
             fixes = {}
         fixes.update(**fixes_kw)
-        for f in fixes.items():
-            self.fix_group(*f, fix_discard=fix_discard)
+        self.void_cache()
+        for key, value in fixes.items():
+            for group in self.get_groups(key):
+                if not fix_discard and group.discard:
+                    continue
+                group.fix(value)
 
-    def unfix_groups(self, *keys: GroupKey):
-        """Unfix groups, and remove group related filters.
-
-        This will void the cache.
+    def unfix(self, *keys: GroupKey):
+        """Unfix groups.
 
         Parameters
         ----------
         keys:
-           Keys to find groups to unfix. See :func:`get_groups`.
-           If no key is provided, all groups will be unfixed.
+           Keys to find groups to unfix. If no key is provided, all groups will be
+           unfixed.
         """
         if not keys:
             keys = tuple(range(self.n_groups))
@@ -337,45 +318,31 @@ class Finder:
             for g in groups:
                 g.unfix()
 
-            # if date only remove 'date' filters, not its elements
-            if key == "date" and self.date_is_first_class:
-                self.filters.remove_by_date()
-                continue
+        self.void_cache()
 
-            indices = [g.idx for g in groups]
-            self.filters.remove_by_group(indices)
-
-        self._void_cache()
-
-    def add_filter(self, func: abc.Callable[..., bool], **kwargs: t.Any):
+    def add_filter(self, func: UserFunc, **kwargs: Any):
         """Add a filter with which to select scanned files.
 
         The filter will be applied to files already in the cache.
 
-        See :ref:`filtering` for details.
-
         Parameters
         ----------
-        func: ~collections.abc.Callable[[Finder, str, Matches, ...], bool]
-            Callable that returns True if the file is to be kept, False otherwise.
+        func
+            Callable that takes in: the Finder instance, a `class:FileMatch` object, and
+            optional kwargs. Returns True if the file is to be kept, False otherwise.
         kwargs
             Will be passed to the function when executed.
         """
         filt = self.filters.add(func, **kwargs)
 
         if self.scanned:
-            self._files = [(f, m) for f, m in self._files if filt.is_valid(self, f, m)]
+            self._matches = [m for m in self._matches if filt.is_valid(self, m)]
 
-    def clear_filters(self) -> None:
-        """Remove all filters."""
-        self.filters.clear()
-        self._void_cache()
-
-    def fix_by_filter(
+    def add_group_filter(
         self,
         key: GroupKey,
-        func: abc.Callable[..., bool],
-        fix_discard: bool = False,
+        func: UserFuncGroup,
+        filter_discard: bool = False,
         default_date: DefaultDate = None,
         pass_unparsed: bool = False,
         **kwargs,
@@ -384,62 +351,87 @@ class Finder:
 
         When a file is scanned, if it matches the pattern, it will only be kept if
         `func` returns True when called with the group parsed value. If the group cannot
-        parse the value, if `pass_unparse` is True the unparsed string will be passed to
+        parse the value: if `pass_unparse` is True the unparsed string will be passed to
         the predicate function nonetheless, otherwise it will not keep the file
         (default).
-
-        This adds a filter (see :meth:`add_filter`) with a name consisting of the `key`
-        and a unique id (this allows multiple filters for a single group).
 
         Parameters
         ----------
         key:
             Can be the index of a group in the pattern (starts at 0), or the name of a
-            group. If multiple groups share the same name, they are all fixed.
+            group. If multiple groups share the same name, they are all fixed. If it is
+            the name of a date pseudo-group, the function will receive a datetime
+            object.
         func
             A function that takes the parsed value of the group and returns True if the
             corresponding file should be kept, or False otherwise. If multiple groups
-            correspond to the key, **all** values will be tested succesively.
-        fix_discard
+            correspond to the key, **all** values will be tested successively.
+        filter_discard
             If True, also use groups values with the *discard* flag. Default is False.
         pass_unparsed
             In case the group cannot parse the string, if True pass the unparsed string
             to the predicate function `func` anyway. If False (default) the file will
             not be kept.
         default_date
-            Passed to :func:`.library.get_date` if key is "date".
+            Default date elements to use when retrieving date.
         kwargs
             Will be passed to the function.
         """
         filt: FilterByGroup | FilterByDate
-        if key == "date" and self.date_is_first_class:
-            filt = self.filters.add_by_date(func, default_date=default_date, **kwargs)  # type: ignore[arg-type]
+        if key in self.get_date_names():
+            filt = self.filters.add_by_date(
+                func, key, default_date=default_date, **kwargs
+            )
 
         else:
             indices = get_groups_indices(self.groups, key)
             filt = self.filters.add_by_group(
                 func,
                 indices,
-                fix_discard=fix_discard,
+                fix_discard=filter_discard,
                 pass_unparsed=pass_unparsed,
                 **kwargs,
             )
 
         if self.scanned:
-            self._files = [(f, m) for f, m in self._files if filt.is_valid(self, f, m)]
+            self._matches = [m for m in self._matches if filt.is_valid(self, m)]
 
-    def _make_matches(
-        self, filename: str, pattern: str | re.Pattern | None = None
-    ) -> Matches | None:
-        if pattern is None:
-            pattern = self.get_regex()
+    def remove_group_filters(self, *keys: str) -> None:
+        """Remove group filters.
 
-        matches = Matches.from_filename(filename, pattern, self.groups)
-        if matches is not None:
-            matches.date_is_first_class = self.date_is_first_class
-        return matches
+        Parameters
+        ----------
+        keys:
+            Name of date pseudo-groups to remove filters from. If empty, all group
+            filters will be removed.
 
-    def get_matches(self, filename: str, relative: bool = True) -> Matches | None:
+        Raises
+        ------
+        KeyError:
+            A key does not correspond to any date pseudo-group name.
+        """
+        date_names = self.get_date_names()
+        if not keys:
+            keys = tuple(date_names)
+
+        for key in keys:
+            if key not in date_names:
+                raise KeyError(f"There is no date pseudo-group with name '{key}'")
+            self.filters.remove_by_date(key)
+
+        self.void_cache()
+
+    def clear_filters(self) -> None:
+        """Remove all filters."""
+        self.filters.clear()
+        self.void_cache()
+
+    def find_matches(
+        self,
+        filename: str,
+        relative: bool = True,
+        pattern: str | re.Pattern | None = None,
+    ) -> FileMatch | None:
         """Find matches for a given filename.
 
         Apply regex to `filename` and return the results as a :class:`~.matches.Matches`
@@ -453,6 +445,9 @@ class Finder:
             True if the filename is relative to the finder root directory
             (default). If False, the filename is made relative before being
             matched.
+        pattern:
+            Regex pattern to match the filename against (compiled or not). If left to
+            None, it is automatically generated.
 
         Returns
         -------
@@ -462,16 +457,33 @@ class Finder:
         if not relative:
             filename = self.get_relative(filename)
 
-        return self._make_matches(filename)
+        if pattern is None:
+            pattern = self.get_regex()
 
-    find_matches = get_matches
-    """Alias for :meth:`get_matches`."""
+        if isinstance(pattern, str):
+            pattern = re.compile(pattern)
+        m = pattern.fullmatch(filename)
+
+        if m is None:
+            return None
+
+        if len(self.groups) != len(m.groups()):
+            raise IndexError(
+                "Not as many captured matches as pattern groups. "
+                "Does one of the group regex contains a capturing group?"
+            )
+
+        match_list = [
+            GroupMatch.from_match(grp, m, i) for i, grp in enumerate(self.groups)
+        ]
+        matches = FileMatch(self.root, filename, match_list, self.groups)
+        return matches
 
     def make_filename(
         self,
         fixes: dict | None = None,
         relative: bool = False,
-        **kw_fixes: t.Any,
+        **kw_fixes: Any,
     ) -> str:
         """Return a filename.
 
@@ -484,8 +496,8 @@ class Finder:
         ----------
         fixes:
             Dictionnary of fixes (group name or index: value). For details, see
-            :func:`fix_group`. Will (temporarily) supplant group fixed
-            prior. If prior fix is a list, first item will be used.
+            :func:`fix`. Will (temporarily) supplant group fixed prior. If prior fix is
+            a list, first item will be used.
         relative:
             If the filename should be relative to the finder root directory.
             Default is False.
@@ -512,12 +524,18 @@ class Finder:
 
         for i, g in enumerate(groups):
             if g.name in fixes:
-                g.fix_value(fixes[g.name])
+                g.fix(fixes[g.name])
             if i in fixes:
-                g.fix_value(fixes[i])
+                g.fix(fixes[i])
+            if g.date_name is not None and g.date_name in fixes:
+                g.fix(fixes[g.date_name])
 
             if g.fixed_string is not None:
-                segments[2 * i + 1] = g.fixed_string
+                segments[2 * i + 1] = (
+                    g.fixed_string
+                    if isinstance(g.fixed_string, str)
+                    else g.fixed_string[0]
+                )
             else:
                 raise ValueError(f"Group '{g!s}' has no fixed value.")
 
@@ -534,7 +552,7 @@ class Finder:
 
     def set_pattern(self, pattern: str):
         """Set pattern and parse for group objects."""
-        self._void_cache()
+        self.void_cache()
         self._pattern = pattern
 
         found_groups = self._find_groups(pattern)
@@ -552,11 +570,9 @@ class Finder:
     def _find_groups(self, pattern: str) -> list[tuple[str, int, int]]:
         """Find the groups within the pattern and their corresponding string indices.
 
-        * The returned indices should be sorted in order of appearance in the pattern.
-        * The indices should correspond to the first and last character of the group,
-          including the delimiter characters.
-        * On the contrary, the string specification of the group should not include
-          them.
+        Return for each group, in order of appearance in the pattern, a tuple of the
+        string specification of the group, without delimiters and indices of the first
+        and last characters of the group (including delimiters).
 
         This implementation finds the matching pair defined by the attribute
         :attr:`_group_delimiters`. A match of the start of a group that does not have a
@@ -596,7 +612,15 @@ class Finder:
 
         return output
 
-    def _get_regex(self) -> str:
+    def get_regex(self, replace_dir_sep: bool = True) -> str:
+        """Return regex.
+
+        Parameters
+        ----------
+        replace_dir_sep:
+            If True (default), replace "/" in the regex by the correct directory
+            separator for the current OS.
+        """
         segments = self._segments.copy()
         if not self.use_regex:
             # escape regex outside groups
@@ -607,40 +631,41 @@ class Finder:
         for idx, group in enumerate(self.groups):
             segments[2 * idx + 1] = group.get_regex()
 
-        return "".join(segments)
+        regex = "".join(segments)
 
-    def get_regex(self) -> str:
-        """Return regex."""
-        return self._get_regex().replace("/", re.escape(os.sep))
+        if replace_dir_sep:
+            regex = regex.replace("/", re.escape(os.sep))
+
+        return regex
 
     def get_regex_subdirs(self) -> list[str]:
         """Return regexes for each sub-directory."""
-        return self._get_regex().split("/")
+        return self.get_regex(replace_dir_sep=False).split("/")
 
     def find_files(self) -> None:
         """Find files to scan and store them in cache.
 
-        Is automatically called when accessing :attr:`files` or :func:`get_files`. Apply
-        all filters and sort files alphabetically.
+        Is automatically called when accessing :attr:`matches` or :func:`get_files`.
+        Apply all filters and sort files alphabetically.
         """
         if self.scan_everything:
             self._find_files_scan_everything()
         else:
             self._find_files_subdirectories()
 
-        self._files.sort(key=lambda x: x[0])
+        self._matches.sort(key=lambda x: x[0])
 
-        logger.debug("Found %d files matching and filtered", len(self._files))
-        if len(self._files) == 0:
+        logger.debug("Found %d files matching and filtered", len(self._matches))
+        if len(self._matches) == 0:
             logger.info("Found no matching files (after filtering)")
 
         self.scanned = True
 
     def _add_file(self, filename: str, pattern: re.Pattern):
         """Add file to cache if it matches pattern and pass filters."""
-        matches = self._make_matches(filename, pattern)
-        if matches is not None and self.filters.is_valid(self, filename, matches):
-            self._files.append((filename, matches))
+        matches = self.find_matches(filename, relative=True, pattern=pattern)
+        if matches is not None and self.filters.is_valid(self, matches):
+            self._matches.append(matches)
 
     def _find_files_scan_everything(self) -> None:
         """Find files in all sub-directories.
@@ -713,16 +738,13 @@ class Finder:
             for d in to_remove:
                 dirnames.remove(d)
 
-    def _void_cache(self) -> None:
+    def void_cache(self) -> None:
         """Clear the cache."""
         self.scanned = False
-        self._files.clear()
+        self._matches.clear()
 
     def get_groups(self, key: GroupKey) -> list[Group]:
         """Return list of groups corresponding to key.
-
-        If :attr:`date_is_first_class` is True, for the key 'date' return all time
-        related groups.
 
         Parameters
         ----------
@@ -740,6 +762,6 @@ class Finder:
         TypeError
             Key type is not valid.
         """
-        selected = get_groups_indices(self.groups, key, self.date_is_first_class)
+        selected = get_groups_indices(self.groups, key)
         groups = [self.groups[i] for i in selected]
         return groups

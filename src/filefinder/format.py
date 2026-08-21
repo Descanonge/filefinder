@@ -13,11 +13,6 @@ The width of the format string is not respected when matching with a regular
 expression.
 """
 
-# This file is part of the 'filefinder' project
-# (http://github.com/Descanonge/filefinder) and subject
-# to the MIT License as defined in the file 'LICENSE',
-# at the root of this project. © 2021 Clément Haëck
-
 import re
 from collections.abc import Mapping
 from typing import Any
@@ -66,8 +61,8 @@ class FormatAbstract:
     (to some limitations), generate a string from a value, or parse such a string into
     a value.
 
-    Users are not meant to instanciate those objects directly, use :func:`get_format`
-    instead (or its alias for retro-compatibility :func:`Format`).
+    Users are not meant to instanciate those objects directly, use :func:`Format`
+    instead.
 
     Parameters
     ----------
@@ -77,6 +72,7 @@ class FormatAbstract:
         Mapping of options/parameters of the format mini-language to their values.
         (type, fill, align, sign, alternate, zero, width, grouping, precision).
         They should not contain None values.
+
     """
 
     ALLOWED_TYPES = "sdfeE"
@@ -349,7 +345,7 @@ FORMAT_CLASSES: dict[str, type[FormatAbstract]] = dict(
 )
 
 
-def get_format(format: str) -> FormatAbstract:
+def Format(format: str) -> FormatAbstract:  # noqa: N802
     """Parse format parameters and return appropriate Format object."""
     m = FORMAT_PATTERN.fullmatch(format)
     if m is None:
@@ -393,7 +389,3 @@ def get_format(format: str) -> FormatAbstract:
             f"expected one of '{list(FORMAT_CLASSES.keys())}'."
         )
     return FORMAT_CLASSES[kind](format, params)
-
-
-# Retrocompatible alias
-Format = get_format

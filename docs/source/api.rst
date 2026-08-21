@@ -14,9 +14,9 @@ API References
 .. autosummary::
    :toctree: _api
 
+   dates
    finder
    filters
    format
    group
-   library
    matches

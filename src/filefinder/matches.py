@@ -1,20 +1,26 @@
 """Matches management."""
 
-# This file is part of the 'filefinder' project
-# (http://github.com/Descanonge/filefinder) and subject
-# to the MIT License as defined in the file 'LICENSE',
-# at the root of this project. © 2021 Clément Haëck
-
 import datetime
 import logging
+import os.path
 import re
-import typing as t
-from collections import abc
+from collections.abc import Iterator, Sequence
+from typing import Any, Self
 
-from .group import Group, GroupKey
-from .util import Sentinel, get_groups_indices
+from .dates import DefaultDate, get_date
+from .group import Group, GroupKey, get_date_names, get_groups_indices
 
 logger = logging.getLogger(__name__)
+
+
+class Sentinel:
+    """Sentinel objects."""
+
+    def __init__(self, msg: str = ""):
+        self.msg = msg
+
+    def __str__(self) -> str:
+        return self.msg
 
 
 PARSE_FAIL = Sentinel("Could not parse")
@@ -22,15 +28,13 @@ PARSE_FAIL = Sentinel("Could not parse")
 NOT_PARSED = Sentinel("Not yet parsed")
 """The match string has not been parsed yet."""
 
-DefaultDate = datetime.datetime | abc.Mapping[str, int] | None
 
-
-class Match:
-    """Match extract from a filename."""
+class GroupMatch:
+    """Value extracted from a filename for a single group."""
 
     @classmethod
-    def from_match(cls, group: Group, match: re.Match, idx: int) -> "Match":
-        """Return Match object from a re.Match object.
+    def from_match(cls, group: Group, match: re.Match, idx: int) -> Self:
+        """Return GroupMatch object from a re.Match object.
 
         Parameters
         ----------
@@ -55,7 +59,7 @@ class Match:
         """Start index of match in the filename."""
         self.end: int = end
         """End index of match in the filename."""
-        self._parsed: t.Any | Sentinel = NOT_PARSED
+        self._parsed: Any | Sentinel = NOT_PARSED
 
     def __repr__(self):
         """Human readable information."""
@@ -66,7 +70,7 @@ class Match:
         return f"{self.group!s} = {self.match_str}"
 
     @property
-    def match_parsed(self) -> t.Any | Sentinel:
+    def match_parsed(self) -> Any | Sentinel:
         """Return value or Sentinel value if failing to parse.
 
         Returns :attr:`PARSE_FAIL` if an exception is thrown when trying to parse the
@@ -84,7 +88,7 @@ class Match:
         """Return if the match can be parsed."""
         return self.match_parsed is not PARSE_FAIL
 
-    def get_match(self, parse: bool = True, raise_on_unparsed: bool = True) -> t.Any:
+    def get_match(self, parse: bool = True, raise_on_unparsed: bool = True) -> Any:
         """Get match string or value.
 
         Parameters
@@ -112,68 +116,37 @@ class Match:
         return self.match_str
 
 
-class Matches:
+class FileMatch:
     """Scan an input file and store the results.
 
     Parameters
     ----------
+    root
+        Root directory containing files.
+    filename
+        Filename from which matches are extracted, relative to root directory.
     match
-        Match object obtained from a filename. It should have as much capturing groups
-        as the pattern.
+        Regex match object obtained from a filename. It should have as much capturing
+        groups as the pattern.
     groups
         Sequence of Groups objects present in the pattern.
-
     """
 
-    @classmethod
-    def from_filename(
-        cls, filename: str, pattern: re.Pattern | str, groups: abc.Sequence[Group]
-    ) -> "Matches | None":
-        """Find matches for a given filename.
-
-        Parameters
-        ----------
-        filename:
-            Filename to retrieve matches from.
-        pattern
-            Match pattern to use, compiled or not.
-
-        Returns
-        -------
-        matches
-            A :class:`Matches` object, or None if the filename did not match.
-
-        Raises
-        ------
-        IndexError
-            Not as many matches as groups. Maybe one of the group regex contains an
-            additional (unwanted) capturing group ?
-        """
-        if isinstance(pattern, str):
-            pattern = re.compile(pattern)
-        m = pattern.fullmatch(filename)
-        if m is None:
-            return None
-
-        if len(groups) != len(m.groups()):
-            raise IndexError(
-                "Not as many captured matches as pattern groups. "
-                "Does one of the group regex contains a capturing group ?"
-            )
-
-        matches = [Match.from_match(grp, m, i) for i, grp in enumerate(groups)]
-
-        return cls(matches, groups)
-
-    def __init__(self, matches: abc.Sequence[Match], groups: abc.Sequence[Group]):
+    def __init__(
+        self,
+        root: str,
+        filename: str,
+        matches: Sequence[GroupMatch],
+        groups: Sequence[Group],
+    ):
         assert len(matches) == len(groups)
 
-        self.matches: list[Match] = list(matches)
-        """Matches for a single filename."""
+        self.root: str = root
+        self.filename: str = filename
+        self.matches: list[GroupMatch] = list(matches)
+        """Matches for every group."""
         self.groups: list[Group] = list(groups)
-        """Groups used."""
-
-        self.date_is_first_class: bool = True
+        """Groups present in the pattern."""
 
     def __repr__(self) -> str:
         """Human readable information."""
@@ -183,14 +156,14 @@ class Matches:
         """Human readable information."""
         return "\n".join([str(m) for m in self.matches])
 
-    def __getitem__(self, key: GroupKey) -> t.Any:
+    def __getitem__(self, key: GroupKey) -> Any:
         """Get first parsed value corresponding to key.
 
         Ignore groups with the 'discard' option.
         """
         return self.get_value(key, parse=True, keep_discard=False)
 
-    def __iter__(self) -> abc.Iterator[Match]:
+    def __iter__(self) -> Iterator[GroupMatch]:
         """Iterate over matches."""
         return iter(self.matches)
 
@@ -198,9 +171,23 @@ class Matches:
         """Return number of matches."""
         return len(self.matches)
 
+    def get_filename(self, relative: bool = True) -> str:
+        """Get filename corresponding to matches.
+
+        :param relative: If True (default), return relative to the finder root
+            directory. If not, return as absolute path.
+        """
+        if relative:
+            return self.filename
+        return os.path.join(self.root, self.filename)
+
     def get_values(
-        self, key: GroupKey, parse: bool = True, keep_discard: bool = False
-    ) -> list[t.Any]:
+        self,
+        key: GroupKey,
+        parse: bool = True,
+        keep_discard: bool = False,
+        default_date: DefaultDate = None,
+    ) -> list[Any]:
         """Get matched values corresponding to key.
 
         Return a list of values, even if only one group is selected.
@@ -213,15 +200,32 @@ class Matches:
             If True (default), return the parsed value. If False return the
             matched string.
         keep_discard:
-            If true groups with the 'discard' option are kept. Defauult is false.
+            If true groups with the 'discard' option are kept. Default is false.
+        default_date:
+            If key correspond to a date pseudo-group, use this as the default date
+            elements. Datetime, or a mapping with keys in: year, month, day, hour,
+            minute, and second. Defaults to 1970-01-01 00:00:00
         """
         matches = self.get_matches(key, keep_discard=keep_discard)
+
+        if key in get_date_names(self.groups):
+            if isinstance(default_date, datetime.datetime):
+                default_date = {
+                    attr: getattr(default_date, attr)
+                    for attr in ["year", "month", "day", "hour", "minute", "second"]
+                }
+            return [get_date(matches, default_date)]
+
         values = [m.get_match(parse=parse) for m in matches]
         return values
 
     def get_value(
-        self, key: GroupKey, parse: bool = True, keep_discard: bool = False
-    ) -> t.Any:
+        self,
+        key: GroupKey,
+        parse: bool = True,
+        keep_discard: bool = False,
+        default_date: DefaultDate = None,
+    ) -> Any:
         """Get matched value corresponding to key.
 
         Return a single value. If multiple groups correspond to ``key``,
@@ -236,16 +240,22 @@ class Matches:
             matched string.
         keep_discard:
             If true groups with the 'discard' option are kept. Defauult is false.
+        default_date:
+            If key correspond to a date pseudo-group, use this as the default date
+            elements. Datetime, or a mapping with keys in: year, month, day, hour,
+            minute, and second. Defaults to 1970-01-01 00:00:00
 
         Raises
         ------
         KeyError
             No group with no 'discard' option was found.
         """
-        values = self.get_values(key, parse=parse, keep_discard=keep_discard)
+        values = self.get_values(
+            key, parse=parse, keep_discard=keep_discard, default_date=default_date
+        )
         if len(values) == 0:
             raise KeyError(
-                "No group was found " f"(key: {key}, keep_discard: {keep_discard})"
+                f"No group was found (key: {key}, keep_discard: {keep_discard})"
             )
         if len(values) > 1:
             if any(v != values[0] for v in values[1:]):
@@ -254,46 +264,24 @@ class Matches:
                 )
         return values[0]
 
-    def get_matches(self, key: GroupKey, keep_discard: bool = False) -> list[Match]:
-        """Get Match objects corresponding to key.
+    def get_matches(
+        self, key: GroupKey, keep_discard: bool = False
+    ) -> list[GroupMatch]:
+        """Get GroupMatch objects corresponding to key.
 
         Parameters
         ----------
         key:
             Group(s) to select, either by index or name.
         keep_discard:
-            If true groups with the 'discard' option are kept. Defauult is false.
+            If true groups with the 'discard' option are kept. Default is false.
 
         Returns
         -------
-        List of Match corresponding to the key.
+        List of GroupMatch corresponding to the key.
         """
-        selected = get_groups_indices(self.groups, key, self.date_is_first_class)
+        selected = get_groups_indices(self.groups, key)
         matches = [self.matches[k] for k in selected]
         if not keep_discard:
             matches = [m for m in matches if not m.group.discard]
         return matches
-
-    def get_date(self, default_date: DefaultDate = None) -> datetime.datetime:
-        """Retrieve date from matched elements.
-
-        Matches that can be used are : YBmdjHMSFxX. If a matcher is *not* found in the
-        filename, it will be replaced by the element of the default date argument. All
-        values deduced from these matches will be compared. If different matchers give
-        different values (for instance the group Y and F give a different year), an
-        exception will be raised.
-
-        Parameters
-        ----------
-        default_date:
-            Default date. Datetime, or a mapping with keys in: year, month, day, hour,
-            minute, and second. Defaults to 1970-01-01 00:00:00
-        """
-        from filefinder.library import get_date
-
-        if isinstance(default_date, datetime.datetime):
-            default_date = {
-                attr: getattr(default_date, attr)
-                for attr in ["year", "month", "day", "hour", "minute", "second"]
-            }
-        return get_date(self, default_date)

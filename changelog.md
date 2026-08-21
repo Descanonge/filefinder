@@ -1,4 +1,34 @@
 
+# v2.0.0
+
+Breaking changes:
+- Date pseudo-groups:
+    - Date-related groups can now be managed as a single pseudo-group of any name.
+      Fixing, filtering, retrieving matches, making filenames, getting nested
+      files have been adapted.
+    - Remove % replacement in regex (made obsolete by pseudo-groups).
+    - Renamed `Group.DEFAULT_GROUPS` to `group.DATE_GROUPS`, only kept date-related elements.
+- Matches:
+    - Renamed `Matches` into `FileMatch`, `Match` into `GroupMatch`.
+    - Scanned files are now stored in `Finder.matches`, a list of `FileMatch`
+    - `FileMatch` stores the corresponding filename.
+    - Date pseudo-groups can be accessed directly as any other group, no need
+      for `Matches.get_date` anymore.
+- Fixing now done by a single method (`Finder.fix`).
+- Filtering:
+    - Unfixing does not remove filters anymore.
+    - Group filters are now added and removed with `Finder.add_group_filter` and
+      `Finder.remove_group_filters`.
+    - Group filters operating on dates are now managed as any other group filter.
+    - Filters do not need the filename as argument (it is now stored in `FileMatch`).
+- Renamed `get_format` to `Format`.
+      
+- Group delimiters can now be changed with an init argument.
+- Use current locale to obtain month number from its name.
+- Fixed `:opt` property implementation. Will now return an empty string as
+  matched string rather than None.
+- Bumped minimal python version to 3.11
+
 ### v1.3.1
 
 - [2026-01-28] Fix issues when using a datetime.date (instead of datetime.datetime)

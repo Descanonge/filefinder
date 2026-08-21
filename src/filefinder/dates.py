@@ -1,23 +1,109 @@
-"""Functions to retrieve values from filename."""
+"""Date related utilities."""
 
-# This file is part of the 'filefinder' project
-# (http://github.com/Descanonge/filefinder) and subject
-# to the MIT License as defined in the file 'LICENSE',
-# at the root of this project. © 2021 Clément Haëck
+from __future__ import annotations
 
+import calendar
 import datetime as dt
 import logging
-from collections import abc
+from collections.abc import Callable, Mapping, Sequence
+from typing import TYPE_CHECKING
 
-from .finder import Finder
-from .matches import Match, Matches
-from .util import date_from_doy, datetime_attributes
+if TYPE_CHECKING:
+    from .matches import GroupMatch
 
 logger = logging.getLogger(__name__)
 
+DefaultDate = dt.datetime | Mapping[str, int] | None
+
+datetime_keys = "YBmdjHMSFxX"
+time_keys = "XHMS"
+
+datetime_attributes = {
+    "F": ["year", "month", "day"],
+    "x": ["year", "month", "day"],
+    "Y": ["year"],
+    "m": ["month"],
+    "d": ["day"],
+    "B": ["month"],
+    "j": ["month", "day"],
+    "X": ["hour", "minute", "second"],
+    "H": ["hour"],
+    "M": ["minute"],
+    "S": ["second"],
+}
+"""Attributes of datetime objects for each group name."""
+
+datetime_format = {
+    "F": "{:04d}-{:02d}-{:02d}",
+    "x": "{:04d}{:02d}{:02d}",
+    "Y": "{:04d}",
+    "m": "{:02d}",
+    "d": "{:02d}",
+    "B": "{:s}",
+    "j": "{:03d}",
+    "X": "{:02d}{:02d}{:02d}",
+    "H": "{:02d}",
+    "M": "{:02d}",
+    "S": "{:02d}",
+}
+"""Format for each group name"""
+
+
+def _check_input(date: dt.datetime | dt.date, name: str):
+    if name in time_keys and not isinstance(date, dt.datetime):
+        raise TypeError(
+            f"'{name}' group needs time information (received a {type(date)} object)"
+        )
+    if name not in datetime_attributes:
+        raise KeyError(f"'{name}' group name not registered in util.datetime_format")
+
+
+def datetime_to_str(date: dt.datetime | dt.date, name: str) -> str:
+    """Format a group from a date object."""
+    _check_input(date, name)
+
+    if name == "j":
+        return f"{get_doy(date):03d}"
+    if name == "B":
+        return date.strftime("%B")
+
+    elements = [getattr(date, attr) for attr in datetime_attributes[name]]
+    fmt = datetime_format[name]
+    return fmt.format(*elements)
+
+
+def datetime_to_value(date: dt.datetime | dt.date, name: str) -> int | str:
+    """Return value of date group name (Y, m, F, ...)."""
+    _check_input(date, name)
+
+    if name == "j":
+        return get_doy(date)
+
+    if name in "xXFB":
+        s = datetime_to_str(date, name)
+        # xX can be returned as int, as per their format in DEFAULT_GROUPS
+        return int(s) if name in "xX" else s
+
+    elements = [getattr(date, attr) for attr in datetime_attributes[name]]
+    assert len(elements) == 1
+    return elements[0]
+
+
+def get_doy(date: dt.date | dt.datetime) -> int:
+    """Return the dayofyear of a date."""
+    if isinstance(date, dt.datetime):
+        date = date.date()
+    return (date - dt.date(date.year, 1, 1)).days + 1
+
+
+def date_from_doy(doy: int, year: int) -> dict[str, int]:
+    """Get month and day from a dayofyear value (and its year)."""
+    day = dt.date(year, 1, 1) + dt.timedelta(days=(doy - 1))
+    return dict(month=day.month, day=day.day)
+
 
 def get_date(
-    matches: Matches, default_date: abc.Mapping[str, int] | None = None
+    matches: Sequence[GroupMatch], default_date: Mapping[str, int] | None = None
 ) -> dt.datetime:
     """Retrieve date from matched elements.
 
@@ -50,7 +136,7 @@ def get_date(
     # list of values found in the matches: year, month, ...
     elts: dict[str, list[int]] = {}
 
-    def process(key: str, callback: abc.Callable[[Match], dict[str, int]]):
+    def process(key: str, callback: Callable[[GroupMatch], dict[str, int]]):
         """Run *callback* on matches selected by *key*.
 
         The callback returns a dictionnary with the datetime arguments (elements) it
@@ -64,24 +150,24 @@ def get_date(
                     elts[elt] = []
                 elts[elt].append(val)
 
-    def process_B(m: Match):
+    def process_B(m: GroupMatch):  # noqa: N802
         return dict(month=_find_month_number(m.match_str))
 
-    def process_F(m: Match):
+    def process_F(m: GroupMatch):  # noqa: N802
         # YYYY-mm-dd
         # 0123456789
         value = m.match_str
         out = dict(year=value[:4], month=value[5:7], day=value[8:10])
         return {elt: int(val) for elt, val in out.items()}
 
-    def process_x(m: Match):
+    def process_x(m: GroupMatch):
         # YYYYmmdd
         # 012345678
         value = m.match_str
         out = dict(year=value[:4], month=value[4:6], day=value[6:8])
         return {elt: int(val) for elt, val in out.items()}
 
-    def process_X(m: Match):
+    def process_X(m: GroupMatch):  # noqa: N802
         # HHMMSS (seconds optional)
         # 0123456
         value = m.match_str
@@ -90,7 +176,7 @@ def get_date(
             out["second"] = value[4:6]
         return {elt: int(val) for elt, val in out.items()}
 
-    def process_j(m: Match):
+    def process_j(m: GroupMatch):
         doy = m.get_match(parse=True)
         # This depend on the value of year, we take the first one discovered, or from
         # the default one if none was processed yet
@@ -100,7 +186,7 @@ def get_date(
             year = default_date["year"]
         return date_from_doy(doy, year)
 
-    def process_simple(m: Match):
+    def process_simple(m: GroupMatch):
         value = m.get_match(parse=True)
         elts = datetime_attributes[m.group.name]
         assert len(elts) == 1
@@ -137,110 +223,13 @@ def _find_month_number(name: str) -> int:
     Name can be the full name (January) or its three letter abbreviation (jan).
     The casing does not matter.
     """
-    names = [
-        "january",
-        "february",
-        "march",
-        "april",
-        "may",
-        "june",
-        "july",
-        "august",
-        "september",
-        "october",
-        "november",
-        "december",
-    ]
+    names = [m.lower() for m in calendar.month_name]
     names_abbr = [c[:3] for c in names]
 
     name = name.lower()
     if name in names:
-        return names.index(name) + 1
+        return names.index(name)
     if name in names_abbr:
-        return names_abbr.index(name) + 1
+        return names_abbr.index(name)
 
     raise ValueError(f"Could not interpret month name '{name}'")
-
-
-def filter_by_range(
-    finder: Finder,
-    filename: str,
-    matches: Matches,
-    group: str,
-    min: float | None = None,
-    max: float | None = None,
-) -> bool:
-    """Filter filename using the value parsed for `group`.
-
-    Keep filename for which the value parsed for `group` fall within a specific range
-    defined by `min` and `max`.
-
-    .. deprecated:: 1.3.0
-        You can now use ``finder.fix_by_filter(group, lambda x: min < x < max)``
-
-    Parameters
-    ----------
-    group
-        Name of the group to use the parsed value. The first non-discard group of that
-        name will be used.
-    min
-        If not None, the parsed value must be above this.
-    max
-        If not None, the parsed value mest be below this.
-
-    Raises
-    ------
-    TypeError
-        `min` and `max` cannot be both None.
-    """
-    if min is None and max is None:
-        raise TypeError("`min` and `max` cannot be both None.")
-
-    parsed = matches.get_value(group, parse=True, keep_discard=False)
-
-    if min is not None and parsed < min:
-        return False
-    if max is not None and parsed > max:
-        return False
-    return True
-
-
-def filter_date_range(
-    finder: Finder,
-    filename: str,
-    matches: Matches,
-    start: dt.date | str,
-    stop: dt.date | str,
-    default_date: dict | None = None,
-) -> bool:
-    """Filter filename to be between two dates.
-
-    .. deprecated:: 1.3.0
-        You can now use ``finder.fix_by_filter("date", lambda x: start < x < stop)``
-
-    Parameters
-    ----------
-    start, stop
-        Start and stop dates that define the range of dates to keep. Can each be a
-        :class:`datetime.date` or :class:`datetime.datetime` object; or a string in
-        which case a datetime object is created with
-        :meth:`~datetime.datetime.fromisoformat`.
-    default_date
-        Is passed to :func:`get_date`.
-
-    Returns
-    -------
-    keep
-        True if the file is within the range and must be kept. False otherwise.
-    """
-    if isinstance(start, str):
-        start = dt.datetime.fromisoformat(start)
-    if isinstance(stop, str):
-        stop = dt.datetime.fromisoformat(stop)
-
-    if start >= stop:
-        raise ValueError(f"Start ({start}) must be before stop ({stop})")
-
-    current = get_date(matches, default_date=default_date)
-
-    return start <= current <= stop

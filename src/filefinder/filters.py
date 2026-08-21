@@ -1,13 +1,15 @@
 """Filters management."""
 
-import datetime
+from __future__ import annotations
+
 import functools
 import typing as t
 from collections import abc
 
-from .matches import DefaultDate, Matches
+from .matches import FileMatch
 
 if t.TYPE_CHECKING:
+    from .dates import DefaultDate
     from .finder import Finder
 
 
@@ -18,15 +20,14 @@ class UserFunc(t.Protocol):
         :no-index:
 
         :param Finder finder: The finder object.
-        :param str filename: The filename to keep or discard.
-        :param Matches matches: The matches associated to this filename.
+        :param FileMatch filematch: The matches associated to this filename.
         :param ~typing.Any kwargs: Additional keywords passed to the filter.
 
         :returns: True if `filename` is to be kept, False otherwise.
     """
 
     def __call__(  # noqa: D102
-        self, finder: "Finder", filename: str, matches: Matches, **kwargs
+        self, finder: Finder, filematch: FileMatch, **kwargs
     ) -> bool: ...
 
 
@@ -45,28 +46,8 @@ class UserFuncGroup(t.Protocol):
     def __call__(self, __value: t.Any, **kwargs) -> bool: ...  # noqa: D102
 
 
-class UserFuncDate(UserFuncGroup, t.Protocol):
-    """Signature of function that can used as a filter for the date pseudo-group.
-
-    .. py:function:: date_filter(date, default_date=None, **kwargs)
-        :no-index:
-
-        :param datetime.date date: The date parsed.
-        :param datetime.date | ~collections.abc.Mapping[str, int] | None default_date:
-            The date elements to use as defaults.
-        :param ~typing.Any kwargs: Additional keywords passed to the filter.
-
-        :returns: True if the file is to be kept, False otherwise.
-    """
-
-    def __call__(  # noqa: D102
-        self, __date: datetime.date, default_date: DefaultDate = None, **kwargs
-    ) -> bool: ...
-
-
-FilterFunc = abc.Callable[["Finder", str, Matches], bool]
+FilterFunc = abc.Callable[["Finder", FileMatch], bool]
 UserFuncGroupPartial = abc.Callable[[t.Any], bool]
-UserFuncDatePartial = abc.Callable[[datetime.date], bool]
 
 
 class Filter:
@@ -90,9 +71,9 @@ class Filter:
     def __str__(self) -> str:
         return f"<{self.__class__.__name__}:{self.name}>"
 
-    def is_valid(self, finder: "Finder", filename: str, matches: Matches) -> bool:
+    def is_valid(self, finder: Finder, filematch: FileMatch) -> bool:
         """Return if the corresponding filename is valid."""
-        return self.filter_func(finder, filename, matches)
+        return self.filter_func(finder, filematch)
 
     def _get_name(self) -> str:
         return getattr(self.user_func, "__name__", "")
@@ -150,10 +131,10 @@ class FilterByGroup(Filter):
         :attr:`indices` and :attr:`pass_unparsed` attributes.
         """
 
-        def filt(finder: "Finder", filename: str, matches: Matches) -> bool:
+        def filt(finder: Finder, filematch: FileMatch) -> bool:
             values: list[t.Any] = []
             for i in self.indices:
-                m = matches.matches[i]
+                m = filematch.matches[i]
                 if not m.can_parse() and self.pass_unparsed:
                     values.append(m.match_str)
                 else:
@@ -175,19 +156,24 @@ class FilterByDate(Filter):
     The user function will receive a date recovered from the matches.
     """
 
-    user_func: UserFuncDate
+    date_name: str
+    """Name of the corresponding pseudo-group."""
+    user_func: UserFuncGroup
     """Initial function given by the user."""
-    partial_func: UserFuncDatePartial
+    partial_func: UserFuncGroupPartial
     """Function with kwargs stored."""
-    default_date: DefaultDate = None
+    default_date: DefaultDate
     """Default date elements to use when recovering date."""
 
     def __init__(
         self,
         user_func: abc.Callable[..., bool],
+        date_name: str,
+        /,
         default_date: DefaultDate = None,
         **kwargs,
     ):
+        self.date_name = date_name
         self.default_date = default_date
         super().__init__(user_func, **kwargs)
 
@@ -198,8 +184,8 @@ class FilterByDate(Filter):
         default elements from :attr:`default_date`.
         """
 
-        def filt(finder: "Finder", filename: str, matches: Matches) -> bool:
-            date = matches.get_date(default_date=self.default_date)
+        def filt(finder: Finder, filematch: FileMatch) -> bool:
+            date = filematch.get_values(self.date_name, default_date=self.default_date)
             return self.partial_func(date)
 
         return filt
@@ -232,12 +218,12 @@ class FilterList:
     def __str__(self) -> str:
         return " ".join(map(str, self.filters))
 
-    def is_valid(self, finder: "Finder", filename: str, matches: Matches) -> bool:
+    def is_valid(self, finder: Finder, filematch: FileMatch) -> bool:
         """Return if the filename is valid.
 
         All filters are executed unless one rejects the filename.
         """
-        return all(filt.is_valid(finder, filename, matches) for filt in self)
+        return all(filt.is_valid(finder, filematch) for filt in self)
 
     def add(self, func: FilterFunc, **kwargs) -> Filter:
         """Add a basic filter."""
@@ -259,12 +245,14 @@ class FilterList:
 
     def add_by_date(
         self,
-        func: UserFuncDate,
+        func: UserFuncGroup,
+        date_name: str,
         default_date: DefaultDate = None,
+        /,
         **kwargs,
     ) -> FilterByDate:
         """Add a date filter."""
-        filt = FilterByDate(func, default_date=default_date, **kwargs)
+        filt = FilterByDate(func, date_name, default_date=default_date, **kwargs)
         self.filters.append(filt)
         return filt
 
@@ -290,7 +278,7 @@ class FilterList:
             filters.append(filt)
         self.filters = filters
 
-    def remove_by_date(self):
+    def remove_by_date(self, date_name: str):
         """Remove all date filters."""
         self.filters = [
             filt for filt in self.filters if not isinstance(filt, FilterByDate)

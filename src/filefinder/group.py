@@ -1,17 +1,15 @@
 """Group management."""
 
-# This file is part of the 'filefinder' project
-# (http://github.com/Descanonge/filefinder) and subject
-# to the MIT License as defined in the file 'LICENSE',
-# at the root of this project. © 2021 Clément Haëck
-
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import re
+from collections.abc import Sequence
 from typing import Any
 
-from .format import FormatAbstract, get_format
+from .dates import datetime_to_value
+from .format import Format, FormatAbstract
 
 logger = logging.getLogger(__name__)
 
@@ -51,17 +49,20 @@ class Group:
     """
 
     PATTERN = re.compile(
-        "(?P<name>[^:]+?)(?:(?P<fmt>:fmt=.+?)|(?P<rgx>:rgx=.*?)"
+        "(?P<name>[^:]+?(?::[Ymd])?)(?:"
+        "(?P<fmt>:fmt=.+?)"
+        "|(?P<rgx>:rgx=.*?)"
         "|(?P<bool>:bool=.*?(?::.*?)??)"
-        "|(?P<opt>:opt)|(?P<discard>:discard)){,5}"
+        "|(?P<opt>:opt)"
+        "|(?P<discard>:discard)"
+        "){,5}"
     )
     """Pattern used to find properties in group definition.
 
     See :meth:`_check_duplicates` for details on the pattern matching.
     """
 
-    DEFAULT_GROUPS = {
-        "I": [r"\d+", "d"],  # index
+    DATE_GROUPS = {
         "Y": [r"\d{4}", "04d"],  # year
         "m": [r"\d\d", "02d"],  # month
         "d": [r"\d\d", "02d"],  # day
@@ -69,12 +70,10 @@ class Group:
         "H": [r"\d\d", "02d"],  # hour
         "M": [r"\d\d", "02d"],  # minute
         "S": [r"\d\d", "02d"],  # second
-        "x": [r"%Y%m%d", "08d"],  # date
-        "X": [r"%H%M%S", "06d"],  # time
-        "F": [r"%Y-%m-%d", "s"],  # formated date
-        "B": [r"[a-zA-Z]*", "s"],  # month / month abbreviation
-        "text": [r"\w", "s"],
-        "char": [r"\S*", "s"],
+        "x": [r"\d{8}", "08d"],  # date
+        "X": [r"\d{6}", "06d"],  # time
+        "F": [r"\d{4}-\d\d-\d\d", "s"],  # formated date
+        "B": [r"\w+", "s"],  # month / month abbreviation
     }
     """Regex and format strings for various default groups.
 
@@ -91,7 +90,7 @@ class Group:
         """Group name."""
         self.rgx: str = ""
         """Regex."""
-        self.fmt: FormatAbstract = get_format("s")
+        self.fmt: FormatAbstract = Format("s")
         """Format string object."""
         self.discard: bool = False
         """If the group should not be used when retrieving values from matches."""
@@ -102,9 +101,15 @@ class Group:
         """If True, the whole group is marked as optional (``()?``).
         Is set to False unless specification ':opt' is indicated."""
 
+        self.date_name: str | None = None
+        self.date_element: str | None = None
+        self.is_date: bool = False
+        self.name_date: tuple[str, str] | None = None
+        """If the group represents a date element, and if yes which one."""
+
         self._fixed = False
-        self.fixed_value: Any | None = None
-        self.fixed_string: str | None = None
+        self.fixed_value: Any | list[Any] | None = None
+        self.fixed_string: str | list[str] | None = None  # to create filenames
         self.fixed_regex: str | None = None
 
         self._parse_group_definition()
@@ -122,11 +127,22 @@ class Group:
 
         self.name = specs["name"]
 
-        # Set to defaults if name is known
-        default = self.DEFAULT_GROUPS.get(self.name)
-        if default is not None:
-            self.rgx, fmt_def = default
-            self.fmt = get_format(fmt_def)
+        if ":" in self.name:
+            self.is_date = True
+            self.date_name, self.date_element = self.name.rsplit(":", 1)
+            if self.date_element not in self.DATE_GROUPS:
+                raise GroupParseError(
+                    f"'{self.date_element}' is not a registered date element.", self
+                )
+        elif self.name in self.DATE_GROUPS:
+            self.is_date = True
+            self.date_name = "date"
+            self.date_element = self.name
+
+        if self.is_date:
+            assert self.date_element is not None
+            self.rgx, fmt_def = self.DATE_GROUPS[self.date_element]
+            self.fmt = Format(fmt_def)
 
         # Extract specs
         for k in ["rgx", "fmt", "bool"]:
@@ -142,7 +158,7 @@ class Group:
 
         # Override default format
         if fmt:
-            self.fmt = get_format(fmt)
+            self.fmt = Format(fmt)
             if not rgx:  # No need to generate rgx if it is provided
                 self.rgx = self.fmt.generate_expression()
 
@@ -160,12 +176,10 @@ class Group:
             self.rgx = rgx
 
         if not self.rgx:
-            raise GroupParseError("No regex has been produced.", self)
-
-        if self.options is not None:
-            # rgx is A|B, A and B being strings we don't do "% replacement"
-            return
-        self.rgx = self._replace_regex_defaults(self.rgx)
+            raise GroupParseError(
+                "No regex has been produced. Group definition is missing properties.",
+                self,
+            )
 
     def _check_duplicates(self, m: re.Match):
         """Check if the definition does not contain duplicates.
@@ -204,32 +218,6 @@ class Group:
                     self,
                 )
 
-    def _replace_regex_defaults(self, regex: str) -> str:
-        """Recursively replace defaults regexes of the form ``%[a-zA-Z]``.
-
-        Replacements are taken from :attr:`Group.DEFAULT_GROUPS`.
-
-        A '%' in the regex should be escaped by another: '%%'.
-
-        Raises
-        ------
-        KeyError
-            Unknown replacement.
-        """
-
-        def replace(match: re.Match):
-            group = match.group(1)
-            if group == "%":
-                return "%"
-            if group in self.DEFAULT_GROUPS:
-                replacement = self.DEFAULT_GROUPS[group][0]
-                if "%" in replacement:  # need to go recursive
-                    return self._replace_regex_defaults(replacement)
-                return replacement
-            raise KeyError(f"Unknown replacement '{match.group(0)}'.")
-
-        return re.sub("%([a-zA-Z%])", replace, regex)
-
     def __repr__(self) -> str:
         """Human readable information."""
         return "\n".join([super().__repr__(), self.__str__()])
@@ -262,7 +250,7 @@ class Group:
 
         return self.fmt.parse(string)
 
-    def fix_value(self, fix: Any | bool | str):
+    def fix(self, fix: Any | Sequence[Any]):
         """Fix the group regex to a specific value.
 
         Parameters
@@ -271,10 +259,8 @@ class Group:
             A string is directly used as a regular expression, otherwise the
             value is formatted according to the group 'format' specification.
         """
-        self._fixed = True
-        self.fixed_value = fix
-
-        if not isinstance(fix, list | tuple):
+        is_solo = isinstance(fix, str) or not isinstance(fix, Sequence)
+        if is_solo:
             fix = [fix]
 
         if len(fix) == 0:
@@ -282,11 +268,26 @@ class Group:
 
         strings = []
         regexes = []
+        values = []
         for f in fix:
+            val: Any = f
+
             # if a string, leave it as is
             if isinstance(f, str):
                 out = f
                 rgx = f
+
+            # date
+            if isinstance(f, dt.date | dt.datetime):
+                if self.date_element is None:
+                    raise RuntimeError(
+                        "Cannot fix a date object to a group not corresponding to a "
+                        f"date element ({self})."
+                    )
+                val = datetime_to_value(f, self.date_element)
+                out = self.fmt.format(val)
+                rgx = re.escape(out)
+
             # if optional A|B choice
             elif isinstance(f, bool):
                 if self.options is None:
@@ -296,13 +297,18 @@ class Group:
                     )
                 out = self.options[f]
                 rgx = re.escape(out)
+
             else:
+                # otherwise, assume number
                 out = self.format(f)
                 rgx = re.escape(out)
+            values.append(val)
             strings.append(out)
             regexes.append(rgx)
 
-        self.fixed_string = strings[0]
+        self._fixed = True
+        self.fixed_value = values[0] if is_solo else values
+        self.fixed_string = strings[0] if is_solo else strings
         self.fixed_regex = "|".join(regexes)
 
     def unfix(self):
@@ -324,10 +330,44 @@ class Group:
         else:
             rgx = self.rgx
 
+        if self.optional is True:
+            rgx = f"(?:{rgx})?"
+
         # Make it matching
         rgx = f"({rgx})"
 
-        if self.optional is True:
-            rgx += "?"
-
         return rgx
+
+
+def get_groups_indices(groups: list[Group], key: GroupKey) -> list[int]:
+    """Get sorted list of groups indices corresponding to key.
+
+    Key can be an integer index, or a string of a group name. Since multiple
+    groups can share the same name, multiple indices can be returned (sorted).
+
+    Raises
+    ------
+    IndexError
+        No group found corresponding to the key
+    TypeError
+        Key is not int or str
+    """
+    if isinstance(key, int):
+        return [key]
+    if isinstance(key, str):
+        selected = [
+            i
+            for i, group in enumerate(groups)
+            if key in set([group.name, group.date_name])
+        ]
+
+        if len(selected) == 0:
+            raise IndexError(f"No group found for key '{key}'")
+        return selected
+
+    raise TypeError("Key must be int or str.")
+
+
+def get_date_names(groups: Sequence[Group]) -> set[str]:
+    """Get the names of date pseudo-groups."""
+    return set(g.date_name for g in groups if g.date_name is not None)

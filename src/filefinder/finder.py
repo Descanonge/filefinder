@@ -1,10 +1,11 @@
 """Main class."""
 
+import datetime as dt
 import itertools
 import logging
 import os
 import re
-from collections import abc
+from collections.abc import Sequence
 from copy import copy
 from typing import Any
 
@@ -185,7 +186,7 @@ class Finder:
     def get_files(
         self,
         relative: bool = False,
-        nested: abc.Sequence[str | abc.Sequence[str]] | None = None,
+        nested: Sequence[str | Sequence[str]] | None = None,
     ) -> list:
         """Return files that match the regex.
 
@@ -291,7 +292,20 @@ class Finder:
             fixes = {}
         fixes.update(**fixes_kw)
         self.void_cache()
+        date_names = self.get_date_names()
         for key, value in fixes.items():
+            if key in date_names:
+                if not (
+                    isinstance(value, dt.date)
+                    or (
+                        isinstance(value, Sequence)
+                        and all(isinstance(v, dt.date) for v in value)
+                    )
+                ):
+                    raise TypeError(
+                        f"Date pseudo-group '{key}' can only be fixed with a datetime "
+                        f"object or list thereof (received {type(value)})."
+                    )
             for group in self.get_groups(key):
                 group.fix(value)
 

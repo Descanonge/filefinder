@@ -1,11 +1,8 @@
 """Generate regex from string format, and parse strings.
 
-Parameters of the format-string are retrieved.
-See `Format Mini Language Specification
-<https://docs.python.org/3/library/string.html#formatspec>`__.
-
-Thoses parameters are then used to generate a regular expression, or to parse
-a string formed from the format.
+Retrieve parameters of the format-string. (see `Format Mini Language Specification
+<https://docs.python.org/3/library/string.html#formatspec>`__.) Thoses parameters are
+then used to generate a regular expression, or to parse a string formed from the format.
 
 Only 's', 'd', 'f', 'e' and 'E' formats types are supported.
 
@@ -72,7 +69,6 @@ class FormatAbstract:
         Mapping of options/parameters of the format mini-language to their values.
         (type, fill, align, sign, alternate, zero, width, grouping, precision).
         They should not contain None values.
-
     """
 
     ALLOWED_TYPES = "sdfeE"
@@ -367,7 +363,9 @@ def Format(format: str) -> FormatAbstract:  # noqa: N802
 
     # TODO Precision not supported in s kind (it truncates the value)
     if kind == "s" and params["precision"]:
-        raise FormatError("Precision parameter is currently not supported.")
+        raise FormatError(
+            "Precision parameter is currently not supported for 's' format."
+        )
 
     # defaults values for unset remaining parameters
     defaults = dict(align="<", fill=" ")

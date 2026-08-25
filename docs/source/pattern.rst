@@ -15,24 +15,27 @@ multiple optional properties, separated by colons (in no particular order):
 .. table::
    :widths: grid
 
-   +---------------+--------------------------+--------------------------------+
-   |Property       |Format                    |Description                     |
-   +===============+==========================+================================+
-   |:ref:`Format   |``:fmt=<format string>``  |Use a python format string to   |
-   |string<fmt>`   |                          |match filenames and format      |
-   |               |                          |values.                         |
-   +---------------+--------------------------+--------------------------------+
-   |:ref:`Boolean  |``:bool=<true>[:<false>]``|Choose between two alternatives.|
-   |format<bool>`  |                          |The second option (false) can be|
-   |               |                          |omitted when empty.             |
-   +---------------+--------------------------+--------------------------------+
-   |:ref:`Custom   |``:rgx=<custom regex>``   |Specify a custom regular        |
-   |regex<rgx>`    |                          |expression directly.            |
-   |               |                          |                                |
-   +---------------+--------------------------+--------------------------------+
-   |:ref:`Optional |``:opt``                  |Mark the group as optional.     |
-   |flag<opt>`     |                          |                                |
-   +---------------+--------------------------+--------------------------------+
+   +--------------------+--------------------------+--------------------------------+
+   |Property            |Format                    |Description                     |
+   +====================+==========================+================================+
+   |:ref:`Format        |``:fmt=<format string>``  |Use a python format string to   |
+   |string<fmt>`        |                          |match filenames and format      |
+   |                    |                          |values.                         |
+   +--------------------+--------------------------+--------------------------------+
+   |:ref:`Boolean       |``:bool=<true>[:<false>]``|Choose between two alternatives.|
+   |format<bool>`       |                          |The second option (false) can be|
+   |                    |                          |omitted when empty.             |
+   +--------------------+--------------------------+--------------------------------+
+   |:ref:`Custom        |``:rgx=<custom regex>``   |Specify a custom regular        |
+   |regex<rgx>`         |                          |expression directly.            |
+   |                    |                          |                                |
+   +--------------------+--------------------------+--------------------------------+
+   |:ref:`Optional      |``:opt``                  |Mark the group as optional.     |
+   |flag<opt>`          |                          |                                |
+   +--------------------+--------------------------+--------------------------------+
+   |:ref:`pre-post`     |``:pre=<prefix>`` et      |Add prefix or suffix to the     |
+   |                    |``:post=<suffix>``        |group.                          |
+   +--------------------+--------------------------+--------------------------------+
 
 So for instance, we can specify a filename pattern that will match an integer
 padded with zeros, followed by two possible options::
@@ -187,6 +190,21 @@ not affect the group in other ways.
 
 For instance, ``A%(param:fmt=d).txt`` would match "A.txt", "A0.txt", etc.
 If the group is not present, its match will be an empty string.
+
+An optional group does not have to be fixed when :ref:`generating a
+filename<create-filenames>`.
+
+.. _pre-post:
+
+Prefix and suffix
+=================
+
+The prefix and suffix will be added to formatted values, as well as to the group
+regex. They will not be added when fixing to a string (strings are fixed as-is).
+They are removed before parsing values.
+
+It can be useful when a group is optional, for instance
+``A%(idx:fmt=d:pre=_).txt`` would match "A.txt" and "A_0.txt".
 
 .. _rgx:
 

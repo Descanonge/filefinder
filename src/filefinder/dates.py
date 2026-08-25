@@ -5,6 +5,7 @@ from __future__ import annotations
 import calendar
 import datetime as dt
 import logging
+import re
 from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING
 
@@ -47,6 +48,39 @@ datetime_format = {
     "S": "{:02d}",
 }
 """Format for each group name"""
+
+
+def make_date_groups(date_format: str, name: str = "") -> str:
+    """Create a pattern string for multiple dates groups.
+
+    Parameters
+    ----------
+    date_format:
+        A date format as given to strftime, with each group marked with a percent sign
+        followed a default element ('%Y' for instance).
+    name:
+        Name of all the date groups. Can be left empty.
+
+    Example
+    -------
+    >>> make_date_groups("%Y%m%d", name="start")
+    "%(start:Y)%(start:m)%(start:d)"
+    >>> make_date_groups("%Y-%m-%d %H:%M:%S")
+    "%(Y)%(m)%(d) %(H):%(M):%(S)"
+    """
+    if name:
+        name = f"{name}:"
+
+    def replace(match: re.Match):
+        group = match.group(1)
+        if group == "%":
+            return "%"
+        if group in datetime_keys:
+            replacement = f"%({name}{group})"
+            return replacement
+        raise KeyError(f"Unknown datetime key '{match.group(0)}'.")
+
+    return re.sub("%([a-zA-Z%])", replace, date_format)
 
 
 def _check_input(date: dt.datetime | dt.date, name: str):

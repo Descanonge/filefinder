@@ -8,7 +8,7 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
-from .dates import datetime_to_value
+from .dates import datetime_keys, datetime_to_value
 from .format import Format, FormatAbstract
 
 logger = logging.getLogger(__name__)
@@ -49,12 +49,14 @@ class Group:
     """
 
     PATTERN = re.compile(
-        "(?P<name>[^:]+?(?::[Ymd])?)(?:"
+        f"(?P<name>[^:]+?(?::[{datetime_keys}])?)(?:"
         "(?P<fmt>:fmt=.+?)"
         "|(?P<rgx>:rgx=.*?)"
         "|(?P<bool>:bool=.*?(?::.*?)??)"
         "|(?P<opt>:opt)"
-        "){,4}"
+        "|(?P<pre>:pre=.*?)"
+        "|(?P<post>:post=.*?)"
+        "){,6}"
     )
     """Pattern used to find properties in group definition.
 
@@ -97,6 +99,11 @@ class Group:
         self.optional: bool = False
         """If True, the whole group is marked as optional (``()?``).
         Is set to False unless specification ':opt' is indicated."""
+
+        self.prefix: str = ""
+        """Group prefix. Added to fixes and regex."""
+        self.suffix: str = ""
+        """Group suffix. Added to fixes and regex."""
 
         self.date_name: str | None = None
         self.date_element: str | None = None
@@ -142,12 +149,17 @@ class Group:
             self.fmt = Format(fmt_def)
 
         # Extract specs
-        for k in ["rgx", "fmt", "bool"]:
+        for k in ["rgx", "fmt", "bool", "pre", "post"]:
             if specs[k] is not None:
                 specs[k] = specs[k].removeprefix(f":{k}=")
         rgx = specs["rgx"]
         fmt = specs["fmt"]
         bol = specs["bool"]
+
+        if (prefix := specs["pre"]) is not None:
+            self.prefix = prefix
+        if (suffix := specs["post"]) is not None:
+            self.suffix = suffix
 
         # Flags
         self.optional = specs["opt"] is not None
@@ -233,6 +245,11 @@ class Group:
 
     def parse(self, string: str) -> Any:
         """Return parsed value from string."""
+        if self.prefix:
+            string = string.removeprefix(self.prefix)
+        if self.suffix:
+            string = string.removesuffix(self.suffix)
+
         # parsing boolean
         if self.options is not None:
             if string == self.options[0]:
@@ -274,14 +291,14 @@ class Group:
                 rgx = f
 
             # date
-            if isinstance(f, dt.date | dt.datetime):
+            elif isinstance(f, dt.date | dt.datetime):
                 if self.date_element is None:
                     raise RuntimeError(
                         "Cannot fix a date object to a group not corresponding to a "
                         f"date element ({self})."
                     )
                 val = datetime_to_value(f, self.date_element)
-                out = self.fmt.format(val)
+                out = self.prefix + self.fmt.format(val) + self.suffix
                 rgx = re.escape(out)
 
             # if optional A|B choice
@@ -291,12 +308,12 @@ class Group:
                         f"{self.name} group has no A|B options, "
                         "cannot fix value with a boolean."
                     )
-                out = self.options[f]
+                out = self.prefix + self.options[f] + self.suffix
                 rgx = re.escape(out)
 
             else:
                 # otherwise, assume number
-                out = self.format(f)
+                out = self.prefix + self.format(f) + self.suffix
                 rgx = re.escape(out)
             values.append(val)
             strings.append(out)
@@ -325,6 +342,7 @@ class Group:
             rgx = self.fixed_regex
         else:
             rgx = self.rgx
+            rgx = self.prefix + rgx + self.suffix
 
         if self.optional is True:
             rgx = f"(?:{rgx})?"

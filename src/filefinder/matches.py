@@ -154,7 +154,9 @@ class FileMatch:
 
     def __str__(self) -> str:
         """Human readable information."""
-        return "\n".join([str(m) for m in self.matches])
+        return "\n".join(
+            [f"from filename: {self.filename}"] + [str(m) for m in self.matches]
+        )
 
     def __getitem__(self, key: GroupKey) -> Any:
         """Get first parsed value corresponding to key."""

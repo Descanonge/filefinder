@@ -537,6 +537,8 @@ class Finder:
                     if isinstance(g.fixed_string, str)
                     else g.fixed_string[0]
                 )
+            elif g.optional:
+                segments[2 * i + 1] = ""
             else:
                 raise ValueError(f"Group '{g!s}' has no fixed value.")
 

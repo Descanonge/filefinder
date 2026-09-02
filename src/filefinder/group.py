@@ -163,7 +163,7 @@ class Group:
         if fmt:
             self.fmt = Format(fmt)
             if not rgx:  # No need to generate rgx if it is provided
-                self.rgx = self.fmt.generate_expression()
+                self.rgx = self.fmt.get_regex()
 
         # Boolean format
         if bol is not None:

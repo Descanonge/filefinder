@@ -120,7 +120,7 @@ class FormatAbstract:
         """Parse string generated with this format into an appropriate value."""
         raise NotImplementedError()
 
-    def generate_expression(self, capture=False) -> str:
+    def get_regex(self, *, capture: bool = False) -> str:
         """Generate a regular expression matching strings created with this format.
 
         Parameters
@@ -153,13 +153,13 @@ class FormatString(FormatAbstract):
 
     def parse(self, s: str) -> str:
         """Parse string generated with this format into an appropriate value."""
-        pattern = self.generate_expression(capture=True)
+        pattern = self.get_regex(capture=True)
         m = re.fullmatch(pattern, s)
         if m is None:
             raise ValueError(f"Error parsing '{s}' with pattern '{pattern}'")
         return m.group(1)
 
-    def generate_expression(self, capture=False) -> str:
+    def get_regex(self, *, capture: bool = False) -> str:
         """Generate a regular expression matching strings created with this format."""
         rgx = ".*?"
         if capture:
@@ -200,7 +200,7 @@ class FormatNumberAbstract(FormatAbstract):
         s
             a string ready to be casted to the appropriate type.
         """
-        pattern = self.generate_expression(capture=True)
+        pattern = self.get_regex(capture=True)
         m = re.fullmatch(pattern, s)
         if m is None:
             raise ValueError(f"Error parsing '{s}' with pattern '{pattern}'")
@@ -251,7 +251,7 @@ class FormatInteger(FormatNumberAbstract):
         s = self.prepare_parse(s)
         return int(s)
 
-    def generate_expression(self, capture=False) -> str:
+    def get_regex(self, *, capture: bool = False) -> str:
         """Generate regex from format string."""
         rgx = self.get_sign_regex(capture=capture)
         number = self.get_left_of_decimal()
@@ -296,7 +296,7 @@ class FormatFloat(FormatNumberAbstract):
             return rf"0?0?\d(?:{self.grouping}00\d)*"
         return r"\d"
 
-    def generate_expression(self, capture=False) -> str:
+    def get_regex(self, *, capture: bool = False) -> str:
         """Generate a regular expression matching strings created with this format."""
         if self.type == "f":
             rgx = self.get_sign_regex(capture=capture)

@@ -140,7 +140,7 @@ class TestCreation:
 
         f = Finder("", pattern_dates.pattern)
         rgx = r"(\d{4})(\d\d)(\d\d)\-(\d{3})"
-        assert f.get_regex() == rf"(\d{{4}})/{rgx}_{rgx}\.txt"
+        assert f.get_regex() == rf"(\d{{4}}){os.sep}{rgx}_{rgx}\.txt"
 
 
 class AssertVoid:
@@ -517,7 +517,9 @@ class TestMatches:
     def test_date(self) -> None:
         """Test retrieving dates."""
         finder = Finder("", pattern_dates.pattern)
-        filematch = finder.find_matches("2086/20860302-061_20870403-093.txt")
+        filematch = finder.find_matches(
+            os.path.join("2086", "20860302-061_20870403-093.txt")
+        )
         assert filematch is not None
 
         assert filematch["Y"] == 2086
@@ -650,17 +652,13 @@ class TestMakeFilename:
     def test_dates(self) -> None:
         finder = Finder("/base/", pattern_dates.pattern)
 
-        assert (
-            finder.make_filename(
-                date=dt.datetime(2086, 3, 2), date2=dt.datetime(2087, 4, 3)
-            )
-            == "/base/2086/20860302-061_20870403-093.txt"
-        )
+        assert finder.make_filename(
+            date=dt.datetime(2086, 3, 2), date2=dt.datetime(2087, 4, 3)
+        ) == os.path.join("/base", "2086", "20860302-061_20870403-093.txt")
 
         finder.fix(date=dt.datetime(2086, 3, 2), date2=dt.datetime(2087, 4, 3))
-        assert (
-            finder.make_filename({"date2:d": 4}, d=3)
-            == "/base/2086/20860303-061_20870404-093.txt"
+        assert finder.make_filename({"date2:d": 4}, d=3) == os.path.join(
+            "/base", "2086", "20860303-061_20870404-093.txt"
         )
 
 
@@ -685,8 +683,8 @@ class TestFileScan:
         finder = tmp_dir.get_filefinder()
 
         files = [
-            "2086/test_2086-02-03_0.0.txt",
-            "2086/test_2086-02-03_0.0_01.txt",
+            os.path.join("2086", "test_2086-02-03_0.0.txt"),
+            os.path.join("2086", "test_2086-02-03_0.0_01.txt"),
         ]
         assert tmp_dir.files == files
         assert finder.get_files(relative=True) == files

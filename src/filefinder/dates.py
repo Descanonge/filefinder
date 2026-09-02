@@ -71,19 +71,18 @@ def make_date_groups(date_format: str, name: str = "") -> str:
     if name:
         name = f"{name}:"
 
-    def replace(match: re.Match):
+    def replace(match: re.Match) -> str:
         group = match.group(1)
         if group == "%":
             return "%"
         if group in datetime_keys:
-            replacement = f"%({name}{group})"
-            return replacement
+            return f"%({name}{group})"
         raise KeyError(f"Unknown datetime key '{match.group(0)}'.")
 
     return re.sub("%([a-zA-Z%])", replace, date_format)
 
 
-def _check_input(date: dt.datetime | dt.date, name: str):
+def _check_input(date: dt.datetime | dt.date, name: str) -> None:
     if name in time_keys and not isinstance(date, dt.datetime):
         raise TypeError(
             f"'{name}' group needs time information (received a {type(date)} object)"
@@ -133,7 +132,7 @@ def get_doy(date: dt.date | dt.datetime) -> int:
 def date_from_doy(doy: int, year: int) -> dict[str, int]:
     """Get month and day from a dayofyear value (and its year)."""
     day = dt.date(year, 1, 1) + dt.timedelta(days=(doy - 1))
-    return dict(month=day.month, day=day.day)
+    return {"month": day.month, "day": day.day}
 
 
 def get_date(
@@ -170,7 +169,7 @@ def get_date(
     # list of values found in the matches: year, month, ...
     elts: dict[str, list[int]] = {}
 
-    def process(key: str, callback: Callable[[GroupMatch], dict[str, int]]):
+    def process(key: str, callback: Callable[[GroupMatch], dict[str, int]]) -> None:
         """Run *callback* on matches selected by *key*.
 
         The callback returns a dictionnary with the datetime arguments (elements) it
@@ -184,45 +183,43 @@ def get_date(
                     elts[elt] = []
                 elts[elt].append(val)
 
-    def process_B(m: GroupMatch):  # noqa: N802
-        return dict(month=_find_month_number(m.match_str))
+    def process_B(m: GroupMatch) -> dict[str, int]:  # noqa: N802
+        return {"month": _find_month_number(m.match_str)}
 
-    def process_F(m: GroupMatch):  # noqa: N802
+    def process_F(m: GroupMatch) -> dict[str, int]:  # noqa: N802
         # YYYY-mm-dd
         # 0123456789
         value = m.match_str
-        out = dict(year=value[:4], month=value[5:7], day=value[8:10])
+        out = {"year": value[:4], "month": value[5:7], "day": value[8:10]}
         return {elt: int(val) for elt, val in out.items()}
 
-    def process_x(m: GroupMatch):
+    def process_x(m: GroupMatch) -> dict[str, int]:
         # YYYYmmdd
         # 012345678
         value = m.match_str
-        out = dict(year=value[:4], month=value[4:6], day=value[6:8])
+        out = {"year": value[:4], "month": value[4:6], "day": value[6:8]}
         return {elt: int(val) for elt, val in out.items()}
 
-    def process_X(m: GroupMatch):  # noqa: N802
+    def process_X(m: GroupMatch) -> dict[str, int]:  # noqa: N802
         # HHMMSS (seconds optional)
         # 0123456
         value = m.match_str
-        out = dict(hour=value[:2], minute=value[2:4])
+        out = {"hour": value[:2], "minute": value[2:4]}
         if len(value) > 4:
             out["second"] = value[4:6]
         return {elt: int(val) for elt, val in out.items()}
 
-    def process_j(m: GroupMatch):
+    def process_j(m: GroupMatch) -> dict[str, int]:
         doy = m.get_match(parse=True)
         # This depend on the value of year, we take the first one discovered, or from
         # the default one if none was processed yet
-        if "year" in elts:
-            year = elts["year"][0]
-        else:
-            year = default_date["year"]
+        year = elts["year"][0] if "year" in elts else default_date["year"]
         return date_from_doy(doy, year)
 
-    def process_simple(m: GroupMatch):
+    def process_simple(m: GroupMatch) -> dict[str, int]:
         value = m.get_match(parse=True)
-        elts = datetime_attributes[m.group.name]
+        assert m.group.date_element is not None
+        elts = datetime_attributes[m.group.date_element]
         assert len(elts) == 1
         return {elts[0]: value}
 
@@ -248,7 +245,7 @@ def get_date(
     for elt, values in elts.items():
         date[elt] = values[0]
 
-    return dt.datetime(**date)  # type: ignore
+    return dt.datetime(**date)  # type: ignore[arg-type]
 
 
 def _find_month_number(name: str) -> int:

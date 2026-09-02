@@ -73,7 +73,7 @@ class FormatAbstract:
 
     ALLOWED_TYPES = "sdfeE"
 
-    def __init__(self, fmt: str, params: Mapping[str, Any]):
+    def __init__(self, fmt: str, params: Mapping[str, Any]) -> None:
         self.fmt: str = fmt
 
         self.type: str = params["type"]
@@ -95,7 +95,7 @@ class FormatAbstract:
         """Return formatted string of a value."""
         return f"{{:{self.fmt}}}".format(value)
 
-    def get_fill_regex(self):
+    def get_fill_regex(self) -> str:
         """Return regex for matching fill characters."""
         return f"{re.escape(self.fill)}*"
 
@@ -143,7 +143,7 @@ class FormatString(FormatAbstract):
 
     type = "s"
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
         if self.align == "=":
@@ -170,8 +170,7 @@ class FormatString(FormatAbstract):
         rgx = ".*?"
         if capture:
             rgx = f"({rgx})"
-        rgx = self.add_outer_alignement(rgx)
-        return rgx
+        return self.add_outer_alignement(rgx)
 
 
 class FormatNumberAbstract(FormatAbstract):
@@ -179,7 +178,7 @@ class FormatNumberAbstract(FormatAbstract):
 
     ALLOWED_TYPES = "dfeE"
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
         # Reject dubious formats
@@ -267,8 +266,7 @@ class FormatInteger(FormatNumberAbstract):
         if capture:
             number = f"({number})"
         rgx += number
-        rgx = self.add_outer_alignement(rgx)
-        return rgx
+        return self.add_outer_alignement(rgx)
 
 
 class FormatFloat(FormatNumberAbstract):
@@ -315,8 +313,7 @@ class FormatFloat(FormatNumberAbstract):
                 number = f"({number})"
             rgx += number
 
-            rgx = self.add_outer_alignement(rgx)
-            return rgx
+            return self.add_outer_alignement(rgx)
 
         assert self.type in "eE"
         rgx = self.get_sign_regex(capture=capture)
@@ -328,24 +325,23 @@ class FormatFloat(FormatNumberAbstract):
         if capture:
             number = f"({number})"
         rgx += number
-        rgx = self.add_outer_alignement(rgx)
-        return rgx
+        return self.add_outer_alignement(rgx)
 
 
-FORMAT_CLASSES: dict[str, type[FormatAbstract]] = dict(
-    s=FormatString,
-    d=FormatInteger,
-    f=FormatFloat,
-    e=FormatFloat,
-    E=FormatFloat,
-)
+FORMAT_CLASSES: dict[str, type[FormatAbstract]] = {
+    "s": FormatString,
+    "d": FormatInteger,
+    "f": FormatFloat,
+    "e": FormatFloat,
+    "E": FormatFloat,
+}
 
 
-def Format(format: str) -> FormatAbstract:  # noqa: N802
+def Format(fmt: str) -> FormatAbstract:  # noqa: N802
     """Parse format parameters and return appropriate Format object."""
-    m = FORMAT_PATTERN.fullmatch(format)
+    m = FORMAT_PATTERN.fullmatch(fmt)
     if m is None:
-        raise FormatParsingError(f"Format-string '{format}' not valid.")
+        raise FormatParsingError(f"Format-string '{fmt}' not valid.")
     params = m.groupdict()
 
     kind = params["type"]
@@ -368,9 +364,15 @@ def Format(format: str) -> FormatAbstract:  # noqa: N802
         )
 
     # defaults values for unset remaining parameters
-    defaults = dict(align="<", fill=" ")
+    defaults = {"align": "<", "fill": " "}
     if kind in "dfeE":
-        defaults |= dict(align=">", sign="-", width="0", precision=".6", grouping="")
+        defaults |= {
+            "align": ">",
+            "sign": "-",
+            "width": "0",
+            "precision": ".6",
+            "grouping": "",
+        }
 
     for k, v in defaults.items():
         if params[k] is None:
@@ -386,4 +388,4 @@ def Format(format: str) -> FormatAbstract:  # noqa: N802
             f"Invalid format kind '{kind}', "
             f"expected one of '{list(FORMAT_CLASSES.keys())}'."
         )
-    return FORMAT_CLASSES[kind](format, params)
+    return FORMAT_CLASSES[kind](fmt, params)

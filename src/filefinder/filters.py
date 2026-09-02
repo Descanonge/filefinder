@@ -88,8 +88,7 @@ class FilterByGroup(Filter):
     def _get_name(self) -> str:
         name = super()._get_name()
         indices = ",".join(map(str, self.indices))
-        name = f"{indices}:{name}"
-        return name
+        return f"{indices}:{name}"
 
     def get_filter_func(self) -> FilterFunc:
         """Return filter function.

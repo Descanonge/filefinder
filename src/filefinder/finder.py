@@ -7,6 +7,8 @@ import os
 import re
 from collections.abc import Callable, Sequence
 from copy import copy
+from typing import Any, overload
+
 from .filters import FilterByDate, FilterByGroup, FilterList
 from .group import Group, GroupKey, get_date_names, get_groups_indices
 from .matches import DefaultDate, FileMatch, GroupMatch
@@ -51,10 +53,11 @@ class Finder:
         self,
         root: str,
         pattern: str,
+        *,
         use_regex: bool = False,
         scan_everything: bool = False,
         group_delimiters: tuple[str, str, str] | None = None,
-    ):
+    ) -> None:
         self.root: str = root
         """The root directory of the finder."""
         self.use_regex: bool = use_regex
@@ -134,21 +137,19 @@ class Finder:
             f"{self.root.rstrip('/')}/ {self.get_regex()}"
         )
 
-    def set_scan_everything(self, scan_everything: bool, /) -> None:
+    def set_scan_everything(self, scan_everything: bool) -> None:  # noqa: FBT001
         """Set value for attribute :attr:`scan_everything`."""
         if scan_everything != self.scan_everything:
             self.scan_everything = scan_everything
             self.void_cache()
 
-    def set_use_regex(self, use_regex: bool, /) -> None:
+    def set_use_regex(self, use_regex: bool) -> None:  # noqa: FBT001
         """Set value for attribute :attr:`use_regex`."""
         if use_regex != self.use_regex:
             self.use_regex = use_regex
             self.void_cache()
 
-    def get_group_names(
-        self, fixed: bool | None = None, date: bool = False
-    ) -> set[str]:
+    def get_group_names(self, *, fixed: bool | None = None) -> set[str]:
         """Get the names of groups in the pattern.
 
         Parameters
@@ -161,7 +162,7 @@ class Finder:
         if fixed is not None:
             groups = [g for g in groups if g.fixed == fixed]
 
-        return set(g.name for g in groups)
+        return {g.name for g in groups}
 
     def get_date_names(self) -> set[str]:
         """Get the names of date pseudo-groups.
@@ -175,11 +176,20 @@ class Finder:
         """
         return get_date_names(self.groups)
 
+    @overload
+    def get_files(self, *, relative: bool = ...) -> list[str]: ...
+
+    @overload
+    def get_files(
+        self, *, relative: bool = ..., nested: Sequence[str | Sequence[str]] = ...
+    ) -> list: ...
+
     def get_files(
         self,
+        *,
         relative: bool = False,
         nested: Sequence[str | Sequence[str]] | None = None,
-    ) -> list:
+    ) -> list[str]:
         """Return files that match the regex.
 
         Lazily scan files: if files were already scanned, just return
@@ -201,10 +211,10 @@ class Finder:
             A group name in `nested` is not found in the pattern.
         """
 
-        def get_files(matches):
+        def get_files(matches: Sequence[FileMatch]) -> list[str]:
             return [m.get_filename(relative=relative) for m in matches]
 
-        def get_key(filematch: FileMatch, level: list[str]) -> str:
+        def get_key(filematch: FileMatch, level: Sequence[str]) -> str:
             i_groups = []
             for name in level:
                 i_groups += get_groups_indices(filematch.groups, name)
@@ -214,12 +224,17 @@ class Finder:
                 [filematch.matches[i].get_match(parse=False) for i in i_groups]
             )
 
-        def nest(matches, levels, relative):
+        def nest(
+            matches: Sequence[FileMatch],
+            levels: Sequence[Sequence[str]],
+            *,
+            relative: bool,
+        ) -> list:
             if len(levels) == 0:
                 return get_files(matches)
 
             level = levels[0]
-            files_grouped = []
+            files_grouped: list[list[FileMatch]] = []
             matches_by_value: dict[str, int] = {}
             # We need to sort files by their value.
             # We use all unparsed matches joined in a single string as a key
@@ -232,22 +247,20 @@ class Finder:
                     files_grouped.append([])
                 files_grouped[matches_by_value[key]].append(m)
 
-            return [nest(grp, levels[1:], relative) for grp in files_grouped]
+            return [nest(grp, levels[1:], relative=relative) for grp in files_grouped]
 
         if not self.scanned:
             self.find_files()
 
         if nested is None:
-            files = get_files(self._matches)
-        else:
-            names = set(g.name for g in self.groups)
-            nested = [[name] if isinstance(name, str) else name for name in nested]
-            for name in itertools.chain(*nested):
-                if name not in names:
-                    raise KeyError(f"{name} is not in Finder groups.")
-            files = nest(self._matches, nested, relative)
+            return get_files(self._matches)
 
-        return files
+        names = {g.name for g in self.groups}
+        nested = [[name] if isinstance(name, str) else name for name in nested]
+        for name in itertools.chain(*nested):
+            if name not in names:
+                raise KeyError(f"{name} is not in Finder groups.")
+        return nest(self._matches, nested, relative=relative)
 
     def get_relative(self, filename: str) -> str:
         """Get filename path relative to root."""
@@ -261,7 +274,7 @@ class Finder:
         self,
         fixes: dict[Any, str | Any] | None = None,
         **fixes_kw: str | Any,
-    ):
+    ) -> None:
         """Fix groups to a value.
 
         Groups are selected with either their index in the pattern (starts at 0), or
@@ -286,22 +299,21 @@ class Finder:
         self.void_cache()
         date_names = self.get_date_names()
         for key, value in fixes.items():
-            if key in date_names:
-                if not (
-                    isinstance(value, dt.date)
-                    or (
-                        isinstance(value, Sequence)
-                        and all(isinstance(v, dt.date) for v in value)
-                    )
-                ):
-                    raise TypeError(
-                        f"Date pseudo-group '{key}' can only be fixed with a datetime "
-                        f"object or list thereof (received {type(value)})."
-                    )
+            if key in date_names and not (
+                isinstance(value, dt.date)
+                or (
+                    isinstance(value, Sequence)
+                    and all(isinstance(v, dt.date) for v in value)
+                )
+            ):
+                raise TypeError(
+                    f"Date pseudo-group '{key}' can only be fixed with a datetime "
+                    f"object or list thereof (received {type(value)})."
+                )
             for group in self.get_groups(key):
                 group.fix(value)
 
-    def unfix(self, *keys: GroupKey):
+    def unfix(self, *keys: GroupKey) -> None:
         """Unfix groups.
 
         Parameters
@@ -419,6 +431,7 @@ class Finder:
     def find_matches(
         self,
         filename: str,
+        *,
         relative: bool = True,
         pattern: str | re.Pattern | None = None,
     ) -> FileMatch | None:
@@ -466,12 +479,12 @@ class Finder:
         match_list = [
             GroupMatch.from_match(grp, m, i) for i, grp in enumerate(self.groups)
         ]
-        matches = FileMatch(self.root, filename, match_list, self.groups)
-        return matches
+        return FileMatch(self.root, filename, match_list, self.groups)
 
     def make_filename(
         self,
         fixes: dict | None = None,
+        *,
         relative: bool = False,
         **kw_fixes: Any,
     ) -> str:
@@ -496,8 +509,8 @@ class Finder:
 
         Raises
         ------
-        ValueError
-            `use_regex` is activated.
+        KeyError
+            Some group has no fixed value.
         """
         if self.use_regex:
             raise ValueError(
@@ -529,7 +542,7 @@ class Finder:
             elif g.optional:
                 segments[2 * i + 1] = ""
             else:
-                raise ValueError(f"Group '{g!s}' has no fixed value.")
+                raise KeyError(f"Group '{g!s}' has no fixed value.")
 
         filename = "".join(segments).replace("/", os.sep)
 
@@ -542,7 +555,7 @@ class Finder:
         """Get filename pattern."""
         return self._pattern
 
-    def set_pattern(self, pattern: str):
+    def set_pattern(self, pattern: str) -> None:
         """Set pattern and parse for group objects."""
         self.void_cache()
         self._pattern = pattern
@@ -604,7 +617,7 @@ class Finder:
 
         return output
 
-    def get_regex(self, replace_dir_sep: bool = True) -> str:
+    def get_regex(self, *, replace_dir_sep: bool = True) -> str:
         """Return regex.
 
         Parameters
@@ -653,7 +666,7 @@ class Finder:
 
         self.scanned = True
 
-    def _add_file(self, filename: str, pattern: re.Pattern):
+    def _add_file(self, filename: str, pattern: re.Pattern) -> None:
         """Add file to cache if it matches pattern and pass filters."""
         matches = self.find_matches(filename, relative=True, pattern=pattern)
         if matches is not None and self.filters.is_valid(self, matches):
@@ -755,5 +768,4 @@ class Finder:
             Key type is not valid.
         """
         selected = get_groups_indices(self.groups, key)
-        groups = [self.groups[i] for i in selected]
-        return groups
+        return [self.groups[i] for i in selected]

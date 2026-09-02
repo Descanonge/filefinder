@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class Sentinel:
     """Sentinel objects."""
 
-    def __init__(self, msg: str = ""):
+    def __init__(self, msg: str = "") -> None:
         self.msg = msg
 
     def __str__(self) -> str:
@@ -50,7 +50,7 @@ class GroupMatch:
         end = match.end(idx + 1)
         return cls(group, match_str, start, end)
 
-    def __init__(self, group: Group, match_str: str, start: int, end: int):
+    def __init__(self, group: Group, match_str: str, start: int, end: int) -> None:
         self.group: Group = group
         """Group used to get this match."""
         self.match_str: str = match_str
@@ -61,11 +61,11 @@ class GroupMatch:
         """End index of match in the filename."""
         self._parsed: Any | Sentinel = NOT_PARSED
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Human readable information."""
         return "\n".join([super().__repr__(), self.__str__()])
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Human readable information."""
         return f"{self.group!s} = {self.match_str}"
 
@@ -88,7 +88,7 @@ class GroupMatch:
         """Return if the match can be parsed."""
         return self.match_parsed is not PARSE_FAIL
 
-    def get_match(self, parse: bool = True, raise_on_unparsed: bool = True) -> Any:
+    def get_match(self, *, parse: bool = True, raise_on_unparsed: bool = True) -> Any:
         """Get match string or value.
 
         Parameters
@@ -138,7 +138,7 @@ class FileMatch:
         filename: str,
         matches: Sequence[GroupMatch],
         groups: Sequence[Group],
-    ):
+    ) -> None:
         assert len(matches) == len(groups)
 
         self.root: str = root
@@ -170,7 +170,7 @@ class FileMatch:
         """Return number of matches."""
         return len(self.matches)
 
-    def get_filename(self, relative: bool = True) -> str:
+    def get_filename(self, *, relative: bool = True) -> str:
         """Get filename corresponding to matches.
 
         :param relative: If True (default), return relative to the finder root
@@ -183,6 +183,7 @@ class FileMatch:
     def get_values(
         self,
         key: GroupKey,
+        *,
         parse: bool = True,
         default_date: DefaultDate = None,
     ) -> list[Any]:
@@ -212,12 +213,12 @@ class FileMatch:
                 }
             return [get_date(matches, default_date)]
 
-        values = [m.get_match(parse=parse) for m in matches]
-        return values
+        return [m.get_match(parse=parse) for m in matches]
 
     def get_value(
         self,
         key: GroupKey,
+        *,
         parse: bool = True,
         default_date: DefaultDate = None,
     ) -> Any:
@@ -266,5 +267,4 @@ class FileMatch:
         List of GroupMatch corresponding to the key.
         """
         selected = get_groups_indices(self.groups, key)
-        matches = [self.matches[k] for k in selected]
-        return matches
+        return [self.matches[k] for k in selected]

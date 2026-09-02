@@ -69,31 +69,50 @@ line-length = 88
 target-version = 'py311'
 
 [tool.ruff.lint]
-select = [
-       'E',  # pycodestyle
-       'W',  # pycodestyle
-       'I',  # isort
-       'N',  # pep8-name
-       'B',  # bugbear
-       'G',  # flake8-logging-format
-       'F',  # pyflakes
-       'UP',  #pyupgrade
-       'D',  #pydocstyle
-       'PL', #pylint
+extend-select = [
+    'ANN',  # flake8-annotations
+    'FBT',  # flake8-boolean-trap
+    'B',    # flake8-bugbear
+    'A',    # flake8-builtins
+    'C4',   # flake8-comprehensions
+    'FIX',  # flake8-fixme
+    'ISC',  # flake8-implicit-str-concat
+    'PIE',  # flake8-pie
+    'Q',    # flake8-quotes
+    'RET',  # flake8-return
+    'SIM',  # flake8-simplify
+    'ARG',  # flake8-unused-arguments
+    'PTH',  # flake8-use-pathlib
+
+    'I',    # isort
+    'N',    # pep8-naming
+    'E',    # pycodestyle Error
+    'W',    # pycodestyle Warning
+    'DOC',  # pydoclint
+    'D',    # pydocstyle
+    'F',    # Pyflakes
+    'PL',   # Pylint
+    'UP',   # pyupgrade
 ]
 
 ignore = [
+       'DTZ',  # datetime tz info
+       'ANN401', # allow Any types
        'E226', # missing whitespace around arithmetic operator
        'D105', # missing docstring for magical method
        'D204', # one blank line after class
        'D213', # multiline docstring start at 2nd line
        'D417', # not all parameters need doc
        'PLR2004',  # magic values
+       'SIM108', # ternary if operator
+       'RET504', # assignement before return
+       'BLE', # blind exceptions
 ]
 unfixable = ["F401"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D"]
+"test_*" = ["FBT"]
 
 [tool.ruff.lint.pycodestyle]
 max-line-length = 90

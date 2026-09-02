@@ -6,7 +6,7 @@ import datetime as dt
 import logging
 import re
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, ClassVar
 
 from .dates import datetime_keys, datetime_to_value
 from .format import Format, FormatAbstract
@@ -26,7 +26,7 @@ explain reasoning behind PATTERN, and alternatives explored
 class GroupParseError(Exception):
     """Custom errors when parsing group definition."""
 
-    def __init__(self, message: str, group: Group | None = None):
+    def __init__(self, message: str, group: Group | None = None) -> None:
         if group is not None:
             message += f" ({group.definition})"
         super().__init__(message)
@@ -48,7 +48,7 @@ class Group:
         Invalid group definition.
     """
 
-    PATTERN = re.compile(
+    PATTERN: ClassVar[re.Pattern] = re.compile(
         f"(?P<name>[^:]+?(?::[{datetime_keys}])?)(?:"
         "(?P<fmt>:fmt=.+?)"
         "|(?P<rgx>:rgx=.*?)"
@@ -63,25 +63,25 @@ class Group:
     See :meth:`_check_duplicates` for details on the pattern matching.
     """
 
-    DATE_GROUPS = {
-        "Y": [r"\d{4}", "04d"],  # year
-        "m": [r"\d\d", "02d"],  # month
-        "d": [r"\d\d", "02d"],  # day
-        "j": [r"\d{3}", "03d"],  # dayofyear
-        "H": [r"\d\d", "02d"],  # hour
-        "M": [r"\d\d", "02d"],  # minute
-        "S": [r"\d\d", "02d"],  # second
-        "x": [r"\d{8}", "08d"],  # date
-        "X": [r"\d{6}", "06d"],  # time
-        "F": [r"\d{4}-\d\d-\d\d", "s"],  # formated date
-        "B": [r"\w+", "s"],  # month / month abbreviation
+    DATE_GROUPS: ClassVar[dict[str, tuple[str, str]]] = {
+        "Y": (r"\d{4}", "04d"),  # year
+        "m": (r"\d\d", "02d"),  # month
+        "d": (r"\d\d", "02d"),  # day
+        "j": (r"\d{3}", "03d"),  # dayofyear
+        "H": (r"\d\d", "02d"),  # hour
+        "M": (r"\d\d", "02d"),  # minute
+        "S": (r"\d\d", "02d"),  # second
+        "x": (r"\d{8}", "08d"),  # date
+        "X": (r"\d{6}", "06d"),  # time
+        "F": (r"\d{4}-\d\d-\d\d", "s"),  # formated date
+        "B": (r"\w+", "s"),  # month / month abbreviation
     }
     """Regex and format strings for various default groups.
 
     See the :ref:`name` section of documentation for details.
     """
 
-    def __init__(self, definition: str, idx: int):
+    def __init__(self, definition: str, idx: int) -> None:
         self.definition = definition
         """The string that created the group ``%(definition)``."""
         self.idx: int = idx
@@ -109,7 +109,6 @@ class Group:
         self.date_element: str | None = None
         self.is_date: bool = False
         self.name_date: tuple[str, str] | None = None
-        """If the group represents a date element, and if yes which one."""
 
         self._fixed = False
         self.fixed_value: Any | list[Any] | None = None
@@ -132,19 +131,17 @@ class Group:
         self.name = specs["name"]
 
         if ":" in self.name:
-            self.is_date = True
             self.date_name, self.date_element = self.name.rsplit(":", 1)
             if self.date_element not in self.DATE_GROUPS:
                 raise GroupParseError(
                     f"'{self.date_element}' is not a registered date element.", self
                 )
         elif self.name in self.DATE_GROUPS:
-            self.is_date = True
             self.date_name = "date"
             self.date_element = self.name
 
-        if self.is_date:
-            assert self.date_element is not None
+        if self.date_element is not None:
+            self.is_date = True
             self.rgx, fmt_def = self.DATE_GROUPS[self.date_element]
             self.fmt = Format(fmt_def)
 
@@ -160,8 +157,6 @@ class Group:
             self.prefix = prefix
         if (suffix := specs["post"]) is not None:
             self.suffix = suffix
-
-        # Flags
         self.optional = specs["opt"] is not None
 
         # Override default format
@@ -171,7 +166,6 @@ class Group:
                 self.rgx = self.fmt.generate_expression()
 
         # Boolean format
-        self.options = None
         if bol is not None:
             options = bol.split(":", maxsplit=1)
             if len(options) == 1:
@@ -189,7 +183,7 @@ class Group:
                 self,
             )
 
-    def _check_duplicates(self, m: re.Match):
+    def _check_duplicates(self, m: re.Match) -> None:
         """Check if the definition does not contain duplicates.
 
         The matching pattern (:attr:`PATTERN`) is written so that specs (rgx, fmt, ...)
@@ -254,16 +248,15 @@ class Group:
         if self.options is not None:
             if string == self.options[0]:
                 return False
-            elif string == self.options[1]:
+            if string == self.options[1]:
                 return True
-            else:
-                raise ValueError(
-                    f"Cannot parse '{string}' into boolean from options {self.options}"
-                )
+            raise ValueError(
+                f"Cannot parse '{string}' into boolean from options {self.options}"
+            )
 
         return self.fmt.parse(string)
 
-    def fix(self, fix: Any | Sequence[Any]):
+    def fix(self, fix: Any | Sequence[Any]) -> None:
         """Fix the group regex to a specific value.
 
         Parameters
@@ -324,7 +317,7 @@ class Group:
         self.fixed_string = strings[0] if is_solo else strings
         self.fixed_regex = "|".join(regexes)
 
-    def unfix(self):
+    def unfix(self) -> None:
         """Unfix value."""
         self._fixed = False
         self.fixed_value = None
@@ -370,9 +363,7 @@ def get_groups_indices(groups: list[Group], key: GroupKey) -> list[int]:
         return [key]
     if isinstance(key, str):
         selected = [
-            i
-            for i, group in enumerate(groups)
-            if key in set([group.name, group.date_name])
+            i for i, group in enumerate(groups) if key in {group.name, group.date_name}
         ]
 
         if len(selected) == 0:
@@ -384,4 +375,4 @@ def get_groups_indices(groups: list[Group], key: GroupKey) -> list[int]:
 
 def get_date_names(groups: Sequence[Group]) -> set[str]:
     """Get the names of date pseudo-groups."""
-    return set(g.date_name for g in groups if g.date_name is not None)
+    return {g.date_name for g in groups if g.date_name is not None}

@@ -283,6 +283,10 @@ class Group:
                 out = f
                 rgx = f
 
+            elif f is None and self.optional:
+                out = ""
+                rgx = ""
+
             # date
             elif isinstance(f, dt.date | dt.datetime):
                 if self.date_element is None:

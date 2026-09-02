@@ -337,7 +337,7 @@ class Group:
             rgx = self.rgx
             rgx = self.prefix + rgx + self.suffix
 
-        if self.optional is True:
+        if self.optional and not self.fixed:
             rgx = f"(?:{rgx})?"
 
         # Make it matching

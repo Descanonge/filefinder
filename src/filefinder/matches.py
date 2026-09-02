@@ -78,11 +78,14 @@ class GroupMatch:
         match.
         """
         if self._parsed is NOT_PARSED:
-            try:
-                self._parsed = self.group.parse(self.match_str)
-            except Exception:
-                self._parsed = PARSE_FAIL
-                logger.debug("Failed to parse for group %s", str(self.group))
+            if self.group.optional and self.match_str == "":
+                self._parsed = None
+            else:
+                try:
+                    self._parsed = self.group.parse(self.match_str)
+                except ValueError:
+                    self._parsed = PARSE_FAIL
+                    logger.debug("Failed to parse for group %s", str(self.group))
         return self._parsed
 
     def can_parse(self) -> bool:

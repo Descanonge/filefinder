@@ -47,10 +47,6 @@ class InvalidFormatTypeError(FormatError):
     """Unsupported type of format-string."""
 
 
-class FormatValueParsingError(FormatError):
-    """Could not parse value."""
-
-
 class FormatAbstract:
     """Represent a format string.
 
@@ -160,9 +156,7 @@ class FormatString(FormatAbstract):
         pattern = self.generate_expression(capture=True)
         m = re.fullmatch(pattern, s)
         if m is None:
-            raise FormatValueParsingError(
-                f"Error parsing '{s}' with pattern '{pattern}'"
-            )
+            raise ValueError(f"Error parsing '{s}' with pattern '{pattern}'")
         return m.group(1)
 
     def generate_expression(self, capture=False) -> str:
@@ -209,9 +203,7 @@ class FormatNumberAbstract(FormatAbstract):
         pattern = self.generate_expression(capture=True)
         m = re.fullmatch(pattern, s)
         if m is None:
-            raise FormatValueParsingError(
-                f"Error parsing '{s}' with pattern '{pattern}'"
-            )
+            raise ValueError(f"Error parsing '{s}' with pattern '{pattern}'")
         # join all capturing groups (sign, number)
         s = "".join(m.groups(""))
         # remove grouping characters

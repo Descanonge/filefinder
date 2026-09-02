@@ -658,7 +658,7 @@ class Finder:
         else:
             self._find_files_subdirectories()
 
-        self._matches.sort(key=lambda x: x[0])
+        self._matches.sort(key=lambda x: x.get_filename())
 
         logger.debug("Found %d files matching and filtered", len(self._matches))
         if len(self._matches) == 0:

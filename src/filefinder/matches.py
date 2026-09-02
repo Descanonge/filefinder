@@ -251,11 +251,11 @@ class FileMatch:
         values = self.get_values(key, parse=parse, default_date=default_date)
         if len(values) == 0:
             raise KeyError(f"No group was found for key '{key}'")
-        if len(values) > 1:
-            if any(v != values[0] for v in values[1:]):
-                logger.warning(
-                    "Different parsed values for key %s (%s)", str(key), repr(values)
-                )
+        if len(values) > 1 and any(v != values[0] for v in values[1:]):
+            warnings.warn(
+                f"Different parsed values for key {key} ({values!r})", stacklevel=1
+            )
+
         return values[0]
 
     def get_matches(self, key: GroupKey) -> list[GroupMatch]:

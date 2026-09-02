@@ -221,7 +221,7 @@ class FormatNumberAbstract(FormatAbstract):
             rgx = r"\d+"
         return rgx
 
-    def get_sign_regex(self, capture=False) -> str:
+    def get_sign_regex(self, *, capture: bool = False) -> str:
         """Get sign regex with approprite zero padding."""
         if self.sign == "-":
             rgx = "-?"

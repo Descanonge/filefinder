@@ -4,15 +4,13 @@ from __future__ import annotations
 
 import calendar
 import datetime as dt
-import logging
 import re
+import warnings
 from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .matches import GroupMatch
-
-logger = logging.getLogger(__name__)
 
 DefaultDate = dt.datetime | Mapping[str, int] | None
 
@@ -235,7 +233,9 @@ def get_date(
     process("j", process_j)
 
     if len(elts) == 0:
-        logger.warning("No date elements could be recovered. Returning default date.")
+        warnings.warn(
+            "No date elements could be recovered. Returning default date.", stacklevel=1
+        )
 
     for elt, values in elts.items():
         if any(v != values[0] for v in values):

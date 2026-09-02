@@ -398,20 +398,16 @@ class Finder:
         keys:
             Name of date pseudo-groups to remove filters from. If empty, all group
             filters will be removed.
-
-        Raises
-        ------
-        KeyError:
-            A key does not correspond to any date pseudo-group name.
         """
         date_names = self.get_date_names()
         if not keys:
             keys = tuple(date_names)
 
         for key in keys:
-            if key not in date_names:
-                raise KeyError(f"There is no date pseudo-group with name '{key}'")
-            self.filters.remove_by_date(key)
+            if key in date_names:
+                self.filters.remove_by_date(key)
+            else:
+                self.filters.remove_by_group(get_groups_indices(self.groups, key))
 
         self.void_cache()
 

@@ -24,8 +24,8 @@ def pytest_collection_modifyitems(
     """
     # test modules in order to be tested, relative to the root config (normally here)
     module_order = [
-        path.join("tests", "unit", f"test_{s}.py")
-        for s in ["format", "group", "filters", "finder", "library"]
+        path.join("tests", f"test_{s}.py")
+        for s in ["format", "dates", "group", "filters", "finder"]
     ]
 
     items_by_module: dict[str, list[Item]] = {m: [] for m in module_order}

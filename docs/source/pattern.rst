@@ -185,11 +185,11 @@ Optional flag
 =============
 
 The optional flag ``:opt`` marks the group as an optional part of the pattern.
-It can be thought as appending a ``?`` to the group regular expression. It does
-not affect the group in other ways.
+It can be thought as appending a ``?`` to the group regular expression.
 
 For instance, ``A%(param:fmt=d).txt`` would match "A.txt", "A0.txt", etc.
-If the group is not present, its match will be an empty string.
+If the group is not present, the parsed value will be `None`. When fixed to
+the value `None`, this will only match files without the group (*ie* "A.txt")
 
 An optional group does not have to be fixed when :ref:`generating a
 filename<create-filenames>`.

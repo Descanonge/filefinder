@@ -1,7 +1,7 @@
 
 # v2.0.0
 
-Breaking changes:
+**Breaking changes**:
 - Date pseudo-groups:
     - Date-related groups can now be managed as a single pseudo-group of any name.
       Fixing, filtering, retrieving matches, making filenames, getting nested
@@ -24,6 +24,9 @@ Breaking changes:
     - Filters do not need the filename as argument (it is now stored in `FileMatch`).
 - Renamed `get_format` to `Format`.
       
+- Optional groups (marked with :opt), if not present in the filename will return
+  None as parsed value and an empty string as matched string.
+    - If the group is not present in the filename, 
 - Group delimiters can now be changed with an init argument.
 - Use current locale to obtain month number from its name.
 - Fixed `:opt` property implementation. Will now return an empty string as

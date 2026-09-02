@@ -431,30 +431,30 @@ arbitrary filenames. This is done with :meth:`.Finder.make_filename`. Any group
 that does not already have its value :ref:`fixed<fixing>` must have a value
 supplied as argument, excepted for :ref:`optional<opt>` groups.
 
-So for pattern ``param_%(param:fmt=.1f)/%(Y)-%(m)-%(d)%(id:fmt=d:pre=_).txt``::
+So for pattern ``param_%(param:fmt=.1f)/%(Y)-%(m)-%(d)%(id:fmt=d:pre=_:opt).txt``::
 
   >>> finder.make_filename(param=1.5, Y=2012, m=1, d=5, id=0)
   "/data/param_1.5/2012-01-05_0.txt"
 
-as always, we can use an equivalent datetime object::
+Optional groups can be left empty::
 
-  finder.make_filename(param=1.5, date=date(2012, 1, 5), id=0)
+  >>> finder.make_filename(param=1.5, Y=2012, m=1, d=5)
+  "/data/param_1.5/2012-01-05.txt"
+
+As always, we can use an equivalent datetime object::
+
+  finder.make_filename(param=1.5, date=date(2012, 1, 5))
 
 If a group is fixed, we do not need to supply a value::
 
   >>> finder.fix(param=2., Y=2014)
-  >>> finder.make_filename(m=5, d=1, id=0)
-  "/data/param_2.0/2014-05-01_0.txt"
-  >>> finder.make_filename(m=6, d=1, id=0)
-  "/data/param_2.0/2014-06-01_0.txt"
+  >>> finder.make_filename(m=5, d=1)
+  "/data/param_2.0/2014-05-01.txt"
+  >>> finder.make_filename(m=6, d=1)
+  "/data/param_2.0/2014-06-01.txt"
 
 As for fixing, a value will be appropriately formatted but a string will be left
-untouched::
+untouched (note the prefix is not added when using a string)::
 
-  >>> finder.make_filename(param="this-feels-wrong", m=6, d=1, id=0)
-  "/data/param_this-feels-wrong/2014-06-01_0.txt"
-
-Optional groups can be left empty::
-
-  >>> finder.make_filename(param=1.5, date=date(2012, 1, 5))
-  "/data/param_1.5/2012-01-05.txt"
+  >>> finder.make_filename(param="this-feels-wrong", m=6, d=1, id="_a")
+  "/data/param_this-feels-wrong/2014-06-01_a.txt"

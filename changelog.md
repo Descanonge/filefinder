@@ -22,15 +22,15 @@
       `Finder.remove_group_filters`.
     - Group filters operating on dates are now managed as any other group filter.
     - Filters do not need the filename as argument (it is now stored in `FileMatch`).
-- Renamed `get_format` to `Format`.
+- Renamed `get_format` to `Format` and `Format.generate_expression` to `Format.get_regex`
       
-- Optional groups (marked with :opt), if not present in the filename will return
-  None as parsed value and an empty string as matched string.
-    - If the group is not present in the filename, 
+- Optional groups (marked with :opt),
+    - If not present in the filename will return None as parsed value and an
+      empty string as matched string.
+    - They do not need to be fixed to create filenames.
+    - Can now be fixed to None
 - Group delimiters can now be changed with an init argument.
 - Use current locale to obtain month number from its name.
-- Fixed `:opt` property implementation. Will now return an empty string as
-  matched string rather than None.
 - Bumped minimal python version to 3.11
 
 ### v1.3.1

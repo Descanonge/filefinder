@@ -116,9 +116,7 @@ class Finder:
         ]
 
         fixed_groups = [
-            (i, g.fixed_value)
-            for i, g in enumerate(self.groups)
-            if g.fixed_value is not None
+            (i, g.fixed_value) for i, g in enumerate(self.groups) if g.fixed
         ]
         if fixed_groups:
             s.append("fixed groups:")

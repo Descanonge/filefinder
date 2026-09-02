@@ -5,17 +5,9 @@ import itertools
 import logging
 import os
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from copy import copy
-from typing import Any
-
-from .filters import (
-    FilterByDate,
-    FilterByGroup,
-    FilterList,
-    UserFunc,
-    UserFuncGroup,
-)
+from .filters import FilterByDate, FilterByGroup, FilterList
 from .group import Group, GroupKey, get_date_names, get_groups_indices
 from .matches import DefaultDate, FileMatch, GroupMatch
 
@@ -328,7 +320,7 @@ class Finder:
 
         self.void_cache()
 
-    def add_filter(self, func: UserFunc, **kwargs: Any):
+    def add_filter(self, func: Callable[..., bool], **kwargs: Any) -> None:
         """Add a filter with which to select scanned files.
 
         The filter will be applied to files already in the cache.
@@ -349,11 +341,12 @@ class Finder:
     def add_group_filter(
         self,
         key: GroupKey,
-        func: UserFuncGroup,
+        func: Callable[..., bool],
+        *,
         default_date: DefaultDate = None,
         pass_unparsed: bool = False,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         """Fix a group value by using a filter function.
 
         When a file is scanned, if it matches the pattern, it will only be kept if

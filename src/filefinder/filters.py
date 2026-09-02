@@ -3,66 +3,32 @@
 from __future__ import annotations
 
 import functools
-import typing as t
-from collections import abc
+from collections.abc import Callable, Iterator, Sequence
+from typing import TYPE_CHECKING, Any
 
 from .matches import FileMatch
 
-if t.TYPE_CHECKING:
+if TYPE_CHECKING:
     from .dates import DefaultDate
     from .finder import Finder
 
 
-class UserFunc(t.Protocol):
-    """Signature of function that can be supplied to be used as a filter.
-
-    .. py:function:: basic_filter(finder, filename, matches, **kwargs)
-        :no-index:
-
-        :param Finder finder: The finder object.
-        :param FileMatch filematch: The matches associated to this filename.
-        :param ~typing.Any kwargs: Additional keywords passed to the filter.
-
-        :returns: True if `filename` is to be kept, False otherwise.
-    """
-
-    def __call__(  # noqa: D102
-        self, finder: Finder, filematch: FileMatch, **kwargs
-    ) -> bool: ...
-
-
-class UserFuncGroup(t.Protocol):
-    """Signature of function that can used as a filter for specific groups.
-
-    .. py:function:: group_filter(value, **kwargs)
-        :no-index:
-
-        :param ~typing.Any value: The value parsed.
-        :param ~typing.Any kwargs: Additional keywords passed to the filter.
-
-        :returns: True if the file is to be kept, False otherwise.
-    """
-
-    def __call__(self, __value: t.Any, **kwargs) -> bool: ...  # noqa: D102
-
-
-FilterFunc = abc.Callable[["Finder", FileMatch], bool]
-UserFuncGroupPartial = abc.Callable[[t.Any], bool]
+FilterFunc = Callable[["Finder", FileMatch], bool]
 
 
 class Filter:
     """Manage a filter."""
 
-    user_func: abc.Callable[..., bool]
+    user_func: Callable[..., bool]
     """Initial function given by the user."""
-    partial_func: abc.Callable[..., bool]
+    partial_func: Callable[..., bool]
     """Function with kwargs stored."""
     filter_func: FilterFunc
     """Function to be used as a filter."""
     name: str
     """Name of the filter."""
 
-    def __init__(self, func: abc.Callable[..., bool], **kwargs):
+    def __init__(self, func: Callable[..., bool], **kwargs: Any) -> None:
         self.user_func = func
         self.partial_func = self.get_partial_func(**kwargs)
         self.filter_func = self.get_filter_func()
@@ -78,7 +44,7 @@ class Filter:
     def _get_name(self) -> str:
         return getattr(self.user_func, "__name__", "")
 
-    def get_partial_func(self, **kwargs) -> abc.Callable[..., bool]:
+    def get_partial_func(self, **kwargs: Any) -> Callable[..., bool]:
         """Return user function with stored kwargs."""
         if kwargs:
             return functools.partial(self.user_func, **kwargs)
@@ -96,9 +62,9 @@ class FilterByGroup(Filter):
     having to find them at each validation from a more generic key.
     """
 
-    user_func: UserFuncGroup
+    user_func: Callable[..., bool]
     """Initial function given by the user."""
-    partial_func: UserFuncGroupPartial
+    partial_func: Callable[[Any], bool]
     """Function with kwargs stored."""
     indices: list[int]
     """List of group indices to apply this filter upon."""
@@ -109,11 +75,12 @@ class FilterByGroup(Filter):
 
     def __init__(
         self,
-        user_func: abc.Callable[..., bool],
-        indices: abc.Sequence[int],
+        user_func: Callable[..., bool],
+        indices: Sequence[int],
+        *,
         pass_unparsed: bool = False,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         self.indices = list(indices)
         self.pass_unparsed = pass_unparsed
         super().__init__(user_func, **kwargs)
@@ -131,8 +98,8 @@ class FilterByGroup(Filter):
         :attr:`indices` and :attr:`pass_unparsed` attributes.
         """
 
-        def filt(finder: Finder, filematch: FileMatch) -> bool:
-            values: list[t.Any] = []
+        def filt(finder: Finder, filematch: FileMatch) -> bool:  # noqa: ARG001
+            values: list[Any] = []
             for i in self.indices:
                 m = filematch.matches[i]
                 if not m.can_parse() and self.pass_unparsed:
@@ -158,21 +125,21 @@ class FilterByDate(Filter):
 
     date_name: str
     """Name of the corresponding pseudo-group."""
-    user_func: UserFuncGroup
+    user_func: Callable[..., bool]
     """Initial function given by the user."""
-    partial_func: UserFuncGroupPartial
+    partial_func: Callable[[Any], bool]
     """Function with kwargs stored."""
     default_date: DefaultDate
     """Default date elements to use when recovering date."""
 
     def __init__(
         self,
-        user_func: abc.Callable[..., bool],
+        user_func: Callable[..., bool],
         date_name: str,
         /,
         default_date: DefaultDate = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         self.date_name = date_name
         self.default_date = default_date
         super().__init__(user_func, **kwargs)
@@ -184,8 +151,8 @@ class FilterByDate(Filter):
         default elements from :attr:`default_date`.
         """
 
-        def filt(finder: Finder, filematch: FileMatch) -> bool:
-            date = filematch.get_values(self.date_name, default_date=self.default_date)
+        def filt(finder: Finder, filematch: FileMatch) -> bool:  # noqa: ARG001
+            date = filematch.get_value(self.date_name, default_date=self.default_date)
             return self.partial_func(date)
 
         return filt
@@ -209,10 +176,10 @@ class FilterList:
     def __len__(self) -> int:
         return len(self.filters)
 
-    def __iter__(self) -> abc.Iterator[Filter]:
+    def __iter__(self) -> Iterator[Filter]:
         return iter(self.filters)
 
-    def __contains__(self, x: t.Any) -> bool:
+    def __contains__(self, x: Any) -> bool:
         return x in self.filters
 
     def __str__(self) -> str:
@@ -225,7 +192,7 @@ class FilterList:
         """
         return all(filt.is_valid(finder, filematch) for filt in self)
 
-    def add(self, func: FilterFunc, **kwargs) -> Filter:
+    def add(self, func: FilterFunc, **kwargs: Any) -> Filter:
         """Add a basic filter."""
         filt = Filter(func, **kwargs)
         self.filters.append(filt)
@@ -233,34 +200,34 @@ class FilterList:
 
     def add_by_group(
         self,
-        func: UserFuncGroup,
-        indices: abc.Sequence[int],
+        func: Callable[..., bool],
+        indices: Sequence[int],
+        *,
         pass_unparsed: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> FilterByGroup:
         """Add a group filter."""
-        filt = FilterByGroup(func, indices, pass_unparsed=pass_unparsed)
+        filt = FilterByGroup(func, indices, pass_unparsed=pass_unparsed, **kwargs)
         self.filters.append(filt)
         return filt
 
     def add_by_date(
         self,
-        func: UserFuncGroup,
+        func: Callable[..., bool],
         date_name: str,
         default_date: DefaultDate = None,
-        /,
-        **kwargs,
+        **kwargs: Any,
     ) -> FilterByDate:
         """Add a date filter."""
         filt = FilterByDate(func, date_name, default_date=default_date, **kwargs)
         self.filters.append(filt)
         return filt
 
-    def clear(self):
+    def clear(self) -> None:
         """Remove all filters."""
         self.filters.clear()
 
-    def remove_by_group(self, indices: abc.Sequence[int]):
+    def remove_by_group(self, indices: Sequence[int]) -> None:
         """Remove groups from all filters.
 
         Every group filter indices has every index in the argument removed. Its match
@@ -278,8 +245,10 @@ class FilterList:
             filters.append(filt)
         self.filters = filters
 
-    def remove_by_date(self, date_name: str):
+    def remove_by_date(self, date_name: str) -> None:
         """Remove all date filters."""
         self.filters = [
-            filt for filt in self.filters if not isinstance(filt, FilterByDate)
+            filt
+            for filt in self.filters
+            if not isinstance(filt, FilterByDate) or filt.date_name != date_name
         ]

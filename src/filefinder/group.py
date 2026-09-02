@@ -52,10 +52,10 @@ class Group:
         f"(?P<name>[^:]+?(?::[{datetime_keys}])?)(?:"
         "(?P<fmt>:fmt=.+?)"
         "|(?P<rgx>:rgx=.*?)"
-        "|(?P<bool>:bool=.*?(?::.*?)??)"
+        "|(?P<bool>:bool=.+?(?::.*?)??)"
         "|(?P<opt>:opt)"
-        "|(?P<pre>:pre=.*?)"
-        "|(?P<post>:post=.*?)"
+        "|(?P<pre>:pre=.+?)"
+        "|(?P<post>:post=.+?)"
         "){,6}"
     )
     """Pattern used to find properties in group definition.

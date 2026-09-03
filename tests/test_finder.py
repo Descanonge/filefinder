@@ -87,10 +87,10 @@ class TestCreation:
 
     @pytest.mark.parametrize("pattern", pattern_examples)
     def test_finder_repr(self, pattern: PatternExample) -> None:
-        f = Finder("/data", pattern.pattern)
+        f = Finder("data", pattern.pattern)
         lines = repr(f).splitlines()
         assert lines[0] == "Finder"
-        assert lines[1] == "root: /data"
+        assert lines[1] == "root: data"
         assert lines[2] == f"pattern: {pattern.pattern}"
         assert lines[-1] == "not scanned"
 
@@ -141,7 +141,7 @@ class TestCreation:
 
         f = Finder("", pattern_dates.pattern)
         rgx = r"(\d{4})(\d\d)(\d\d)\-(\d{3})"
-        assert f.get_regex() == rf"(\d{{4}}){re.escape(os.sep)}/{rgx}_{rgx}\.txt"
+        assert f.get_regex() == rf"(\d{{4}}){re.escape(os.sep)}{rgx}_{rgx}\.txt"
 
 
 class AssertVoid:
@@ -540,7 +540,7 @@ class TestMatches:
 
 class TestMakeFilename:
     def test_by_value(self) -> None:
-        finder = Finder("/base/", pattern.pattern)
+        finder = Finder("base", pattern.pattern)
 
         fixes: dict[str, Any] = {
             "fmt_int": 1,
@@ -549,7 +549,7 @@ class TestMakeFilename:
             "bool": True,
             "optional": 0.1,
         }
-        filename = "/base/A_01_a+_b+_true._0.1.txt"
+        filename = os.path.join("base", "A_01_a+_b+_true._0.1.txt")
 
         assert finder.make_filename(fixes) == filename
         assert finder.make_filename(**fixes) == filename
@@ -559,7 +559,7 @@ class TestMakeFilename:
 
     def test_by_str(self) -> None:
         """String values are not escaped."""
-        finder = Finder("/base/", pattern.pattern)
+        finder = Finder("base", pattern.pattern)
 
         fixes: dict[str, Any] = {
             "fmt_int": "a+",
@@ -568,7 +568,7 @@ class TestMakeFilename:
             "bool": "d+",
             "optional": "e+",
         }
-        filename = "/base/A_a+_b+_c+_d+e+.txt"
+        filename = os.path.join("base", "A_a+_b+_c+_d+e+.txt")
 
         assert finder.make_filename(fixes) == filename
         assert finder.make_filename(**fixes) == filename
@@ -577,7 +577,7 @@ class TestMakeFilename:
         assert finder.make_filename() == filename
 
     def test_wrong(self) -> None:
-        finder = Finder("/base/", pattern.pattern)
+        finder = Finder("base", pattern.pattern)
 
         with pytest.raises(KeyError):
             finder.make_filename()
@@ -590,65 +590,62 @@ class TestMakeFilename:
 
     def test_fixed(self) -> None:
         """Test that only some values can be fixed, and correct overwrite."""
-        finder = Finder("/base/", pattern.pattern)
+        finder = Finder("base", pattern.pattern)
 
         finder.fix(
             fmt_int=1,
             fmt_str="a+",
             bool=True,
         )
-        assert (
-            finder.make_filename(custom_rgx="b+", optional=0.5)
-            == "/base/A_01_a+_b+_true._0.5.txt"
+        assert finder.make_filename(custom_rgx="b+", optional=0.5) == os.path.join(
+            "base", "A_01_a+_b+_true._0.5.txt"
         )
 
-        assert (
-            finder.make_filename(custom_rgx="b+", optional=0.5, fmt_int=5)
-            == "/base/A_05_a+_b+_true._0.5.txt"
-        )
+        assert finder.make_filename(
+            custom_rgx="b+", optional=0.5, fmt_int=5
+        ) == os.path.join("base", "A_05_a+_b+_true._0.5.txt")
 
     def test_optional(self) -> None:
         """Optional groups do not have to be fixed."""
-        finder = Finder("/base/", pattern.pattern)
+        finder = Finder("base", pattern.pattern)
 
         finder.fix(
             fmt_int=1,
             fmt_str="a+",
             bool=True,
         )
-        assert (
-            finder.make_filename(fmt_int=1, fmt_str="a", custom_rgx="b", bool=False)
-            == "/base/A_01_a_b_false..txt"
-        )
+        assert finder.make_filename(
+            fmt_int=1, fmt_str="a", custom_rgx="b", bool=False
+        ) == os.path.join("base", "A_01_a_b_false..txt")
 
     def test_multiple_fix(self) -> None:
         """The first value is used when fixed to multiple values."""
-        finder = Finder("/base/", pattern.pattern)
+        finder = Finder("base", pattern.pattern)
 
         finder.fix(
             fmt_int=[1, 2, 3],
             fmt_str=["a1", "a2"],
             bool=[True, False],
         )
-        assert (
-            finder.make_filename(custom_rgx=["b1", "b2"], optional=[0.5, 0.6, 0.7])
-            == "/base/A_01_a1_b1_true._0.5.txt"
-        )
+        assert finder.make_filename(
+            custom_rgx=["b1", "b2"], optional=[0.5, 0.6, 0.7]
+        ) == os.path.join("base", "A_01_a1_b1_true._0.5.txt")
 
-        assert (
-            finder.make_filename(
-                custom_rgx=["b1"], optional=[0.5, 0.6, 0.7], fmt_int=[2, 3]
-            )
-            == "/base/A_02_a1_b1_true._0.5.txt"
-        )
+        assert finder.make_filename(
+            custom_rgx=["b1"], optional=[0.5, 0.6, 0.7], fmt_int=[2, 3]
+        ) == os.path.join("base", "A_02_a1_b1_true._0.5.txt")
 
     def test_doubles(self) -> None:
         """Multiple groups with the same name are correctly handled."""
-        finder = Finder("/base/", pattern_double.pattern)
-        assert finder.make_filename(fmt_int=1, other=True) == "/base/A-01_B-01_C-a.txt"
+        finder = Finder("base", pattern_double.pattern)
+        assert finder.make_filename(fmt_int=1, other=True) == os.path.join(
+            "base", "A-01_B-01_C-a.txt"
+        )
 
         finder.fix(fmt_int=1)
-        assert finder.make_filename({0: 2}, other=True) == "/base/A-02_B-01_C-a.txt"
+        assert finder.make_filename({0: 2}, other=True) == os.path.join(
+            "base", "A-02_B-01_C-a.txt"
+        )
 
     def test_dates(self) -> None:
         finder = Finder("base", pattern_dates.pattern)

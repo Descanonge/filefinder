@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import os
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -140,7 +141,7 @@ class TestCreation:
 
         f = Finder("", pattern_dates.pattern)
         rgx = r"(\d{4})(\d\d)(\d\d)\-(\d{3})"
-        assert f.get_regex() == rf"(\d{{4}}){os.sep}{rgx}_{rgx}\.txt"
+        assert f.get_regex() == rf"(\d{{4}}){re.escape(os.sep)}/{rgx}_{rgx}\.txt"
 
 
 class AssertVoid:
@@ -650,15 +651,15 @@ class TestMakeFilename:
         assert finder.make_filename({0: 2}, other=True) == "/base/A-02_B-01_C-a.txt"
 
     def test_dates(self) -> None:
-        finder = Finder("/base/", pattern_dates.pattern)
+        finder = Finder("base", pattern_dates.pattern)
 
         assert finder.make_filename(
             date=dt.datetime(2086, 3, 2), date2=dt.datetime(2087, 4, 3)
-        ) == os.path.join("/base", "2086", "20860302-061_20870403-093.txt")
+        ) == os.path.join("base", "2086", "20860302-061_20870403-093.txt")
 
         finder.fix(date=dt.datetime(2086, 3, 2), date2=dt.datetime(2087, 4, 3))
         assert finder.make_filename({"date2:d": 4}, d=3) == os.path.join(
-            "/base", "2086", "20860303-061_20870404-093.txt"
+            "base", "2086", "20860303-061_20870404-093.txt"
         )
 
 

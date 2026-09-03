@@ -181,7 +181,7 @@ class TestFilterExecute:
 
         def is_valid_(values: list[int]) -> bool:
             filematch = self.get_filematch("", groups, values)
-            return filters.is_valid(None, filematch)
+            return is_valid(filters, filematch)
 
         filters.add_by_group(is_positive, [0])
         assert is_valid_([2, 0, 0])

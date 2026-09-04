@@ -670,6 +670,9 @@ class Finder:
         Is automatically called when accessing :attr:`matches` or :func:`get_files`.
         Apply all filters and sort files alphabetically.
         """
+        if self.scanned:
+            self.clear_cache()
+
         if self.scan_everything:
             self._find_files_scan_everything()
         else:

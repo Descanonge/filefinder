@@ -180,7 +180,7 @@ filters won't run).
 .. important::
 
    Adding a new filter will filter the files already scanned, and removing
-   filters will void the cache.
+   filters will clear the cache.
 
 .. note::
 
@@ -237,7 +237,7 @@ in alphabetical order.
 
 .. note::
 
-    The cache is appropriately voided when using some methods, like when fixing
+    The cache is appropriately cleared when using some methods, like when fixing
     groups. For that reason, avoid setting attributes directly on a Finder
     instance and use set methods instead.
 

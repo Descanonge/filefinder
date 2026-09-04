@@ -145,10 +145,10 @@ class TestCreation:
         assert f.get_regex() == rf"(\d{{4}}){re.escape(os.sep)}{rgx}_{rgx}\.txt"
 
 
-class AssertVoid:
-    def __init__(self, finder: Finder, void: bool = True) -> None:
+class AssertClear:
+    def __init__(self, finder: Finder, clear: bool = True) -> None:
         self.finder = finder
-        self.void = void
+        self.clear = clear
 
     def __enter__(self) -> None:
         filematch = self.finder.find_matches("A_01_a_b_true._0.5.txt")
@@ -157,7 +157,7 @@ class AssertVoid:
         self.finder.scanned = True
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> Literal[False]:  # noqa: ANN001
-        if self.void:
+        if self.clear:
             assert len(self.finder._matches) == 0
             assert not self.finder.scanned
         else:
@@ -169,67 +169,67 @@ class AssertVoid:
         return False
 
 
-class TestVoidCache:
+class TestClearCache:
     def get_finder(self) -> Finder:
         return Finder("", pattern.pattern)
 
-    def assert_voided(self, finder: Finder, *, void: bool = True) -> AssertVoid:
-        return AssertVoid(finder, void)
+    def assert_cleared(self, finder: Finder, *, clear: bool = True) -> AssertClear:
+        return AssertClear(finder, clear)
 
     def test_nothing(self) -> None:
         finder = self.get_finder()
-        with self.assert_voided(finder, void=False):
+        with self.assert_cleared(finder, clear=False):
             pass
 
-        with pytest.raises(AssertionError), self.assert_voided(finder):
+        with pytest.raises(AssertionError), self.assert_cleared(finder):
             pass
 
     def test_set_attributes(self) -> None:
         finder = self.get_finder()
 
-        with self.assert_voided(finder, void=False):
+        with self.assert_cleared(finder, clear=False):
             finder.set_scan_everything(False)
-        with self.assert_voided(finder, void=False):
+        with self.assert_cleared(finder, clear=False):
             finder.set_use_regex(False)
 
-        with self.assert_voided(finder):
+        with self.assert_cleared(finder):
             finder.set_scan_everything(True)
-        with self.assert_voided(finder):
+        with self.assert_cleared(finder):
             finder.set_use_regex(True)
 
     def test_set_pattern(self) -> None:
         finder = self.get_finder()
 
-        with self.assert_voided(finder):
+        with self.assert_cleared(finder):
             finder.set_pattern("")
 
     def test_fix(self) -> None:
         finder = self.get_finder()
-        with self.assert_voided(finder):
+        with self.assert_cleared(finder):
             finder.fix(fmt_int=1)
 
     def test_unfix(self) -> None:
         finder = self.get_finder()
 
         finder.fix(fmt_int=1, fmt_str="a")
-        with self.assert_voided(finder):
+        with self.assert_cleared(finder):
             finder.unfix("fmt_int")
 
         finder.fix(fmt_int=1)
-        with self.assert_voided(finder):
+        with self.assert_cleared(finder):
             finder.unfix()
 
     def test_filter(self) -> None:
         finder = self.get_finder()
 
-        with self.assert_voided(finder, void=False):
+        with self.assert_cleared(finder, clear=False):
             finder.add_filter(lambda *_: True)
-        with self.assert_voided(finder, void=False):
+        with self.assert_cleared(finder, clear=False):
             finder.add_group_filter("fmt_int", lambda _: True)
 
-        with self.assert_voided(finder):
+        with self.assert_cleared(finder):
             finder.remove_group_filters("fmt_int")
-        with self.assert_voided(finder):
+        with self.assert_cleared(finder):
             finder.clear_filters()
 
 
@@ -794,7 +794,7 @@ class TestFileScanNested:
 
         self.finder = self.tmp_dir.get_filefinder()
         assert len(self.finder.matches) == len(self.tmp_dir.files)
-        self.finder.void_cache()
+        self.finder.clear_cache()
 
         return self.tmp_dir.dates, self.tmp_dir.params, self.tmp_dir.options
 

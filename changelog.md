@@ -22,7 +22,10 @@
       `Finder.remove_group_filters`.
     - Group filters operating on dates are now managed as any other group filter.
     - Filters do not need the filename as argument (it is now stored in `FileMatch`).
+- Renamed `Finder.void_cache` to `Finder.clear_cache`.
 - Renamed `get_format` to `Format` and `Format.generate_expression` to `Format.get_regex`
+- Boolean options for groups are stored in a dictionary `{True: "a", False: "b"}` instead
+  of a tuple `("b", "a")` which order can be confusing.
       
 - Optional groups (marked with :opt),
     - If not present in the filename will return None as parsed value and an

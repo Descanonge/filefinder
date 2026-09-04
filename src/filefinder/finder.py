@@ -100,7 +100,7 @@ class Finder:
         self.scanned: bool = False
         """True if files have been scanned with current parameters.
 
-        Is reset to False if the cache (of scanned files) is voided, for instance by
+        Is reset to False if the cache (of scanned files) is cleared, for instance by
         operations like changing fixed values of groups.
         """
 
@@ -158,13 +158,13 @@ class Finder:
         """Set value for attribute :attr:`scan_everything`."""
         if scan_everything != self.scan_everything:
             self.scan_everything = scan_everything
-            self.void_cache()
+            self.clear_cache()
 
     def set_use_regex(self, use_regex: bool) -> None:  # noqa: FBT001
         """Set value for attribute :attr:`use_regex`."""
         if use_regex != self.use_regex:
             self.use_regex = use_regex
-            self.void_cache()
+            self.clear_cache()
 
     def get_group_names(self, *, fixed: bool | None = None) -> set[str]:
         """Get the names of groups in the pattern.
@@ -313,7 +313,7 @@ class Finder:
         if fixes is None:
             fixes = {}
         fixes.update(**fixes_kw)
-        self.void_cache()
+        self.clear_cache()
         date_names = self.get_date_names()
         for key, value in fixes.items():
             if key in date_names and not (
@@ -347,7 +347,7 @@ class Finder:
             for g in groups:
                 g.unfix()
 
-        self.void_cache()
+        self.clear_cache()
 
     def add_filter(self, func: Callable[..., bool], **kwargs: Any) -> None:
         """Add a filter with which to select scanned files.
@@ -438,12 +438,12 @@ class Finder:
             else:
                 self.filters.remove_by_group(get_groups_indices(self.groups, key))
 
-        self.void_cache()
+        self.clear_cache()
 
     def clear_filters(self) -> None:
         """Remove all filters."""
         self.filters.clear()
-        self.void_cache()
+        self.clear_cache()
 
     def find_matches(
         self,
@@ -574,7 +574,7 @@ class Finder:
 
     def set_pattern(self, pattern: str) -> None:
         """Set pattern and parse for group objects."""
-        self.void_cache()
+        self.clear_cache()
         self._pattern = pattern
 
         found_groups = self._find_groups(pattern)
@@ -761,8 +761,7 @@ class Finder:
                     # logger.debug("Matching %s to %s", to_root, full_pattern.pattern)
                     self._add_file(to_root, full_pattern)
 
-
-    def void_cache(self) -> None:
+    def clear_cache(self) -> None:
         """Clear the cache."""
         self.scanned = False
         self._matches.clear()

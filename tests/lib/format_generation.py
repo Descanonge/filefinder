@@ -168,7 +168,9 @@ class StFormat:
         '{}' characters are excluded to avoid format-calls issues. Other characters are
         excluded using :func:`build_exclude`.
         """
-        exclude = build_exclude(set("{}"), for_pattern, for_filename)
+        exclude = build_exclude(
+            set("{}"), for_pattern=for_pattern, for_filename=for_filename
+        )
 
         alph = st.characters(
             exclude_categories=["Cc", "Cs"],

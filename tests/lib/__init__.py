@@ -22,14 +22,21 @@ T = TypeVar("T")
 
 
 class Drawer(Protocol):
-    def __call__(self, __strat: st.SearchStrategy[T]) -> T: ...
+    def __call__(self, strat: st.SearchStrategy[T], /) -> T: ...
 
 
-def assert_fixed(group: Group, value: Any, string: str | list[str], regex: str):
+def assert_fixed(
+    group: Group,
+    value: Any | None = None,
+    string: str | list[str] | None = None,
+    regex: str | None = None,
+):
     assert group.fixed
-    assert group.fixed_value == value
-    assert group.fixed_string == string
-    assert group.fixed_regex == regex
+    assert group.fixed_value == value  # check even if None for optional groups
+    if string is not None:
+        assert group.fixed_string == string
+    if regex is not None:
+        assert group.fixed_regex == regex
 
 
 def assert_unfixed(group: Group):
@@ -40,6 +47,7 @@ def assert_unfixed(group: Group):
 
 def build_exclude(
     exclude: set[str] | None = None,
+    *,
     for_pattern: bool = False,
     for_filename: bool = False,
 ) -> set[str]:

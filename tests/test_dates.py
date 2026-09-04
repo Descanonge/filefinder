@@ -19,7 +19,11 @@ from filefinder.dates import (
 
 def test_make_date_groups() -> None:
     assert make_date_groups("%Y%m%d%j%F") == "%(Y)%(m)%(d)%(j)%(F)"
-    assert make_date_groups("%Y%m%d%j%F", name="a") == "%(a:Y)%(a:m)%(a:d)%(a:j)%(a:F)"
+    assert (
+        make_date_groups("%Y%m%d%j%F", name="a")
+        == "%(a__Y)%(a__m)%(a__d)%(a__j)%(a__F)"
+    )
+    assert make_date_groups("%Y%m%dT%H:%M:%S") == "%(Y)%(m)%(d)T%(H):%(M):%(S)"
 
 
 def test_datetime_to_str() -> None:

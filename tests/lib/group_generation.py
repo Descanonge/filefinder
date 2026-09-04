@@ -55,6 +55,10 @@ class GroupSpecs:
     def __contains__(self, key: str) -> bool:
         return key in self.ordered_specs
 
+    @property
+    def options(self) -> dict[bool, str]:
+        return dict(zip([True, False], self.bool_elts, strict=True))
+
     def is_valid(self) -> bool:
         """Return if Group object can be constructed."""
         try:
@@ -72,7 +76,7 @@ class GroupSpecs:
             assert self.fmt_struct is not None
             rgx = self.fmt_struct.get_regex(capture=False)
         else:
-            raise ValueError("Cannon create regex from specs.")
+            raise ValueError("Cannot create regex from specs.")
 
         if matching:
             rgx = self.pre + rgx + self.post
@@ -185,9 +189,9 @@ class StGroup:
             min_size=1,
             max_size=MAX_TEXT_SIZE,
         )
-        strat = strat.filter(lambda s: s not in Group.DATE_GROUPS).filter(
-            lambda s: s != "date"
-        )
+        strat = strat.filter(lambda s: s not in Group.DATE_GROUPS)
+        strat = strat.filter(lambda s: s != "date")
+        strat = strat.filter(lambda s: "__" not in s)
         return strat
 
     @classmethod

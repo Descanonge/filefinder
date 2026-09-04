@@ -16,6 +16,7 @@ from lib import assert_fixed, assert_unfixed
 from lib.tmp_dir import TmpDirectory, TmpDirectoryExample, date_range
 
 from filefinder import Finder
+from filefinder.group import Group
 from filefinder.matches import NOT_PARSED, PARSE_FAIL, FileMatch
 
 log = logging.getLogger(__name__)
@@ -39,8 +40,8 @@ pattern_double = PatternExample(
     names=["fmt_int", "fmt_int", "other"],
 )
 pattern_dates = PatternExample(
-    pattern="%(Y)/%(Y)%(m)%(d)-%(j)_%(date2:Y)%(date2:m)%(date2:d)-%(date2:j).txt",
-    names=["Y", "Y", "m", "d", "j", "date2:Y", "date2:m", "date2:d", "date2:j"],
+    pattern="%(Y)/%(Y)%(m)%(d)-%(j)_%(date2__Y)%(date2__m)%(date2__d)-%(date2__j).txt",
+    names=["Y", "Y", "m", "d", "j", "date2__Y", "date2__m", "date2__d", "date2__j"],
 )
 
 pattern_examples = [pattern, pattern_double, pattern_dates]
@@ -387,49 +388,48 @@ class TestFixing:
 
     def test_fix_date_exotic(self) -> None:
         """Test more complex date elements (F, x, B)."""
-        finder = Finder("", "%(date1:F)_%(date2:x)_%(date3:B)")
+        finder = Finder("", "%(date1__F)_%(date2__x)_%(date3__B)")
         assert finder.get_regex() == r"(\d{4}-\d\d-\d\d)_(\d{8})_(\w+)"
         groups = {grp.name: grp for grp in finder.groups}
 
         finder.fix(date1=dt.date(2086, 1, 2))
-        assert_fixed(groups["date1:F"], "2086-01-02", "2086-01-02", r"2086\-01\-02")
+        assert_fixed(groups["date1__F"], "2086-01-02", "2086-01-02", r"2086\-01\-02")
 
         finder.fix(date2=dt.date(2087, 2, 3))
-        assert_fixed(groups["date2:x"], 20870203, "20870203", "20870203")
+        assert_fixed(groups["date2__x"], 20870203, "20870203", "20870203")
 
         finder.fix(date3=dt.date(2088, 3, 4))
-        assert_fixed(groups["date3:B"], "March", "March", "March")
+        assert_fixed(groups["date3__B"], "March", "March", "March")
 
     def test_fix_multiple_dates(self) -> None:
-        def assert_fixed(finder: Finder, fixes: dict[str, Any]) -> None:
-            for name, value in fixes.items():
-                for grp in finder.get_groups(name):
-                    assert grp.fixed_value == value
+        def assert_fixed_(groups: dict[str, Group], values: dict) -> None:
+            for name, value in values.items():
+                assert_fixed(groups[name], value)
 
-        def assert_unfixed(finder: Finder, *names: str) -> None:
+        def assert_unfixed_(groups: dict[str, Group], *names: str) -> None:
             for name in names:
-                for grp in finder.get_groups(name):
-                    assert not grp.fixed
+                assert_unfixed(groups[name])
 
-        finder = Finder("", "%(Y)%(m)%(d)_%(a:Y)%(a:m)%(a:d)_%(b:Y)%(b:m)%(b:d)")
+        finder = Finder("", "%(Y)%(m)%(d)_%(a__Y)%(a__m)%(a__d)_%(b__Y)%(b__m)%(b__d)")
+        groups = {grp.name: grp for grp in finder.groups}
 
         finder.fix(date=dt.date(2000, 1, 2))
-        assert_fixed(finder, {"Y": 2000, "m": 1, "d": 2})
-        assert_unfixed(finder, "a", "b")
+        assert_fixed_(groups, {"Y": 2000, "m": 1, "d": 2})
+        assert_unfixed_(groups, "a__Y", "a__m", "a__d", "b__Y", "b__m", "b__d")
 
         finder.fix(a=dt.date(2010, 3, 4))
-        assert_fixed(finder, {"Y": 2000, "m": 1, "d": 2})
-        assert_fixed(finder, {"a:Y": 2010, "a:m": 3, "a:d": 4})
-        assert_unfixed(finder, "b")
+        assert_fixed_(groups, {"Y": 2000, "m": 1, "d": 2})
+        assert_fixed_(groups, {"a__Y": 2010, "a__m": 3, "a__d": 4})
+        assert_unfixed_(groups, "b__Y", "b__m", "b__d")
 
         finder.unfix("date")
-        assert_unfixed(finder, "date")
-        assert_fixed(finder, {"a:Y": 2010, "a:m": 3, "a:d": 4})
+        assert_unfixed_(groups, "Y", "m", "d")
+        assert_fixed_(groups, {"a__Y": 2010, "a__m": 3, "a__d": 4})
 
         finder.fix(b=dt.date(2020, 5, 6), date=dt.date(2030, 7, 8))
-        assert_fixed(finder, {"Y": 2030, "m": 7, "d": 8})
-        assert_fixed(finder, {"a:Y": 2010, "a:m": 3, "a:d": 4})
-        assert_fixed(finder, {"b:Y": 2020, "b:m": 5, "b:d": 6})
+        assert_fixed_(groups, {"Y": 2030, "m": 7, "d": 8})
+        assert_fixed_(groups, {"a__Y": 2010, "a__m": 3, "a__d": 4})
+        assert_fixed_(groups, {"b__Y": 2020, "b__m": 5, "b__d": 6})
 
 
 class TestMatches:
@@ -525,8 +525,8 @@ class TestMatches:
 
         assert filematch["Y"] == 2086
         assert filematch["m"] == 3
-        assert filematch["date2:Y"] == 2087
-        assert filematch["date2:j"] == 93
+        assert filematch["date2__Y"] == 2087
+        assert filematch["date2__j"] == 93
 
         assert filematch["date"] == dt.datetime(2086, 3, 2)
         assert filematch["date2"] == dt.datetime(2087, 4, 3)
@@ -655,7 +655,7 @@ class TestMakeFilename:
         ) == os.path.join("base", "2086", "20860302-061_20870403-093.txt")
 
         finder.fix(date=dt.datetime(2086, 3, 2), date2=dt.datetime(2087, 4, 3))
-        assert finder.make_filename({"date2:d": 4}, d=3) == os.path.join(
+        assert finder.make_filename({"date2__d": 4}, d=3) == os.path.join(
             "base", "2086", "20860303-061_20870404-093.txt"
         )
 

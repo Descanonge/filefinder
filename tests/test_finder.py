@@ -6,6 +6,7 @@ import datetime as dt
 import logging
 import os
 import re
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -783,6 +784,10 @@ class TestFileScan:
         for f, f_ref in zip(finder.get_files(relative=True), files, strict=False):
             assert f == f_ref
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Changing permission does not work on Windows (easily)",
+    )
     def test_permission_warning(self, tmp_path: Path) -> None:
         tmp_dir = TmpDirectory(tmp_path)
         tmp_dir.create_dir("inacessible")

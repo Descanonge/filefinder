@@ -62,12 +62,12 @@ def make_date_groups(date_format: str, name: str = "") -> str:
     Example
     -------
     >>> make_date_groups("%Y%m%d", name="start")
-    "%(start:Y)%(start:m)%(start:d)"
+    "%(start__Y)%(start__m)%(start__d)"
     >>> make_date_groups("%Y-%m-%d %H:%M:%S")
     "%(Y)%(m)%(d) %(H):%(M):%(S)"
     """
     if name:
-        name = f"{name}:"
+        name = f"{name}__"
 
     def replace(match: re.Match) -> str:
         group = match.group(1)

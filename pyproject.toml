@@ -93,6 +93,7 @@ extend-select = [
     'F',    # Pyflakes
     'PL',   # Pylint
     'UP',   # pyupgrade
+    'RUF',  # ruff
 ]
 
 ignore = [

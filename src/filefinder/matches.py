@@ -143,7 +143,10 @@ class FileMatch:
         matches: Sequence[GroupMatch],
         groups: Sequence[Group],
     ) -> None:
-        assert len(matches) == len(groups)
+        if len(matches) != len(groups):
+            raise IndexError(
+                f"Not as many group matches ({len(matches)}) as groups ({len(groups)})"
+            )
 
         self.root: str = root
         self.filename: str = filename

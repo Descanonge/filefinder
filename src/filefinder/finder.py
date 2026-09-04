@@ -567,7 +567,7 @@ class Finder:
             splits += [start, end]
 
         self._segments = [
-            pattern[i:j] for i, j in zip(splits, splits[1:] + [None], strict=False)
+            pattern[i:j] for i, j in zip(splits, [*splits[1:], None], strict=False)
         ]
 
     def _find_groups(self, pattern: str) -> list[tuple[str, int, int]]:

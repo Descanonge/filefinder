@@ -118,7 +118,7 @@ class FormatAbstract:
 
     def parse(self, s: str) -> Any:
         """Parse string generated with this format into an appropriate value."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def get_regex(self, *, capture: bool = False) -> str:
         """Generate a regular expression matching strings created with this format.
@@ -129,7 +129,7 @@ class FormatAbstract:
             If true, add capturing groups that will be used to parse the value by
             selecting only relevant information. Default is false.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class FormatString(FormatAbstract):
@@ -179,7 +179,7 @@ class FormatNumberAbstract(FormatAbstract):
         digits = list(map(str, range(10)))
         if self.width > 0 and (
             (self.fill in digits and self.align in "<^")
-            or (self.fill in digits[1:] and self.align in "=")
+            or (self.fill in digits[1:] and self.align == "=")
             or (self.fill in digits and self.align == ">" and self.sign == "-")
             or (self.fill == "-" and self.align in ">^=" and self.sign == "-")
         ):
@@ -349,11 +349,8 @@ def Format(fmt: str) -> FormatAbstract:  # noqa: N802
         if params["align"] is None:
             params["align"] = "="
 
-    # TODO Precision not supported in s kind (it truncates the value)
     if kind == "s" and params["precision"]:
-        raise FormatError(
-            "Precision parameter is currently not supported for 's' format."
-        )
+        raise FormatError("Precision parameter is not supported for 's' format.")
 
     # defaults values for unset remaining parameters
     defaults = {"align": "<", "fill": " "}

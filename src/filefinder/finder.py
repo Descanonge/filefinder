@@ -35,6 +35,11 @@ def _log_list(
             logger.log(level, "\t%s", elements[-1])
 
 
+def _handle_walk_error(exc: OSError) -> None:
+    """Handle OS errors when scanning directories."""
+    warnings.warn(str(exc), stacklevel=1)
+
+
 class Finder:
     """Find files using a filename pattern.
 
@@ -51,12 +56,15 @@ class Finder:
     use_regex:
         If True, characters outside of groups are considered as valid regex (and
         not escaped). Default is False.
-    scan_everything
+    scan_everything:
         If true, look into all sub-directories up to a depth of :attr:`max_scan_depth` .
         This is appropriate if the pattern contains optional sub-directories. If false
         (default), check that every sub-directory matches its part of the regular
         expression, thus avoiding some work.
-    group_delimiters
+    follow_symlinks:
+        If true, follow symbolic links pointing to directories when scanning for files.
+        This may lead to infinite recursion.
+    group_delimiters:
         Tuple of (prefix, start characters, end characters) that defines how groups are
         delimited in the pattern. Start and end character must be balanced within the
         group. Prefix can be empty. If None, the default `%()` is used.
@@ -75,6 +83,7 @@ class Finder:
         *,
         use_regex: bool = False,
         scan_everything: bool = False,
+        follow_symlinks: bool = True,
         group_delimiters: tuple[str, str, str] | None = None,
     ) -> None:
         self.root: str = root
@@ -84,6 +93,8 @@ class Finder:
         (and not escaped). Default is False."""
         self.scan_everything: bool = scan_everything
         """Whether to scan all subdirectories."""
+        self.follow_symlinks: bool = follow_symlinks
+        """Whether to follow symbolic links to directories when scanning files."""
 
         if group_delimiters is not None:
             self._group_delimiters = group_delimiters
@@ -164,6 +175,12 @@ class Finder:
         """Set value for attribute :attr:`use_regex`."""
         if use_regex != self.use_regex:
             self.use_regex = use_regex
+            self.clear_cache()
+
+    def set_follow_symlinks(self, follow_symlinks: bool) -> None:  # noqa: FBT001
+        """Set value for attribute :attr:`follow_symlinks`."""
+        if follow_symlinks != self.follow_symlinks:
+            self.follow_symlinks = follow_symlinks
             self.clear_cache()
 
     def get_group_names(self, *, fixed: bool | None = None) -> set[str]:
@@ -704,7 +721,9 @@ class Finder:
         """
         pattern = re.compile(self.get_regex())
 
-        for dirpath, dirnames, filenames in os.walk(self.root):
+        for dirpath, dirnames, filenames in os.walk(
+            self.root, followlinks=self.follow_symlinks, onerror=_handle_walk_error
+        ):
             depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
                 os.sep
             ).count(os.sep)
@@ -728,12 +747,12 @@ class Finder:
         separator. But it will limit the number of sub-directories to explore and
         thus the number of files to check.
         """
-        max_log_lines = 3
-
         full_pattern = re.compile(self.get_regex())
         subpatterns = [re.compile(rgx) for rgx in self.get_regex_subdirs()]
         maxdepth = len(subpatterns) - 1
-        for dirpath, dirnames, filenames in os.walk(self.root):
+        for dirpath, dirnames, filenames in os.walk(
+            self.root, followlinks=self.follow_symlinks, onerror=_handle_walk_error
+        ):
             depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
                 os.sep
             ).count(os.sep)

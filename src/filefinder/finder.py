@@ -5,6 +5,7 @@ import itertools
 import logging
 import os
 import re
+import warnings
 from collections.abc import Callable, Sequence
 from copy import copy
 from typing import Any, overload
@@ -14,6 +15,24 @@ from .group import Group, GroupKey, get_date_names, get_groups_indices
 from .matches import DefaultDate, FileMatch, GroupMatch
 
 logger = logging.getLogger(__name__)
+
+
+def _log_list(
+    logger: logging.Logger,
+    elements: Sequence[str],
+    *,
+    level: int = logging.DEBUG,
+    max_log_lines: int = 4,
+) -> None:
+    """Log a list of elements. Truncate if too long."""
+    if logger.isEnabledFor(level):
+        is_long = len(elements) > max_log_lines
+        i_max = max_log_lines - 2 if is_long else len(elements)
+        for element in elements[:i_max]:
+            logger.log(level, "\t%s", element)
+        if is_long:
+            logger.log(level, "\t...")
+            logger.log(level, "\t%s", elements[-1])
 
 
 class Finder:
@@ -692,6 +711,8 @@ class Finder:
             if depth > self.max_scan_depth:
                 dirnames.clear()
 
+            logger.debug("Found %d files", len(filenames))
+            _log_list(logger, filenames, level=logging.DEBUG)
             for f in filenames:
                 to_root = self.get_relative(os.path.join(dirpath, f))
                 self._add_file(to_root, pattern)
@@ -715,31 +736,31 @@ class Finder:
             ).count(os.sep)
             pattern = subpatterns[depth]
 
-            logger.debug(
-                "Scanning in %s (depth %d/%d) with pattern %s",
-                dirpath,
-                depth,
-                maxdepth,
-                pattern.pattern,
-            )
+            logger.debug("Looking in %s (depth %d/%d)", dirpath, depth, maxdepth)
+            if depth < maxdepth:
+                logger.debug(
+                    "Found %d directories to match against %s",
+                    len(dirnames),
+                    pattern.pattern,
+                )
+                _log_list(logger, dirnames, level=logging.DEBUG)
 
-            if depth == maxdepth:
+                # Removes directories not matching regex
+                to_remove = [d for d in dirnames if not pattern.fullmatch(d)]
+                for d in to_remove:
+                    dirnames.remove(d)
+
+            else:
                 dirnames.clear()  # look no deeper
 
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug("Found %d files in %s", len(filenames), dirpath)
-                    logger.debug("\t%s", "\n\t".join(filenames[:max_log_lines]))
-                    if len(filenames) > max_log_lines:
-                        logger.debug("...")
+                logger.debug("Found %d files", len(filenames))
+                _log_list(logger, filenames, level=logging.DEBUG)
 
                 for f in filenames:
                     to_root = self.get_relative(os.path.join(dirpath, f))
+                    # logger.debug("Matching %s to %s", to_root, full_pattern.pattern)
                     self._add_file(to_root, full_pattern)
 
-            # Removes directories not matching regex
-            to_remove = [d for d in dirnames if not pattern.fullmatch(d)]
-            for d in to_remove:
-                dirnames.remove(d)
 
     def void_cache(self) -> None:
         """Clear the cache."""

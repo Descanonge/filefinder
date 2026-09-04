@@ -191,11 +191,15 @@ class TestClearCache:
             finder.set_scan_everything(False)
         with self.assert_cleared(finder, clear=False):
             finder.set_use_regex(False)
+        with self.assert_cleared(finder, clear=False):
+            finder.set_follow_symlinks(False)
 
         with self.assert_cleared(finder):
             finder.set_scan_everything(True)
         with self.assert_cleared(finder):
             finder.set_use_regex(True)
+        with self.assert_cleared(finder):
+            finder.set_follow_symlinks(True)
 
     def test_set_pattern(self) -> None:
         finder = self.get_finder()
@@ -778,6 +782,61 @@ class TestFileScan:
         assert len(finder.get_files()) == len(files)
         for f, f_ref in zip(finder.get_files(relative=True), files, strict=False):
             assert f == f_ref
+
+    def test_permission_warning(self, tmp_path: Path) -> None:
+        tmp_dir = TmpDirectory(tmp_path)
+        tmp_dir.create_dir("inacessible")
+        tmp_dir.create_file("inacessible/a.txt")
+
+        (tmp_dir.base_dir / "inacessible").chmod(0)
+
+        finder = Finder(str(tmp_dir.base_dir), "inacessible/%(a:rgx=a).txt")
+        with pytest.warns(UserWarning):
+            finder.find_files()
+
+    def test_follow_symlink(self, tmp_path: Path) -> None:
+        tmp_dir = TmpDirectory(tmp_path)
+        files = []
+        for f in [
+            ("a0", "a00", "a00.file"),
+            ("a0", "a01", "a01.file"),
+            ("a1", "a10", "a10.file"),
+            ("a1", "a11", "a11.file"),
+        ]:
+            files.append(tmp_dir.create_file(os.path.join(*f)))
+
+        # Finder base dir will be "a1", will not find two first files
+        files = files[2:]
+
+        os.symlink(tmp_dir.base_dir / "a1" / "a10", tmp_dir.base_dir / "a1" / "a12")
+        files.append(str(tmp_dir.base_dir / "a1" / "a12" / "a10.file"))
+
+        # follow_symlinks = False
+        finder = Finder(
+            str(tmp_dir.base_dir / "a1"),
+            r"%(l1:rgx=a\d\d)/%(l2:rgx=a\d\d).file",
+        )
+        assert files[:2] == finder.get_files()
+
+        finder = Finder(
+            str(tmp_dir.base_dir / "a1"),
+            r"%(l1:rgx=a\d\d)/%(l2:rgx=a\d\d).file",
+            follow_symlinks=True,
+        )
+        assert sorted(files) == finder.get_files()
+
+        # Add symlink going outside of base dir
+        os.symlink(tmp_dir.base_dir / "a0" / "a00", tmp_dir.base_dir / "a1" / "a03")
+        files.append(str(tmp_dir.base_dir / "a1" / "a03" / "a00.file"))
+
+        # Add a misdirect (the different depth should not allow matching)
+        os.symlink(tmp_dir.base_dir / "a0", tmp_dir.base_dir / "a1" / "a04")
+        finder = Finder(
+            str(tmp_dir.base_dir / "a1"),
+            r"%(l1:rgx=a\d\d)/%(l2:rgx=a\d\d).file",
+            follow_symlinks=True,
+        )
+        assert sorted(files) == finder.get_files()
 
 
 class TestFileScanNested:

@@ -4,8 +4,8 @@
 **Breaking changes**:
 - Date pseudo-groups:
     - Date-related groups can now be managed as a single pseudo-group of any name.
-      Fixing, filtering, retrieving matches, making filenames, getting nested
-      files have been adapted.
+        Fixing, filtering, retrieving matches, making filenames, getting nested
+        files have been adapted.
     - Remove % replacement in regex (made obsolete by pseudo-groups).
     - Remove `:discard` property (made obsolete by pseudo-groups).
     - Renamed `Group.DEFAULT_GROUPS` to `group.DATE_GROUPS`, only kept date-related elements.
@@ -31,7 +31,10 @@
     - If not present in the filename will return None as parsed value and an
       empty string as matched string.
     - They do not need to be fixed to create filenames.
-    - Can now be fixed to None
+    - Can now be fixed to None.
+- Better file scanning:
+    - Add option to follow symbolic links
+    - Log warnings on OS errors (for missing permissions for instance)
 - Group delimiters can now be changed with an init argument.
 - Use current locale to obtain month number from its name.
 - Bumped minimal python version to 3.11

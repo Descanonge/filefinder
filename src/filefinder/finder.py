@@ -83,7 +83,7 @@ class Finder:
         *,
         use_regex: bool = False,
         scan_everything: bool = False,
-        follow_symlinks: bool = True,
+        follow_symlinks: bool = False,
         group_delimiters: tuple[str, str, str] | None = None,
     ) -> None:
         self.root: str = root

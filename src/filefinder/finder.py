@@ -626,7 +626,7 @@ class Finder:
 
         groups_starts = [m.start() for m in re.finditer(pattern_starts, pattern)]
 
-        output = []
+        output: list[tuple[str, int, int]] = []
         # This finds the matching end characters for each group start
         for start in groups_starts:
             end = None
@@ -640,7 +640,10 @@ class Finder:
                     if level == 0:  # matching parenthesis
                         end = m.end()
                         end_spec = end - len(grp_end)
-                        assert end_spec > 0
+                        if end_spec <= 0:
+                            raise RuntimeError(
+                                f"Error finding groups in pattern '{pattern}'"
+                            )
                         break
 
             if end is None:  # did not find matching parenthesis :(

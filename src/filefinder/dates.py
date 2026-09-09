@@ -241,7 +241,7 @@ def get_date(
         if any(v != values[0] for v in values):
             raise ValueError(f"Different values found for {elt}: {values}")
 
-    date = default_date
+    date = dict(default_date)
     for elt, values in elts.items():
         date[elt] = values[0]
 

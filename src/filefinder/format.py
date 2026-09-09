@@ -84,7 +84,8 @@ class FormatAbstract:
 
         if self.type not in self.ALLOWED_TYPES:
             raise InvalidFormatTypeError(
-                f"Invalid format type '{type}', expected one of {self.ALLOWED_TYPES}."
+                f"Invalid format type '{self.type}', "
+                f"expected one of {self.ALLOWED_TYPES}."
             )
 
     def format(self, value: Any) -> str:

@@ -245,7 +245,7 @@ class FilterList:
         self.filters = filters
 
     def remove_by_date(self, date_name: str) -> None:
-        """Remove all date filters."""
+        """Remove filters corresponding to a date pseudo-group."""
         self.filters = [
             filt
             for filt in self.filters

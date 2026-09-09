@@ -271,14 +271,76 @@ class Group:
 
         return self.fmt.parse(string)
 
-    def fix(self, fix: Any | Sequence[Any]) -> None:
-        """Fix the group regex to a specific value.
+    def get_single_fix_result(self, fix: Any) -> tuple[Any, str, str]:
+        """Return the fixed value, fixed string, and regex for a single fix.
 
         Parameters
         ----------
         fix:
-            A string is directly used as a regular expression, otherwise the
-            value is formatted according to the group 'format' specification.
+            String or value to fix.
+
+        Returns
+        -------
+        fixed_value: Any
+            The fixed value. If the input fix is a date, the appropriate element is
+            isolated.
+        fixed_string: str
+            The formatted fix, to use in filename creation.
+        fixed_regex: str
+            The resulting regex, to use in creating the Finder regex.
+        """
+        # if a string, leave it as is
+        if isinstance(fix, str):
+            return fix, fix, fix
+
+        # None for optional group
+        if fix is None and self.optional:
+            return fix, "", ""
+
+        # date, select correct element
+        if isinstance(fix, dt.date | dt.datetime):
+            if self.date_element is None:
+                raise RuntimeError(
+                    "Cannot fix a date object to a group not corresponding to a "
+                    f"date element ({self})."
+                )
+            fixed_value = datetime_to_value(fix, self.date_element)
+            fixed_string = self.prefix + self.fmt.format(fixed_value) + self.suffix
+            return fixed_value, fixed_string, re.escape(fixed_string)
+
+        # bool for A|B choice
+        if isinstance(fix, bool):
+            if self.options is None:
+                raise ValueError(
+                    f"{self.name} group has no A|B options, cannot fix with a boolean."
+                )
+            fixed_string = self.prefix + self.options[fix] + self.suffix
+            return fix, fixed_string, re.escape(fixed_string)
+
+        # otherwise, assume number
+        fixed_string = self.prefix + self.format(fix) + self.suffix
+        return fix, fixed_string, re.escape(fixed_string)
+
+    def get_fix_result(
+        self, fix: Any | Sequence[Any]
+    ) -> tuple[Any, str, str] | tuple[list[Any], list[str], str]:
+        """Return the fixed value, fixed string, and regex for one or more fix.
+
+        Parameters
+        ----------
+        fix:
+            String or value to fix, or a sequence thereof.
+
+        Returns
+        -------
+        fixed_value:
+            The fixed value(s). If the input fix is a date, this contains only the
+            appropriate element.
+        fixed_string:
+            The formatted fix(es), to use in filename creation.
+        fixed_regex:
+            The regex, to use in creating the Finder regex. If there are multiple fix
+            values, the regex is an OR pattern (without parentheses).
         """
         is_solo = isinstance(fix, str) or not isinstance(fix, Sequence)
         if is_solo:
@@ -287,54 +349,28 @@ class Group:
         if len(fix) == 0:
             raise ValueError("A list of fixes must contain at least one element.")
 
-        strings = []
-        regexes = []
-        values = []
-        for f in fix:
-            val: Any = f
+        results = [self.get_single_fix_result(f) for f in fix]
+        values, strings, regexes = [list(i) for i in zip(*results, strict=True)]
 
-            # if a string, leave it as is
-            if isinstance(f, str):
-                out = f
-                rgx = f
+        if is_solo:
+            return values[0], strings[0], regexes[0]
+        return values, strings, "|".join(regexes)
 
-            elif f is None and self.optional:
-                out = ""
-                rgx = ""
+    def fix(self, fix: Any | Sequence[Any]) -> None:
+        """Fix the group regex to a specific value.
 
-            # date
-            elif isinstance(f, dt.date | dt.datetime):
-                if self.date_element is None:
-                    raise RuntimeError(
-                        "Cannot fix a date object to a group not corresponding to a "
-                        f"date element ({self})."
-                    )
-                val = datetime_to_value(f, self.date_element)
-                out = self.prefix + self.fmt.format(val) + self.suffix
-                rgx = re.escape(out)
-
-            # if optional A|B choice
-            elif isinstance(f, bool):
-                if self.options is None:
-                    raise ValueError(
-                        f"{self.name} group has no A|B options, "
-                        "cannot fix value with a boolean."
-                    )
-                out = self.prefix + self.options[f] + self.suffix
-                rgx = re.escape(out)
-
-            else:
-                # otherwise, assume number
-                out = self.prefix + self.format(f) + self.suffix
-                rgx = re.escape(out)
-            values.append(val)
-            strings.append(out)
-            regexes.append(rgx)
+        Parameters
+        ----------
+        fix:
+            A string is directly used as a regular expression, otherwise the
+            value is formatted according to the group specifications.
+        """
+        values, strings, regex = self.get_fix_result(fix)
 
         self._fixed = True
-        self.fixed_value = values[0] if is_solo else values
-        self.fixed_string = strings[0] if is_solo else strings
-        self.fixed_regex = "|".join(regexes)
+        self.fixed_value = values
+        self.fixed_string = strings
+        self.fixed_regex = regex
 
     def unfix(self) -> None:
         """Unfix value."""

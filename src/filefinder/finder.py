@@ -7,7 +7,6 @@ import os
 import re
 import warnings
 from collections.abc import Callable, Sequence
-from copy import copy
 from typing import Any, overload
 
 from .filters import FilterByDate, FilterByGroup, FilterList
@@ -533,8 +532,8 @@ class Finder:
         ----------
         fixes:
             Dictionnary of fixes (group name or index: value). For details, see
-            :func:`fix`. Will (temporarily) supplant group fixed prior. If prior fix is
-            a list, first item will be used.
+            :func:`fix`. Will (temporarily) supplant group fixed prior. If fix is a
+            list, first item will be used.
         relative:
             If the filename should be relative to the finder root directory.
             Default is False.
@@ -557,26 +556,30 @@ class Finder:
         fixes.update(**kw_fixes)
 
         segments = self._segments.copy()
-        groups = [copy(g) for g in self.groups]  # shallow copy (no reparsing of def)
 
-        for i, g in enumerate(groups):
-            if g.name in fixes:
-                g.fix(fixes[g.name])
-            if i in fixes:
-                g.fix(fixes[i])
-            if g.date_name is not None and g.date_name in fixes:
-                g.fix(fixes[g.date_name])
-
-            if g.fixed_string is not None:
-                segments[2 * i + 1] = (
-                    g.fixed_string
-                    if isinstance(g.fixed_string, str)
-                    else g.fixed_string[0]
-                )
-            elif g.optional:
-                segments[2 * i + 1] = ""
+        fixed_strings: list[str | list[str] | None] = []
+        for group in self.groups:
+            if group.fixed_string is not None:
+                fixed_strings.append(group.fixed_string)
+            elif group.optional:
+                fixed_strings.append("")
             else:
-                raise KeyError(f"Group '{g!s}' has no fixed value.")
+                fixed_strings.append(None)
+
+        fixed_string: str | list[str] | None
+        for key, value in fixes.items():
+            groups = self.get_groups(key)
+            for group in groups:
+                _, fixed_string, _ = group.get_fix_result(value)
+                fixed_strings[group.idx] = fixed_string
+
+        for i, fixed_string in enumerate(fixed_strings):
+            if fixed_string is not None:
+                segments[2 * i + 1] = (
+                    fixed_string if isinstance(fixed_string, str) else fixed_string[0]
+                )
+            else:
+                raise KeyError(f"Group '{self.groups[i]!s}' has no fixed value.")
 
         filename = "".join(segments).replace("/", os.sep)
 

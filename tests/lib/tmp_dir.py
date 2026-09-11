@@ -111,8 +111,8 @@ class TmpDirectoryExample(TmpDirectory):
 
     def get_filefinder(self) -> Finder:
         finder = Finder(
-            self.base_dir,
             "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:fmt=02d:pre=_:opt).txt",
+            root=self.base_dir,
         )
         return finder
 

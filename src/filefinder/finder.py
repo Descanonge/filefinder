@@ -53,10 +53,11 @@ class Finder:
 
     Parameters
     ----------
-    root:
-        The root directory of the filetree where all files can be found.
     pattern:
         The filename pattern. See :doc:`/pattern` for details.
+    root:
+        The root directory of the filetree where all files can be found. If not
+        supplied, the current directory will be used.
     use_regex:
         If True, characters outside of groups are considered as valid regex (and
         not escaped). Default is False.
@@ -82,14 +83,16 @@ class Finder:
 
     def __init__(
         self,
-        root: str | Path,
         pattern: str,
         *,
+        root: str | Path | None = None,
         use_regex: bool = False,
         scan_everything: bool = False,
         follow_symlinks: bool = False,
         group_delimiters: tuple[str, str, str] | None = None,
     ) -> None:
+        if root is None:
+            root = Path.cwd()
         self.root: Path = _to_path(root)
         """The root directory of the finder."""
         self.use_regex: bool = use_regex

@@ -6,6 +6,8 @@ import os.path
 import re
 import warnings
 from collections.abc import Iterator, Sequence
+from enum import StrEnum
+from pathlib import Path
 from typing import Any, Self
 
 from .dates import DefaultDate, get_date
@@ -14,20 +16,11 @@ from .group import Group, GroupKey, get_date_names, get_groups_indices
 logger = logging.getLogger(__name__)
 
 
-class Sentinel:
-    """Sentinel objects."""
+class ParseStatus(StrEnum):
+    """Status of parsing."""
 
-    def __init__(self, msg: str = "") -> None:
-        self.msg = msg
-
-    def __str__(self) -> str:
-        return self.msg
-
-
-PARSE_FAIL = Sentinel("Could not parse")
-"""The match string could not be parsed successfully."""
-NOT_PARSED = Sentinel("Not yet parsed")
-"""The match string has not been parsed yet."""
+    FAILED = "The match string could not be parsed successfully."
+    NOT_PARSED = "The match string has not been parsed yet."
 
 
 class GroupMatch:
@@ -60,7 +53,7 @@ class GroupMatch:
         """Start index of match in the filename."""
         self.end: int = end
         """End index of match in the filename."""
-        self._parsed: Any | Sentinel = NOT_PARSED
+        self._parsed: Any | ParseStatus = ParseStatus.NOT_PARSED
 
     def __repr__(self) -> str:
         """Human readable information."""
@@ -71,26 +64,26 @@ class GroupMatch:
         return f"{self.group!s} = {self.match_str}"
 
     @property
-    def match_parsed(self) -> Any | Sentinel:
-        """Return value or Sentinel value if failing to parse.
+    def match_parsed(self) -> Any | ParseStatus:
+        """Return value or status if failing to parse.
 
-        Returns :attr:`PARSE_FAIL` if an exception is thrown when trying to parse the
-        match.
+        Returns :attr:`ParseStatus.PARSE_FAIL` if an exception is thrown when trying to
+        parse the match.
         """
-        if self._parsed is NOT_PARSED:
+        if self._parsed is ParseStatus.NOT_PARSED:
             if self.group.optional and self.match_str == "":
                 self._parsed = None
             else:
                 try:
                     self._parsed = self.group.parse(self.match_str)
                 except ValueError:
-                    self._parsed = PARSE_FAIL
+                    self._parsed = ParseStatus.FAILED
                     logger.debug("Failed to parse for group %s", str(self.group))
         return self._parsed
 
     def can_parse(self) -> bool:
         """Return if the match can be parsed."""
-        return self.match_parsed is not PARSE_FAIL
+        return self.match_parsed is not ParseStatus.FAILED
 
     def get_match(self, *, parse: bool = True, raise_on_unparsed: bool = True) -> Any:
         """Get match string or value.

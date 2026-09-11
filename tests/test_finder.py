@@ -18,7 +18,7 @@ from lib.tmp_dir import TmpDirectory, TmpDirectoryExample, date_range
 
 from filefinder import Finder
 from filefinder.group import Group
-from filefinder.matches import NOT_PARSED, PARSE_FAIL, FileMatch
+from filefinder.matches import FileMatch, ParseStatus
 
 log = logging.getLogger(__name__)
 
@@ -462,7 +462,7 @@ class TestMatches:
 
         # Make sure we have not triggered any parsing
         for group_match in filematch.matches:
-            assert group_match._parsed is NOT_PARSED
+            assert group_match._parsed is ParseStatus.NOT_PARSED
 
     def test_parse(self) -> None:
         """Test parsing values."""
@@ -482,7 +482,7 @@ class TestMatches:
 
         # Make sure the parsed value is cached
         for group_match in filematch.matches:
-            assert group_match._parsed is not NOT_PARSED
+            assert group_match._parsed is not ParseStatus.NOT_PARSED
 
     def test_optional(self) -> None:
         """Test optional group has empty match."""
@@ -493,7 +493,7 @@ class TestMatches:
         assert filematch["optional"] is None
 
     def test_bad_parse(self) -> None:
-        """Test sentinel value is set, and raises when necessary."""
+        """Test status value is set, and raises when necessary."""
         finder = Finder("", "%(a:fmt=d:rgx=.*)")
         filematch = finder.find_matches("bad")
         assert filematch is not None
@@ -502,7 +502,7 @@ class TestMatches:
         with pytest.raises(ValueError):
             assert filematch.get_value("a")
 
-        assert filematch.matches[0]._parsed is PARSE_FAIL
+        assert filematch.matches[0]._parsed is ParseStatus.FAILED
         assert filematch.matches[0].get_match(raise_on_unparsed=False) == "bad"
 
     def test_multiple_values(self) -> None:

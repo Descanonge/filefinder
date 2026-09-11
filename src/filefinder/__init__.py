@@ -1,3 +1,5 @@
+"""Find files on disk following a given pattern."""
+
 from importlib.metadata import version
 
 from .dates import make_date_groups

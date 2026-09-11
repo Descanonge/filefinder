@@ -121,5 +121,8 @@ max-line-length = 90
 [tool.ruff.lint.pydocstyle]
 convention = 'numpy'
 
+[tool.ruff.lint.pylint]
+max-args = 9
+
 [tool.ruff.format]
 quote-style = 'double'

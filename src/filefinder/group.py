@@ -152,8 +152,8 @@ class Group:
     """
 
     def __init__(self, definition: str, idx: int) -> None:
-        self.definition = definition
-        """The string that created the group ``%(definition)``."""
+        self.definition: str = definition
+        """The string that created the group: ``%(definition)``."""
         self.idx: int = idx
         """Index inside the pre-regex."""
 
@@ -174,12 +174,17 @@ class Group:
         """Group suffix. Added to fixes and regex."""
 
         self.date_name: str | None = None
+        """Name of the parent date pseudo-group. None if not a date group."""
         self.date_element: str | None = None
+        """Name of the date element (Y, m, d, ...). None if not a date group."""
 
         self._fixed = False
         self.fixed_value: Any | list[Any] | None = None
-        self.fixed_string: str | list[str] | None = None  # to create filenames
+        """Current fixed value(s). None if not fixed."""
+        self.fixed_string: str | list[str] | None = None
+        """String representation(s) of current fixed value(s). None if not fixed."""
         self.fixed_regex: str | None = None
+        """Regex to match current fixed value(s). None if not fixed."""
 
         specs = GroupSpecs.from_string(definition)
         logger.debug("Parsed group definition %s to specs %s.", definition, specs)
@@ -394,6 +399,9 @@ class Group:
 
         if self.optional and not self.fixed:
             rgx = f"(?:{rgx})?"
+            # Note we don't use "({rgx})?", because if missing from the filename we
+            # couldn't retrieve the start and end indices of the group.
+            # (m.start(i) would return -1)
 
         # Make it matching
         rgx = f"({rgx})"

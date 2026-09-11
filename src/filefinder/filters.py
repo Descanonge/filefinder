@@ -19,20 +19,15 @@ FilterFunc = Callable[["Finder", FileMatch], bool]
 class Filter:
     """Manage a filter."""
 
-    user_func: Callable[..., bool]
-    """Initial function given by the user."""
-    partial_func: Callable[..., bool]
-    """Function with kwargs stored."""
-    filter_func: FilterFunc
-    """Function to be used as a filter."""
-    name: str
-    """Name of the filter."""
-
     def __init__(self, func: Callable[..., bool], **kwargs: Any) -> None:
-        self.user_func = func
-        self.partial_func = self.get_partial_func(**kwargs)
-        self.filter_func = self.get_filter_func()
-        self.name = self._get_name()
+        self.user_func: Callable[..., bool] = func
+        """Initial function given by the user."""
+        self.partial_func: Callable[..., bool] = self.get_partial_func(**kwargs)
+        """Function with kwargs stored."""
+        self.filter_func: FilterFunc = self.get_filter_func()
+        """Function to be used as a filter."""
+        self.name: str = self._get_name()
+        """Name of the filter."""
 
     def __str__(self) -> str:
         return f"<{self.__class__.__name__}:{self.name}>"
@@ -62,16 +57,8 @@ class FilterByGroup(Filter):
     having to find them at each validation from a more generic key.
     """
 
-    user_func: Callable[..., bool]
-    """Initial function given by the user."""
     partial_func: Callable[[Any], bool]
     """Function with kwargs stored."""
-    indices: list[int]
-    """List of group indices to apply this filter upon."""
-    pass_unparsed: bool
-    """Whether to pass unparsed groups to the filter."""
-    filter_func: FilterFunc
-    """Function to be used as a filter."""
 
     def __init__(
         self,
@@ -81,8 +68,10 @@ class FilterByGroup(Filter):
         pass_unparsed: bool = False,
         **kwargs: Any,
     ) -> None:
-        self.indices = list(indices)
-        self.pass_unparsed = pass_unparsed
+        self.indices: list[int] = list(indices)
+        """List of group indices to apply this filter upon."""
+        self.pass_unparsed: bool = pass_unparsed
+        """Whether to pass unparsed groups to the filter."""
         super().__init__(user_func, **kwargs)
 
     def _get_name(self) -> str:
@@ -122,14 +111,8 @@ class FilterByDate(Filter):
     The user function will receive a date recovered from the matches.
     """
 
-    date_name: str
-    """Name of the corresponding pseudo-group."""
-    user_func: Callable[..., bool]
-    """Initial function given by the user."""
     partial_func: Callable[[Any], bool]
     """Function with kwargs stored."""
-    default_date: DefaultDate
-    """Default date elements to use when recovering date."""
 
     def __init__(
         self,
@@ -139,8 +122,10 @@ class FilterByDate(Filter):
         default_date: DefaultDate = None,
         **kwargs: Any,
     ) -> None:
-        self.date_name = date_name
-        self.default_date = default_date
+        self.date_name: str = date_name
+        """Name of the corresponding pseudo-group."""
+        self.default_date: DefaultDate = default_date
+        """Default date elements to use when recovering date."""
         super().__init__(user_func, **kwargs)
 
     def get_filter_func(self) -> FilterFunc:
@@ -163,11 +148,9 @@ class FilterList:
     Has minimal interface: ``__getitem__``, ``__len__``, ``__iter__``, ``__contains__``
     """
 
-    filters: list[Filter]
-    """List of filters."""
-
     def __init__(self) -> None:
-        self.filters = []
+        self.filters: list[Filter] = []
+        """List of filters."""
 
     def __getitem__(self, key: int) -> Filter:
         return self.filters[key]

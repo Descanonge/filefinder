@@ -104,7 +104,7 @@ def datetime_to_str(date: dt.datetime | dt.date, name: str) -> str:
 
 
 def datetime_to_value(date: dt.datetime | dt.date, name: str) -> int | str:
-    """Return value of date group name (Y, m, F, ...)."""
+    """Extract value of date group name (Y, m, F, ...) from a datetime object."""
     _check_input(date, name)
 
     if name == "j":
@@ -112,7 +112,7 @@ def datetime_to_value(date: dt.datetime | dt.date, name: str) -> int | str:
 
     if name in "xXFB":
         s = datetime_to_str(date, name)
-        # xX can be returned as int, as per their format in DEFAULT_GROUPS
+        # xX can be returned as int, as per their format in Group.DATE_GROUPS
         return int(s) if name in "xX" else s
 
     elements = [getattr(date, attr) for attr in datetime_attributes[name]]
@@ -138,7 +138,7 @@ def get_date(
 ) -> dt.datetime:
     """Retrieve date from matched elements.
 
-    Matches that can be used are : YBmdjHMSFxX. If a matcher is *not* found in the
+    Matches that can be used are in ``YBmdjHMSFxX``. If a matcher is *not* found in the
     filename, it will be replaced by the element of the default date argument. All
     values deduced from these matches will be compared. If different matchers give
     different values (for instance the group Y and F give a different year), an

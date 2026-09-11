@@ -14,10 +14,20 @@ if TYPE_CHECKING:
 
 
 FilterFunc = Callable[["Finder", FileMatch], bool]
+"""Type for basic filter function."""
 
 
 class Filter:
-    """Manage a filter."""
+    """Manage a filter.
+
+    Parameters
+    ----------
+    user_func:
+        Function given by user. Takes a :class:`.Finder`, a :class:`.FileMatch`, and
+        eventual keyword arguments, and return whether to keep the file or not.
+    kwargs:
+        Passed to the filter function.
+    """
 
     def __init__(self, func: Callable[..., bool], **kwargs: Any) -> None:
         self.user_func: Callable[..., bool] = func
@@ -55,6 +65,19 @@ class FilterByGroup(Filter):
 
     The list of indices of those groups must be supplied at initialization to avoid
     having to find them at each validation from a more generic key.
+
+    Parameters
+    ----------
+    user_func:
+        Function given by user. Takes a value retrieved from a group, and eventual
+        keyword arguments, and return whether to keep the file or not.
+    indices:
+        The indices of groups that should be used to retrieve the value.
+    pass_unparsed:
+        If True and a group has failed to parse its value do not raise and pass the
+        unparsed matched string. Default is False (raise on parsing failure).
+    kwargs:
+        Passed to the filter function.
     """
 
     partial_func: Callable[[Any], bool]
@@ -109,6 +132,18 @@ class FilterByDate(Filter):
     """Manage a filter for the date.
 
     The user function will receive a date recovered from the matches.
+
+    Parameters
+    ----------
+    user_func:
+        Function given by user. Takes a date retrieved from the filename, and eventual
+        keyword arguments, and return whether to keep the file or not.
+    date_name:
+        Name of the date pseudo-group that will be used to retrieve a value.
+    default_date:
+        Default date elements that will be used if missing from the filename.
+    kwargs:
+        Passed to the filter function.
     """
 
     partial_func: Callable[[Any], bool]
@@ -118,7 +153,7 @@ class FilterByDate(Filter):
         self,
         user_func: Callable[..., bool],
         date_name: str,
-        /,
+        *,
         default_date: DefaultDate = None,
         **kwargs: Any,
     ) -> None:
@@ -132,7 +167,7 @@ class FilterByDate(Filter):
         """Return filter function.
 
         Wrap so the partial function is applied on a date recovered on matches, with the
-        default elements from :attr:`default_date`.
+        default elements from :attr:`.default_date`.
         """
 
         def filt(finder: Finder, filematch: FileMatch) -> bool:  # noqa: ARG001

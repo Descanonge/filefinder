@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from .matches import GroupMatch
 
 DefaultDate = dt.datetime | Mapping[str, int] | None
+"""Type for default_date argument."""
 
 datetime_keys = "YBmdjHMSFxX"
 time_keys = "XHMS"

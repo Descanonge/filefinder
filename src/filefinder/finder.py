@@ -7,6 +7,7 @@ import os
 import re
 import warnings
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Any, overload
 
 from .filters import FilterByDate, FilterByGroup, FilterList
@@ -14,6 +15,10 @@ from .group import Group, GroupKey, get_date_names, get_groups_indices
 from .matches import DefaultDate, FileMatch, GroupMatch
 
 logger = logging.getLogger(__name__)
+
+
+def _to_path(path: str | Path) -> Path:
+    return path if isinstance(path, Path) else Path(path)
 
 
 def _log_list(
@@ -77,7 +82,7 @@ class Finder:
 
     def __init__(
         self,
-        root: str,
+        root: str | Path,
         pattern: str,
         *,
         use_regex: bool = False,
@@ -85,7 +90,7 @@ class Finder:
         follow_symlinks: bool = False,
         group_delimiters: tuple[str, str, str] | None = None,
     ) -> None:
-        self.root: str = root
+        self.root: Path = _to_path(root)
         """The root directory of the finder."""
         self.use_regex: bool = use_regex
         """If True, characters outside of groups are considered as valid regex
@@ -159,10 +164,7 @@ class Finder:
 
     def __str__(self) -> str:
         """Human readable information (short)."""
-        return (
-            f"{self.__class__.__qualname__}: "
-            f"{self.root.rstrip('/')}/ {self.get_regex()}"
-        )
+        return f"{self.__class__.__qualname__}: {self.root}/ {self.get_regex()}"
 
     def set_scan_everything(self, scan_everything: bool) -> None:  # noqa: FBT001
         """Set value for attribute :attr:`scan_everything`."""
@@ -210,7 +212,7 @@ class Finder:
         return get_date_names(self.groups)
 
     @overload
-    def get_files(self, *, relative: bool = ...) -> list[str]: ...
+    def get_files(self, *, relative: bool = ...) -> list[Path]: ...
 
     @overload
     def get_files(
@@ -222,7 +224,7 @@ class Finder:
         *,
         relative: bool = False,
         nested: Sequence[str | Sequence[str]] | None = None,
-    ) -> list[str]:
+    ) -> list[Path]:
         """Return files that match the regex.
 
         Lazily scan files: if files were already scanned, just return
@@ -244,7 +246,7 @@ class Finder:
             A group name in `nested` is not found in the pattern.
         """
 
-        def get_files(matches: Sequence[FileMatch]) -> list[str]:
+        def get_files(matches: Sequence[FileMatch]) -> list[Path]:
             return [m.get_filename(relative=relative) for m in matches]
 
         def get_key(filematch: FileMatch, level: Sequence[str]) -> str:
@@ -295,13 +297,13 @@ class Finder:
                 raise KeyError(f"{name} is not in Finder groups.")
         return nest(self._matches, nested, relative=relative)
 
-    def get_relative(self, filename: str) -> str:
+    def get_relative(self, filename: str | Path) -> Path:
         """Get filename path relative to root."""
-        return os.path.relpath(filename, self.root)
+        return _to_path(filename).relative_to(self.root)
 
-    def get_absolute(self, filename: str) -> str:
+    def get_absolute(self, filename: str | Path) -> Path:
         """Concatenate the finder root directory and a filename."""
-        return os.path.join(self.root, filename)
+        return self.root / _to_path(filename)
 
     def fix(
         self,
@@ -463,7 +465,7 @@ class Finder:
 
     def find_matches(
         self,
-        filename: str,
+        filename: str | Path,
         *,
         relative: bool = True,
         pattern: str | re.Pattern | None = None,
@@ -490,6 +492,8 @@ class Finder:
         matches
             A :class:`~.matches.Matches` object, or None if the filename did not match.
         """
+        if not isinstance(filename, Path):
+            filename = Path(filename)
         if not relative:
             filename = self.get_relative(filename)
 
@@ -498,7 +502,7 @@ class Finder:
 
         if isinstance(pattern, str):
             pattern = re.compile(pattern)
-        m = pattern.fullmatch(filename)
+        m = pattern.fullmatch(str(filename))
 
         if m is None:
             return None
@@ -520,7 +524,7 @@ class Finder:
         *,
         relative: bool = False,
         **kw_fixes: Any,
-    ) -> str:
+    ) -> Path:
         """Return a filename.
 
         Replace groups with provided values.
@@ -581,11 +585,9 @@ class Finder:
             else:
                 raise KeyError(f"Group '{self.groups[i]!s}' has no fixed value.")
 
-        filename = "".join(segments).replace("/", os.sep)
-
+        filename = Path("".join(segments).replace("/", os.sep))
         if not relative:
             filename = self.get_absolute(filename)
-
         return filename
 
     def get_pattern(self) -> str:
@@ -709,7 +711,7 @@ class Finder:
 
         self.scanned = True
 
-    def _add_file(self, filename: str, pattern: re.Pattern) -> None:
+    def _add_file(self, filename: Path, pattern: re.Pattern) -> None:
         """Add file to cache if it matches pattern and pass filters."""
         matches = self.find_matches(filename, relative=True, pattern=pattern)
         if matches is not None and self.filters.is_valid(self, matches):
@@ -727,12 +729,10 @@ class Finder:
         """
         pattern = re.compile(self.get_regex())
 
-        for dirpath, dirnames, filenames in os.walk(
-            self.root, followlinks=self.follow_symlinks, onerror=_handle_walk_error
+        for dirpath, dirnames, filenames in self.root.walk(
+            follow_symlinks=self.follow_symlinks, on_error=_handle_walk_error
         ):
-            depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
-                os.sep
-            ).count(os.sep)
+            depth = len(dirpath.relative_to(self.root).parts)
             logger.debug(
                 "Scanning in %s (depth %d/%d)", dirpath, depth, self.max_scan_depth
             )
@@ -742,8 +742,7 @@ class Finder:
             logger.debug("Found %d files", len(filenames))
             _log_list(logger, filenames, level=logging.DEBUG)
             for f in filenames:
-                to_root = self.get_relative(os.path.join(dirpath, f))
-                self._add_file(to_root, pattern)
+                self._add_file(self.get_relative(dirpath / f), pattern)
 
     def _find_files_subdirectories(self) -> None:
         """Find files checking sub-directories along the way.
@@ -756,12 +755,10 @@ class Finder:
         full_pattern = re.compile(self.get_regex())
         subpatterns = [re.compile(rgx) for rgx in self.get_regex_subdirs()]
         maxdepth = len(subpatterns) - 1
-        for dirpath, dirnames, filenames in os.walk(
-            self.root, followlinks=self.follow_symlinks, onerror=_handle_walk_error
+        for dirpath, dirnames, filenames in self.root.walk(
+            follow_symlinks=self.follow_symlinks, on_error=_handle_walk_error
         ):
-            depth = dirpath.rstrip(os.sep).count(os.sep) - self.root.rstrip(
-                os.sep
-            ).count(os.sep)
+            depth = len(dirpath.relative_to(self.root).parts)
             pattern = subpatterns[depth]
 
             logger.debug("Looking in %s (depth %d/%d)", dirpath, depth, maxdepth)
@@ -785,9 +782,7 @@ class Finder:
                 _log_list(logger, filenames, level=logging.DEBUG)
 
                 for f in filenames:
-                    to_root = self.get_relative(os.path.join(dirpath, f))
-                    # logger.debug("Matching %s to %s", to_root, full_pattern.pattern)
-                    self._add_file(to_root, full_pattern)
+                    self._add_file(self.get_relative(dirpath / f), full_pattern)
 
     def clear_cache(self) -> None:
         """Clear the cache."""

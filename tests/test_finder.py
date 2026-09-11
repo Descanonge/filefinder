@@ -523,9 +523,7 @@ class TestMatches:
     def test_date(self) -> None:
         """Test retrieving dates."""
         finder = Finder("", pattern_dates.pattern)
-        filematch = finder.find_matches(
-            os.path.join("2086", "20860302-061_20870403-093.txt")
-        )
+        filematch = finder.find_matches(Path("2086", "20860302-061_20870403-093.txt"))
         assert filematch is not None
 
         assert filematch["Y"] == 2086
@@ -554,7 +552,7 @@ class TestMakeFilename:
             "bool": True,
             "optional": 0.1,
         }
-        filename = os.path.join("base", "A_01_a+_b+_true._0.1.txt")
+        filename = Path("base", "A_01_a+_b+_true._0.1.txt")
 
         assert finder.make_filename(fixes) == filename
         assert finder.make_filename(**fixes) == filename
@@ -573,7 +571,7 @@ class TestMakeFilename:
             "bool": "d+",
             "optional": "e+",
         }
-        filename = os.path.join("base", "A_a+_b+_c+_d+e+.txt")
+        filename = Path("base", "A_a+_b+_c+_d+e+.txt")
 
         assert finder.make_filename(fixes) == filename
         assert finder.make_filename(**fixes) == filename
@@ -602,13 +600,13 @@ class TestMakeFilename:
             fmt_str="a+",
             bool=True,
         )
-        assert finder.make_filename(custom_rgx="b+", optional=0.5) == os.path.join(
+        assert finder.make_filename(custom_rgx="b+", optional=0.5) == Path(
             "base", "A_01_a+_b+_true._0.5.txt"
         )
 
-        assert finder.make_filename(
-            custom_rgx="b+", optional=0.5, fmt_int=5
-        ) == os.path.join("base", "A_05_a+_b+_true._0.5.txt")
+        assert finder.make_filename(custom_rgx="b+", optional=0.5, fmt_int=5) == Path(
+            "base", "A_05_a+_b+_true._0.5.txt"
+        )
 
     def test_optional(self) -> None:
         """Optional groups do not have to be fixed."""
@@ -621,7 +619,7 @@ class TestMakeFilename:
         )
         assert finder.make_filename(
             fmt_int=1, fmt_str="a", custom_rgx="b", bool=False
-        ) == os.path.join("base", "A_01_a_b_false..txt")
+        ) == Path("base", "A_01_a_b_false..txt")
 
     def test_multiple_fix(self) -> None:
         """The first value is used when fixed to multiple values."""
@@ -634,21 +632,21 @@ class TestMakeFilename:
         )
         assert finder.make_filename(
             custom_rgx=["b1", "b2"], optional=[0.5, 0.6, 0.7]
-        ) == os.path.join("base", "A_01_a1_b1_true._0.5.txt")
+        ) == Path("base", "A_01_a1_b1_true._0.5.txt")
 
         assert finder.make_filename(
             custom_rgx=["b1"], optional=[0.5, 0.6, 0.7], fmt_int=[2, 3]
-        ) == os.path.join("base", "A_02_a1_b1_true._0.5.txt")
+        ) == Path("base", "A_02_a1_b1_true._0.5.txt")
 
     def test_doubles(self) -> None:
         """Multiple groups with the same name are correctly handled."""
         finder = Finder("base", pattern_double.pattern)
-        assert finder.make_filename(fmt_int=1, other=True) == os.path.join(
+        assert finder.make_filename(fmt_int=1, other=True) == Path(
             "base", "A-01_B-01_C-a.txt"
         )
 
         finder.fix(fmt_int=1)
-        assert finder.make_filename({0: 2}, other=True) == os.path.join(
+        assert finder.make_filename({0: 2}, other=True) == Path(
             "base", "A-02_B-01_C-a.txt"
         )
 
@@ -657,10 +655,10 @@ class TestMakeFilename:
 
         assert finder.make_filename(
             date=dt.datetime(2086, 3, 2), date2=dt.datetime(2087, 4, 3)
-        ) == os.path.join("base", "2086", "20860302-061_20870403-093.txt")
+        ) == Path("base", "2086", "20860302-061_20870403-093.txt")
 
         finder.fix(date=dt.datetime(2086, 3, 2), date2=dt.datetime(2087, 4, 3))
-        assert finder.make_filename({"date2__d": 4}, d=3) == os.path.join(
+        assert finder.make_filename({"date2__d": 4}, d=3) == Path(
             "base", "2086", "20860303-061_20870404-093.txt"
         )
 
@@ -672,7 +670,7 @@ class TestFileScan:
             self.tmp_dir.create_file(f"invalid_files_{i}.ext", save=False)
         self.finder = self.tmp_dir.get_filefinder()
 
-    def assert_files(self, ref_files: Sequence[str]) -> None:
+    def assert_files(self, ref_files: Sequence[Path]) -> None:
         assert len(self.finder.matches) == len(ref_files)
         for f, f_ref in zip(
             self.finder.get_files(relative=True), ref_files, strict=False
@@ -686,8 +684,8 @@ class TestFileScan:
         finder = tmp_dir.get_filefinder()
 
         files = [
-            os.path.join("2086", "test_2086-02-03_0.0.txt"),
-            os.path.join("2086", "test_2086-02-03_0.0_01.txt"),
+            Path("2086", "test_2086-02-03_0.0.txt"),
+            Path("2086", "test_2086-02-03_0.0_01.txt"),
         ]
         assert tmp_dir.files == files
         assert finder.get_files(relative=True) == files
@@ -695,6 +693,13 @@ class TestFileScan:
     def test_simple(self, tmp_path: Path) -> None:
         self.setup(tmp_path)
         self.assert_files(self.tmp_dir.files)
+
+    def test_absolute(self, tmp_path: Path) -> None:
+        self.setup(tmp_path)
+        for f, f_ref in zip(
+            self.finder.get_files(relative=False), self.tmp_dir.files, strict=False
+        ):
+            assert f == self.tmp_dir.base_dir / f_ref
 
     def test_fix_parameter(self, tmp_path: Path) -> None:
         self.setup(tmp_path)
@@ -765,24 +770,21 @@ class TestFileScan:
         tmp_dir = TmpDirectory(tmp_path)
 
         files = [
-            "0.txt",
-            f"a{os.sep}1.txt",
-            f"b{os.sep}2.txt",
-            f"a{os.sep}c{os.sep}3.txt",
-            f"b{os.sep}d{os.sep}4.txt",
+            ("0.txt",),
+            ("a", "1.txt"),
+            ("a", "c", "3.txt"),
+            ("b", "2.txt"),
+            ("b", "d", "4.txt"),
         ]
-        files.sort()
-        for f in files:
-            tmp_dir.create_file(f)
+        for f_ref in files:
+            tmp_dir.create_file(Path(*f_ref))
 
-        finder = Finder(
-            str(tmp_dir.base_dir),
+        self.finder = Finder(
+            tmp_dir.base_dir,
             "%(folder:rgx=[a-z]/:opt)%(folder:rgx=[a-z]/:opt)%(param:fmt=d).txt",
             scan_everything=True,
         )
-        assert len(finder.get_files()) == len(files)
-        for f, f_ref in zip(finder.get_files(relative=True), files, strict=False):
-            assert f == f_ref
+        self.assert_files(tmp_dir.files)
 
     @pytest.mark.skipif(
         sys.platform == "win32",
@@ -795,7 +797,7 @@ class TestFileScan:
 
         (tmp_dir.base_dir / "inacessible").chmod(0)
 
-        finder = Finder(str(tmp_dir.base_dir), "inacessible/%(a:rgx=a).txt")
+        finder = Finder(tmp_dir.base_dir, "inacessible/%(a:rgx=a).txt")
         with pytest.warns(UserWarning):
             finder.find_files()
 
@@ -808,36 +810,36 @@ class TestFileScan:
             ("a1", "a10", "a10.file"),
             ("a1", "a11", "a11.file"),
         ]:
-            files.append(tmp_dir.create_file(os.path.join(*f)))
+            files.append(tmp_dir.create_file(Path(*f)))
 
         # Finder base dir will be "a1", will not find two first files
         files = files[2:]
 
-        os.symlink(tmp_dir.base_dir / "a1" / "a10", tmp_dir.base_dir / "a1" / "a12")
-        files.append(str(tmp_dir.base_dir / "a1" / "a12" / "a10.file"))
+        (tmp_dir.base_dir / "a1" / "a12").symlink_to(tmp_dir.base_dir / "a1" / "a10")
+        files.append(tmp_dir.base_dir / "a1" / "a12" / "a10.file")
 
         # follow_symlinks = False
         finder = Finder(
-            str(tmp_dir.base_dir / "a1"),
+            tmp_dir.base_dir / "a1",
             r"%(l1:rgx=a\d\d)/%(l2:rgx=a\d\d).file",
         )
         assert files[:2] == finder.get_files()
 
         finder = Finder(
-            str(tmp_dir.base_dir / "a1"),
+            tmp_dir.base_dir / "a1",
             r"%(l1:rgx=a\d\d)/%(l2:rgx=a\d\d).file",
             follow_symlinks=True,
         )
         assert sorted(files) == finder.get_files()
 
         # Add symlink going outside of base dir
-        os.symlink(tmp_dir.base_dir / "a0" / "a00", tmp_dir.base_dir / "a1" / "a03")
-        files.append(str(tmp_dir.base_dir / "a1" / "a03" / "a00.file"))
+        (tmp_dir.base_dir / "a1" / "a03").symlink_to(tmp_dir.base_dir / "a0" / "a00")
+        files.append(tmp_dir.base_dir / "a1" / "a03" / "a00.file")
 
         # Add a misdirect (the different depth should not allow matching)
-        os.symlink(tmp_dir.base_dir / "a0", tmp_dir.base_dir / "a1" / "a04")
+        (tmp_dir.base_dir / "a1" / "a04").symlink_to(tmp_dir.base_dir / "a0")
         finder = Finder(
-            str(tmp_dir.base_dir / "a1"),
+            tmp_dir.base_dir / "a1",
             r"%(l1:rgx=a\d\d)/%(l2:rgx=a\d\d).file",
             follow_symlinks=True,
         )

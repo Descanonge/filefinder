@@ -2,7 +2,6 @@
 
 import datetime
 import logging
-import os.path
 import re
 import warnings
 from collections.abc import Iterator, Sequence
@@ -131,8 +130,8 @@ class FileMatch:
 
     def __init__(
         self,
-        root: str,
-        filename: str,
+        root: Path,
+        filename: Path,
         matches: Sequence[GroupMatch],
         groups: Sequence[Group],
     ) -> None:
@@ -141,8 +140,10 @@ class FileMatch:
                 f"Not as many group matches ({len(matches)}) as groups ({len(groups)})"
             )
 
-        self.root: str = root
-        self.filename: str = filename
+        self.root: Path = root
+        """Root directory containing files."""
+        self.filename: Path = filename
+        """Corresponding filename, relative to root directory."""
         self.matches: list[GroupMatch] = list(matches)
         """Matches for every group."""
         self.groups: list[Group] = list(groups)
@@ -155,7 +156,7 @@ class FileMatch:
     def __str__(self) -> str:
         """Human readable information."""
         return "\n".join(
-            [f"from filename: {self.filename}"] + [str(m) for m in self.matches]
+            [f"from filename: {self.filename!s}"] + [str(m) for m in self.matches]
         )
 
     def __getitem__(self, key: GroupKey) -> Any:
@@ -170,7 +171,7 @@ class FileMatch:
         """Return number of matches."""
         return len(self.matches)
 
-    def get_filename(self, *, relative: bool = True) -> str:
+    def get_filename(self, *, relative: bool = True) -> Path:
         """Get filename corresponding to matches.
 
         :param relative: If True (default), return relative to the finder root
@@ -178,7 +179,7 @@ class FileMatch:
         """
         if relative:
             return self.filename
-        return os.path.join(self.root, self.filename)
+        return self.root / self.filename
 
     def get_values(
         self,

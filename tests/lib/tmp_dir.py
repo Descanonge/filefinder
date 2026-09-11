@@ -21,28 +21,28 @@ class TmpDirectory:
     """Temporary directory that can easily create files."""
 
     def __init__(self, tmp_path: Path, **kwargs: Any) -> None:  # noqa: ARG002
-        self.files: list[str] = []
+        self.files: list[Path] = []
         self.parent_dir = tmp_path
         self._base_dir = TemporaryDirectory(dir=self.parent_dir)
         self.base_dir = Path(self._base_dir.name)
 
-    def create_file(self, filename: str | Path, *, save: bool = True) -> str:
+    def create_file(self, filename: str | Path, *, save: bool = True) -> Path:
         new_file = self.base_dir / filename
         parent = new_file.parent
         if not parent.exists():
             parent.mkdir(parents=True, exist_ok=True)
         new_file.touch()
         if save:
-            self.files.append(str(new_file.relative_to(self.base_dir)))
-        return str(new_file)
+            self.files.append(new_file.relative_to(self.base_dir))
+        return new_file
 
-    def create_dir(self, dirname: str | Path) -> str:
+    def create_dir(self, dirname: str | Path) -> Path:
         new_dir = self.base_dir / dirname
         new_dir.mkdir()
-        return str(new_dir)
+        return new_dir
 
-    def get_absolute(self, path: str) -> str:
-        return str(self.base_dir / path)
+    def get_absolute(self, path: str | Path) -> Path:
+        return self.base_dir / path
 
 
 class TmpDirectoryExample(TmpDirectory):
@@ -81,21 +81,21 @@ class TmpDirectoryExample(TmpDirectory):
             self.create_files()
 
     @staticmethod
-    def make_filename(date: dt.datetime, param: float, option: int | None) -> str:
+    def make_filename(date: dt.datetime, param: float, option: int | None) -> Path:
         option_s = "" if option is None else f"_{option:02d}"
         filename = (
             f"{date.year}{os.sep}test"
             f"_{date.strftime('%Y-%m-%d')}"
             f"_{param:.1f}{option_s}.txt"
         )
-        return filename
+        return Path(filename)
 
     def make_filenames(
         self,
         dates: Sequence[dt.datetime] | None = None,
         params: Sequence[float] | None = None,
         options: Sequence[int | None] | None = None,
-    ) -> list[str]:
+    ) -> list[Path]:
         if dates is None:
             dates = self.dates
         if params is None:
@@ -111,7 +111,7 @@ class TmpDirectoryExample(TmpDirectory):
 
     def get_filefinder(self) -> Finder:
         finder = Finder(
-            str(self.base_dir),
+            self.base_dir,
             "%(Y)/test_%(Y)-%(m)-%(d)_%(param:fmt=.1f)%(option:fmt=02d:pre=_:opt).txt",
         )
         return finder

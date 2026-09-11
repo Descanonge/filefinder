@@ -230,6 +230,17 @@ class Finder:
             self.find_files()
         return self._matches
 
+    @property
+    def files(self) -> list[Path]:
+        """List of filenames.
+
+        Lazily scan files: if files were already scanned, just return
+        the stored list of filenames.
+        """
+        if not self.scanned:
+            self.find_files()
+        return self.get_files()
+
     def __repr__(self) -> str:
         """Human readable information (long)."""
         s = [

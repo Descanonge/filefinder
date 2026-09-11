@@ -142,8 +142,8 @@ class FileMatch:
 
         self.root: Path = root
         """Root directory containing files."""
-        self.filename: Path = filename
-        """Corresponding filename, relative to root directory."""
+        self.filename: Path = root / filename
+        """Corresponding filename, absolute path."""
         self.matches: list[GroupMatch] = list(matches)
         """Matches for every group."""
         self.groups: list[Group] = list(groups)
@@ -174,15 +174,15 @@ class FileMatch:
         """Return number of matches."""
         return len(self.matches)
 
-    def get_filename(self, *, relative: bool = True) -> Path:
+    def get_filename(self, *, relative: bool = False) -> Path:
         """Get filename corresponding to matches.
 
         :param relative: If True (default), return relative to the finder root
             directory. If not, return as absolute path.
         """
         if relative:
-            return self.filename
-        return self.root / self.filename
+            return self.filename.relative_to(self.root)
+        return self.filename
 
     def get_values(
         self,

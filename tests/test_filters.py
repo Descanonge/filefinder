@@ -1,6 +1,7 @@
 """Test filtering."""
 
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Any
 
 from filefinder.filters import Filter, FilterByDate, FilterByGroup, FilterList
@@ -134,30 +135,30 @@ class TestFilterExecute:
             GroupMatch(group, str(value), -1, -1)
             for group, value in zip(groups, values, strict=True)
         ]
-        return FileMatch("", filename, matches, groups)
+        return FileMatch(Path(), Path(filename), matches, groups)
 
     def get_int_groups(self, length: int) -> list[Group]:
         return [Group(f"{chr(97 + i)}:fmt=d", i) for i in range(length)]
 
     def test_simple(self) -> None:
         def func(finder: Finder, filematch: FileMatch) -> bool:  # noqa: ARG001
-            return filematch.filename.isupper()
+            return str(filematch.filename).isupper()
 
         filt = Filter(func)
-        assert is_valid(filt, FileMatch("", "ABC", [], []))
-        assert not is_valid(filt, FileMatch("", "abc", [], []))
+        assert is_valid(filt, FileMatch(Path(), Path("ABC"), [], []))
+        assert not is_valid(filt, FileMatch(Path(), Path("abc"), [], []))
 
     def test_kwargs(self) -> None:
         def func(finder: Finder, filematch: FileMatch, legal: list[str]) -> bool:  # noqa: ARG001
-            return filematch.filename in legal
+            return str(filematch.filename) in legal
 
         filt = Filter(func, legal=["a", "b"])
-        assert is_valid(filt, FileMatch("", "a", [], []))
-        assert not is_valid(filt, FileMatch("", "c", [], []))
+        assert is_valid(filt, FileMatch(Path(), Path("a"), [], []))
+        assert not is_valid(filt, FileMatch(Path(), Path("c"), [], []))
 
         filt = Filter(func, legal=["b", "c"])
-        assert not is_valid(filt, FileMatch("", "a", [], []))
-        assert is_valid(filt, FileMatch("", "c", [], []))
+        assert not is_valid(filt, FileMatch(Path(), Path("a"), [], []))
+        assert is_valid(filt, FileMatch(Path(), Path("c"), [], []))
 
     def test_by_group(self) -> None:
         groups = self.get_int_groups(3)

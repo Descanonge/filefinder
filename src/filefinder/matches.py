@@ -156,7 +156,10 @@ class FileMatch:
     def __str__(self) -> str:
         """Human readable information."""
         return "\n".join(
-            [f"from filename: {self.filename!s}"] + [str(m) for m in self.matches]
+            [
+                f"from filename: {self.filename!s}",
+                f"{{{', '.join([str(m) for m in self.matches])}}}",
+            ]
         )
 
     def __getitem__(self, key: GroupKey) -> Any:

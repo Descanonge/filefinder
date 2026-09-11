@@ -185,28 +185,28 @@ class TestClearCache:
         with pytest.raises(AssertionError), self.assert_cleared(finder):
             pass
 
-    def test_set_attributes(self) -> None:
+    def test_set_properties(self) -> None:
         finder = self.get_finder()
 
         with self.assert_cleared(finder, clear=False):
-            finder.set_scan_everything(False)
+            finder.scan_everything = False
         with self.assert_cleared(finder, clear=False):
-            finder.set_use_regex(False)
+            finder.use_regex = False
         with self.assert_cleared(finder, clear=False):
-            finder.set_follow_symlinks(False)
+            finder.follow_symlinks = False
+        with self.assert_cleared(finder, clear=False):
+            finder.group_delimiters = ("%", "(", ")")
 
         with self.assert_cleared(finder):
-            finder.set_scan_everything(True)
+            finder.pattern = finder.pattern
         with self.assert_cleared(finder):
-            finder.set_use_regex(True)
+            finder.scan_everything = True
         with self.assert_cleared(finder):
-            finder.set_follow_symlinks(True)
-
-    def test_set_pattern(self) -> None:
-        finder = self.get_finder()
-
+            finder.use_regex = True
         with self.assert_cleared(finder):
-            finder.set_pattern("")
+            finder.follow_symlinks = True
+        with self.assert_cleared(finder):
+            finder.group_delimiters = ("", "{{", "}}")
 
     def test_fix(self) -> None:
         finder = self.get_finder()

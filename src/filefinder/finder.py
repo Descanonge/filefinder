@@ -8,7 +8,7 @@ import re
 import warnings
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any, overload
+from typing import Any, cast, overload
 
 from .filters import FilterByDate, FilterByGroup, FilterList
 from .group import Group, GroupKey, get_date_names, get_groups_indices
@@ -64,22 +64,19 @@ class Finder:
     scan_everything:
         If true, look into all sub-directories up to a depth of :attr:`max_scan_depth` .
         This is appropriate if the pattern contains optional sub-directories. If false
-        (default), check that every sub-directory matches its part of the regular
-        expression, thus avoiding some work.
+        (default), only explore every sub-directory that match the corresponding part of
+        the regular expression.
     follow_symlinks:
         If true, follow symbolic links pointing to directories when scanning for files.
         This may lead to infinite recursion.
     group_delimiters:
         Tuple of (prefix, start characters, end characters) that defines how groups are
         delimited in the pattern. Start and end character must be balanced within the
-        group. Prefix can be empty. If None, the default `%()` is used.
+        group. Prefix can be empty. If None, the default ``%()`` is used.
     """
 
-    max_scan_depth: int = 32
+    MAX_SCAN_DEPTH: int = 32
     """Maximum sub-directory depth to scan when :attr:`scan_everything` is True."""
-
-    _group_delimiters: tuple[str, str, str] = ("%", "(", ")")
-    """Delimiter characters of groups in the pattern."""
 
     def __init__(
         self,
@@ -94,38 +91,128 @@ class Finder:
         if root is None:
             root = Path.cwd()
         self.root: Path = _to_path(root)
-        """The root directory of the finder."""
-        self.use_regex: bool = use_regex
-        """If True, characters outside of groups are considered as valid regex
-        (and not escaped). Default is False."""
-        self.scan_everything: bool = scan_everything
-        """Whether to scan all subdirectories."""
-        self.follow_symlinks: bool = follow_symlinks
-        """Whether to follow symbolic links to directories when scanning files."""
+        """The root directory containing files."""
 
-        if group_delimiters is not None:
-            self._group_delimiters = group_delimiters
-
-        self._pattern: str
+        self._use_regex: bool = use_regex
+        self._scan_everything: bool = scan_everything
+        self._follow_symlinks: bool = follow_symlinks
+        if group_delimiters is None:
+            group_delimiters = ("%", "(", ")")
+        self._group_delimiters: tuple[str, str, str] = group_delimiters
 
         self.groups: list[Group] = []
-        self._segments: list[str] = []
+        """Group objects, in the order they appear in the pattern."""
+        self.segments: list[str] = []
         """Segments of the pattern. Used to replace specific groups.
         `['text before group 1', 'group 1',
         'text before group 2, 'group 2', ..., 'last group', 'text after last group']`
         """
+
         self._matches: list[FileMatch] = []
         self.scanned: bool = False
-        """True if files have been scanned with current parameters.
-
-        Is reset to False if the cache (of scanned files) is cleared, for instance by
-        operations like changing fixed values of groups.
-        """
+        """True if files have been scanned with current parameters."""
 
         self.filters: FilterList = FilterList()
         """List of filters to apply to found files."""
 
-        self.set_pattern(pattern)
+        self._pattern: str = ""
+        self.pattern = pattern
+
+    @property
+    def pattern(self) -> str:
+        """Filename pattern.
+
+        Property can be set. It will clear the cache and parse for groups.
+        """
+        return self._pattern
+
+    @pattern.setter
+    def pattern(self, pattern: str) -> None:
+        self.clear_cache()
+        self._pattern = pattern
+
+        found_groups = self._find_groups(pattern)
+
+        self.groups = []
+        splits = [0]  # separation between groups
+        for idx, (specs, start, end) in enumerate(found_groups):
+            self.groups.append(Group(specs, idx))
+            splits += [start, end]
+
+        self._segments = [
+            pattern[i:j] for i, j in zip(splits, [*splits[1:], None], strict=False)
+        ]
+
+    @property
+    def use_regex(self) -> bool:
+        """If True, characters outside of groups are considered as valid regex.
+
+        Property can be set, if the given value is different from the current one, the
+        cache will be cleared.
+        """
+        return self._use_regex
+
+    @use_regex.setter
+    def use_regex(self, use_regex: bool) -> None:
+        if use_regex != self._use_regex:
+            self._use_regex = use_regex
+            self.clear_cache()
+
+    @property
+    def scan_everything(self) -> bool:
+        """Whether to scan all subdirectories.
+
+        Property can be set, if the given value is different from the current one, the
+        cache will be cleared.
+        """
+        return self._scan_everything
+
+    @scan_everything.setter
+    def scan_everything(self, scan_everything: bool) -> None:
+        if scan_everything != self._scan_everything:
+            self._scan_everything = scan_everything
+            self.clear_cache()
+
+    @property
+    def follow_symlinks(self) -> bool:
+        """Whether to follow symbolic links to directories when scanning files.
+
+        Property can be set, if the given value is different from the current one, the
+        cache will be cleared.
+        """
+        return self._follow_symlinks
+
+    @follow_symlinks.setter
+    def follow_symlinks(self, follow_symlinks: bool) -> None:
+        if follow_symlinks != self._follow_symlinks:
+            self._follow_symlinks = follow_symlinks
+            self.clear_cache()
+
+    @property
+    def group_delimiters(self) -> tuple[str, str, str]:
+        """Tuple of (prefix, start characters, end characters).
+
+        Defines how groups are delimited in the pattern. Start and end character must be
+        balanced within the group. Prefix can be empty. If None, the default `%()` is
+        used.
+
+        Property can be set, if the given value is different from the current one, the
+        cache will be cleared.
+        """
+        return self._group_delimiters
+
+    @group_delimiters.setter
+    def group_delimiters(self, group_delimiters: tuple[str, str, str]) -> None:
+        if len(group_delimiters) != 3:
+            raise IndexError(
+                "Group delimiters must be a tuple of (prefix, start characters, "
+                f"end characters), received '{group_delimiters}'."
+            )
+        group_delimiters = cast(tuple[str, str, str], tuple(group_delimiters))
+        if self._group_delimiters != group_delimiters:
+            self._group_delimiters = group_delimiters
+            # re-parse groups
+            self.pattern = self._pattern
 
     @property
     def n_groups(self) -> int:
@@ -168,24 +255,6 @@ class Finder:
     def __str__(self) -> str:
         """Human readable information (short)."""
         return f"{self.__class__.__qualname__}: {self.root}/ {self.get_regex()}"
-
-    def set_scan_everything(self, scan_everything: bool) -> None:  # noqa: FBT001
-        """Set value for attribute :attr:`scan_everything`."""
-        if scan_everything != self.scan_everything:
-            self.scan_everything = scan_everything
-            self.clear_cache()
-
-    def set_use_regex(self, use_regex: bool) -> None:  # noqa: FBT001
-        """Set value for attribute :attr:`use_regex`."""
-        if use_regex != self.use_regex:
-            self.use_regex = use_regex
-            self.clear_cache()
-
-    def set_follow_symlinks(self, follow_symlinks: bool) -> None:  # noqa: FBT001
-        """Set value for attribute :attr:`follow_symlinks`."""
-        if follow_symlinks != self.follow_symlinks:
-            self.follow_symlinks = follow_symlinks
-            self.clear_cache()
 
     def get_group_names(self, *, fixed: bool | None = None) -> set[str]:
         """Get the names of groups in the pattern.
@@ -249,7 +318,7 @@ class Finder:
             A group name in `nested` is not found in the pattern.
         """
 
-        def get_files(matches: Sequence[FileMatch]) -> list[Path]:
+        def extract_files(matches: Sequence[FileMatch]) -> list[Path]:
             return [m.get_filename(relative=relative) for m in matches]
 
         def get_key(filematch: FileMatch, level: Sequence[str]) -> str:
@@ -269,7 +338,7 @@ class Finder:
             relative: bool,
         ) -> list:
             if len(levels) == 0:
-                return get_files(matches)
+                return extract_files(matches)
 
             level = levels[0]
             files_grouped: list[list[FileMatch]] = []
@@ -291,7 +360,7 @@ class Finder:
             self.find_files()
 
         if nested is None:
-            return get_files(self._matches)
+            return extract_files(self._matches)
 
         names = {g.name for g in self.groups}
         nested = [[name] if isinstance(name, str) else name for name in nested]
@@ -593,27 +662,6 @@ class Finder:
             filename = self.get_absolute(filename)
         return filename
 
-    def get_pattern(self) -> str:
-        """Get filename pattern."""
-        return self._pattern
-
-    def set_pattern(self, pattern: str) -> None:
-        """Set pattern and parse for group objects."""
-        self.clear_cache()
-        self._pattern = pattern
-
-        found_groups = self._find_groups(pattern)
-
-        self.groups = []
-        splits = [0]  # separation between groups
-        for idx, (specs, start, end) in enumerate(found_groups):
-            self.groups.append(Group(specs, idx))
-            splits += [start, end]
-
-        self._segments = [
-            pattern[i:j] for i, j in zip(splits, [*splits[1:], None], strict=False)
-        ]
-
     def _find_groups(self, pattern: str) -> list[tuple[str, int, int]]:
         """Find the groups within the pattern and their corresponding string indices.
 
@@ -625,7 +673,7 @@ class Finder:
         :attr:`_group_delimiters`. A match of the start of a group that does not have a
         matching end will raise.
         """
-        grp_prefix, grp_start, grp_end = self._group_delimiters
+        grp_prefix, grp_start, grp_end = self.group_delimiters
         pattern_starts = re.escape(f"{grp_prefix}{grp_start}")
         find_next = re.compile(f"({re.escape(grp_start)}|{re.escape(grp_end)})")
 
@@ -737,9 +785,9 @@ class Finder:
         ):
             depth = len(dirpath.relative_to(self.root).parts)
             logger.debug(
-                "Scanning in %s (depth %d/%d)", dirpath, depth, self.max_scan_depth
+                "Scanning in %s (depth %d/%d)", dirpath, depth, self.MAX_SCAN_DEPTH
             )
-            if depth > self.max_scan_depth:
+            if depth > self.MAX_SCAN_DEPTH:
                 dirnames.clear()
 
             logger.debug("Found %d files", len(filenames))

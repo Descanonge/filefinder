@@ -129,7 +129,13 @@ class Finder:
 
     @pattern.setter
     def pattern(self, pattern: str) -> None:
+        if pattern != self._pattern:
+            self.set_pattern(pattern)
+
+    def set_pattern(self, pattern: str) -> None:
+        """Set pattern, re-create group objects, remove all filters."""
         self.clear_cache()
+        self.clear_filters()
         self._pattern = pattern
 
         found_groups = self._find_groups(pattern)

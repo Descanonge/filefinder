@@ -174,8 +174,8 @@ class TestClearCache:
     def get_finder(self) -> Finder:
         return Finder(pattern.pattern)
 
-    def assert_cleared(self, finder: Finder, *, clear: bool = True) -> AssertClear:
-        return AssertClear(finder, clear)
+    def assert_cleared(self, finder: Finder, **kwargs: bool) -> AssertClear:
+        return AssertClear(finder, **kwargs)
 
     def test_nothing(self) -> None:
         finder = self.get_finder()
@@ -188,25 +188,53 @@ class TestClearCache:
     def test_set_properties(self) -> None:
         finder = self.get_finder()
 
+        # No changes
         with self.assert_cleared(finder, clear=False):
             finder.scan_everything = False
         with self.assert_cleared(finder, clear=False):
             finder.use_regex = False
         with self.assert_cleared(finder, clear=False):
             finder.follow_symlinks = False
-        with self.assert_cleared(finder, clear=False):
-            finder.group_delimiters = ("%", "(", ")")
 
-        with self.assert_cleared(finder):
-            finder.pattern = finder.pattern
+        # Changes
         with self.assert_cleared(finder):
             finder.scan_everything = True
         with self.assert_cleared(finder):
             finder.use_regex = True
         with self.assert_cleared(finder):
             finder.follow_symlinks = True
+
+    def test_set_group_delim_properties(self) -> None:
+        finder = self.get_finder()
+        finder.fix(fmt_int=1)
+        finder.add_group_filter("fmt_int", bool)
+
+        # No changes
+        with self.assert_cleared(finder, clear=False):
+            finder.group_delimiters = ("%", "(", ")")
+        assert finder.groups[0].fixed
+
+        # Changes
         with self.assert_cleared(finder):
             finder.group_delimiters = ("", "{{", "}}")
+        assert len(finder.groups) == 0
+        assert len(finder.filters) == 0
+
+    def test_set_pattern_properties(self) -> None:
+        finder = self.get_finder()
+        finder.fix(fmt_int=1)
+        finder.add_group_filter("fmt_int", bool)
+
+        # No changes
+        with self.assert_cleared(finder, clear=False):
+            finder.pattern = finder.pattern
+        assert finder.groups[0].fixed
+
+        # Changes
+        with self.assert_cleared(finder):
+            finder.pattern = pattern_double.pattern
+        assert not finder.groups[0].fixed
+        assert len(finder.filters) == 0
 
     def test_fix(self) -> None:
         finder = self.get_finder()

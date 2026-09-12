@@ -9,26 +9,47 @@ Usage
 Create the Finder object
 ========================
 
-The main entry point of this package is the :class:`.Finder` class. Its main
-arguments are the root directory containing the files, and a pattern specifying
-the filename structure. For instance for files contained in the ``/data``
-directory that follow the structure
-``param_[parameter]/[year]/variable_[year]-[month]-[day].nc``, with the
-parameter being a float with a precision of one decimal::
-
-    finder = Finder(
-        "/data",
-        "param_%(param:fmt=.1f)/%(Y)/variable_%(Y)-%(m)-%(d).nc"
-    )
-
+The main entry point of this package is the :class:`.Finder` class.
+It takes in a pattern specifying the filename structure to scan for.
 The parts that vary from file to file are indicated in the pattern by
 parentheses, preceded by a percent sign. Within the parentheses are
 specifications for a :class:`~.Group`, that will handle creating
 the regular expression to find files and formatting values appropriately.
 
+For instance, to find files contained in the ``/data`` directory and that follow
+the structure ``param_[parameter]/[year]/variable_[year]-[month]-[day].nc``::
+
+    finder = Finder(
+        "param_%(param:fmt=.1f)/%(Y)/variable_%(Y)-%(m)-%(d).nc",
+        root="/data"
+    )
+
 .. important::
 
     Details on how to write the pattern are available at: :doc:`pattern`.
+
+Behind the scenes, the Finder object will transform the pattern into a regular
+expression for filenames to match against.
+
+.. _cache:
+
+Cache
++++++
+
+Whenever the :class:`.Finder` scans for files, it will cache the results (see
+:ref:`retrieve-files` for how to scan files and access the results).
+Changing some parameters may clear the cache:
+
+* changing the value of properties :attr:`~.Finder.scan_everything`,
+  :attr:`~.Finder.use_regex`, :attr:`~.Finder.follow_symlinks` will clear the
+  cache
+* changing the value of :attr:`~.Finder.pattern` or
+  :attr:`~.Finder.group_delimiters` will clear the cache, re-create group
+  objects, and remove all filters.
+* removing filters (via :meth:`~.Finder.clear_filters` or
+  :meth:`~.Finder.remove_group_filters`) will clear the cache. Note that adding
+  a filter will only remove files from the cache that do not pass that new
+  filter.
 
 .. _dates:
 
@@ -39,19 +60,17 @@ When working with dates, it is necessary to deal with multiple individual
 elements: year, month, day, etc. The package tries to make this easier by
 allowing to refer to multiple elements as a single pseudo-group.
 
-Group names that have the form ``<date name>:<date element>`` will be considered
-date elements (if omitted date name defaults to 'date', see :ref:`name` for
-details). All groups with the same date name can be managed as a single
-pseudo-group.
-
-There are more details for each operation below.
+Group names that have the form ``<date name>__<date element>`` (with a double
+underscore) will be considered date elements (if omitted, date name defaults to
+'date', see :ref:`name` for details). All groups with the same date name can be
+managed as a single pseudo-group.
 
 Some methods (:meth:`.FileMatch.get_value` and :meth:`.Finder.add_group_filter`)
 accept a ``default_date`` argument that specifies the default elements to use
 when constructing datetime objects. For instance, if the filename does not
 specify the year, we can use 2000 as a default::
 
-    finder = Finder("", "%(m)-%(d).txt")
+    finder = Finder("%(m)-%(d).txt")
     filematch.get_value("date", default_date={"year": 2000})
 
 The default date can be a datetime object, or a mapping containing any elements
@@ -62,7 +81,7 @@ Restrict values
 ===============
 
 The filenames to keep when scanning can be restricted using two main ways:
-directly fixing groups to specific values, or/and run arbitrary filters on those
+fixing groups to specific values, and/or run arbitrary filters on those
 filenames.
 
 .. _fixing:
@@ -79,10 +98,10 @@ scanning.
    When :ref:`creating filenames<create-filenames>`, if a group already
    has a fixed value it will be used by default.
 
-Fixing groups can be done with either the :meth:`.Finder.fix` method.
-Groups can be selected either by their index in the filename pattern (starting
-from 0), or by their name. If using a name, groups with the same name can be
-fixed to the same value all at once.
+Fixing groups is done with the :meth:`.Finder.fix` method. Groups can be
+selected either by their index in the filename pattern (starting from 0), or by
+their name. If using a name, groups with the same name can be fixed to the same
+value all at once.
 
 The given value can be:
 
@@ -92,8 +111,10 @@ The given value can be:
 * a **boolean**: if the group has two options (specified with the
   :ref:`bool<bool>` keyword), one of the options is selected and used as a
   string.
-* a :mod:`datetime` object when fixing a date pseudo-group. Groups will
-  be fixed to the corresponding element.
+* a :mod:`datetime` object when fixing a date pseudo-group. Each group will
+  be fixed to the appropriate date element (year, month, ...).
+* **None** if the group is marked as :ref:`optional<opt>`: it will then not
+  appear in the filename.
 * a **string**: the value is directly interpreted as a regular expression and
   used as-is when scanning files or creating filenames, without further escaping
   or formatting.
@@ -102,14 +123,14 @@ The given value can be:
   with *OR* (``(value1|value2|...)``), and when creating files only the
   **first** element of the list is used.
 
-So for example::
+So with the same example as previously::
 
+  >>> finder.fix(param=3.0)
+  will be formatted as "3\.0"
   >>> finder.fix(param="[a-z]+")
   will be kept as is
-  >>> finder.fix(param=3.)
-  will be formatted as "3\.0"
 
-For further examples, we could keep only the files corresponding to january::
+We could keep only the files corresponding to january::
 
   finder.fix(m=1)
 
@@ -120,15 +141,15 @@ We could also select specific days using a list::
 When fixing a date pseudo-group to a :mod:`datetime` object, all individual
 groups will be fixed with the corresponding element::
 
-    finder = Finder("", "%(start:Y)-%(start:m)-%(start:d).txt")
+    finder = Finder("%(start:Y)-%(start:m)-%(start:d).txt")
     finder.fix(start=datetime(2000, 1, 1))
     # is equivalent to
-    finder.fix({"start:Y": 2000, "start:m": 1, "start:d": 1})
+    finder.fix(start__Y=2000, start__m=1, start__d=1)
 
-    finder = Finder("", "%(Y)-%(m)-%(d).txt")
+    finder = Finder("%(Y)-%(m)-%(d).txt")
     finder.fix(date=datetime(2000, 1, 1))
     # is equivalent to
-    finder.fix({"Y": 2000, "m": 1, "d": 1})
+    finder.fix(Y=2000, m=1, d=1)
 
 .. important::
 
@@ -154,11 +175,10 @@ Filtering
 +++++++++
 
 Using regular expressions makes for a very efficient way to find files that
-follow a specific pattern. However, they cannot deal with advanced logic with
-which one might want to select the files. Thus, **after** being "validated" by
-the pattern (and its eventual fixed groups) a file can be subjected to any
-number of filters. They are two kinds of filters available: **basic** filters
-and **group** filters.
+follow a specific pattern. However, they cannot deal with advanced logic. Thus,
+**after** being "validated" by the regular expression, a file can be subjected
+to any number of filters. They are two kinds of filters available: **basic**
+filters and **group** filters.
 
 A basic filter is a function has the following signature:
 
@@ -166,7 +186,8 @@ A basic filter is a function has the following signature:
     :no-index:
 
     :param Finder finder: The finder object.
-    :param FileMatch filematch: The matches associated to this filename.
+    :param FileMatch filematch: The matches associated to this filename. See
+        :ref:`retrieve-information` for details.
     :param ~typing.Any kwargs: Additional keywords passed to the filter.
 
     :returns: True if the file is to be kept, False otherwise.
@@ -180,7 +201,7 @@ filters won't run).
 .. important::
 
    Adding a new filter will filter the files already scanned, and removing
-   filters will clear the cache.
+   filters will clear the :ref:`cache`.
 
 .. note::
 
@@ -190,8 +211,8 @@ filters won't run).
      finder.add_filter(some_filter, value=1.)
      finder.add_filter(some_filter, value=3.5)
 
-Very often, it can suffice to have a filter operate on the value from a single
-group. To that end, one can create a **group** filter by using
+Very often, it is enough to have a filter operate on just the value from a
+single group. To that end, one can create a **group** filter by using
 :meth:`.Finder.add_group_filter`. This requires a function which acts on a
 single value.
 
@@ -201,7 +222,7 @@ For instance, let's say we only need days that are even::
 
 or where some parameters starts with a specific value::
 
-    finder.add_group_filter("param", lambda s: s.startswith("a_"))
+    finder.add_group_filter("string_param", lambda s: s.startswith("a_"))
 
 When adding a filter for a date pseudo-group, the filter function will receive a
 datetime object constructed from the relevant matches in the filename::
@@ -230,27 +251,22 @@ Find files
 Retrieve files
 ++++++++++++++
 
-Files can be retrieved with the :meth:`.Finder.get_files` method, or from the
-:attr:`.Finder.matches` attribute. Both will automatically scan the directory
-for matching files and cache the results for future access. The files are stored
-in alphabetical order.
+Found files can be accessed with:
 
-.. note::
+* :attr:`.Finder.files`: a list of absolute filenames as :mod:`pathlib` Paths
+  objects.
+* :attr:`.Finder.matches`: a list of :class:`.FileMatch` objects each containing
+  a filename and group values parsed from it.
+* :attr:`.Finder.get_files()` which provides some additional options.
 
-    The cache is appropriately cleared when using some methods, like when fixing
-    groups. For that reason, avoid setting attributes directly on a Finder
-    instance and use set methods instead.
+All three will automatically scan the disk for files and cache the results for
+later access. Files can be scanned manually with :meth:`.Finder.find_files`. The
+files are stored in alphabetical order.
 
-The method :meth:`~.Finder.get_files` simply returns a sorted list of the
-filenames found when scanning. By default the full path is returned, ie the
-concatenation of the root directory and the pattern part. It can also return the
-filename relative to the root directory (ie only the pattern part) by passing
-*relative=True*.
-
-Instead of a flat list of filenames, :meth:`~.Finder.get_files` can also arrange
-them in nested lists. To that end, one must provide the ``nested`` argument with
-a list that specifies the order in which groups must be nested. Each element of
-the list gives:
+:meth:`~.Finder.get_files` can return paths relative to the root directory by
+passing *relative=True*. It can also return filenames in nested lists. To that
+end, one must provide the ``nested`` argument with a list that specifies the
+order in which groups must be nested. Each element of the list gives:
 
 * a group, by index or name, so that files be grouped together based on the
   value of that group
@@ -335,14 +351,16 @@ Retrieve information
 ++++++++++++++++++++
 
 As some metadata might only be found in the filenames, FileFinder offer the
-possibility to retrieve it easily. One can find the matching strings and values
-of all groups for any filename by calling :meth:`.Finder.find_matches`. It will
-return a :class:`.FileMatch` object containing all the information.
-The files scanned are available in the :attr:`.Finder.matches` attribute as a
-list of :class:`.FileMatch` objects.
+possibility to retrieve it easily. Information about a scanned file is stored in
+a :class:`.FileMatch` object. It contains the filename, root directory, and
+match for each group of the pattern.
 
-For most cases, the simplest is to access the FileMatch object with a group
-index or name::
+The property :attr:`.Finder.matches` contains a list of FileMatch objects
+corresponding to the scanned files. One can also get a FileMatch for any
+filename by calling :meth:`.Finder.find_matches`.
+
+Accessing the FileMatch with a group index or name will return a **parsed**
+value::
 
   >>> filematch = finder.matches[0]
   >>> filematch["param"]
@@ -358,30 +376,39 @@ possible to encounter some issues:
   case an error will be raised.
 
 For more flexibility :meth:`.FileMatch.get_values` will return a list of values
-corresponding to the selected group(s). It has argument ``parse`` to choose
-whether to use the parsed value or solely the string that matched.
-:meth:`.FileMatch.get_value` will return the first element of that list, raise
-if the list is empty or warn if the values are not all equal.
+corresponding to the selected group(s). :meth:`.FileMatch.get_value` will return
+the first element of that list, raise if the list is empty or warn if the values
+are not all equal. Both function can be given the argument ``parse`` to choose
+whether to use the parsed value or solely the string that matched. Note that
+FileMatch will only parse the value when requested, not at construction.
 
 .. note::
 
    ``matches[key]`` is a thin wrapper around
    ``matches.get_value(key, parse=True)``.
 
-Using the name of a pseudo-group will return a datetime object constructed from
-relevant matches::
+Using the name of a date pseudo-group will return a datetime object constructed
+from relevant matches::
 
-    >>> finder = Finder("", "%(start:Y)%(start:m)%(start:d)_%(end:Y)%(end:m)%(end:d).txt")
+    >>> finder = Finder(
+        "%(start:Y)%(start:m)%(start:d)_%(end:Y)%(end:m)%(end:d).txt"
+    )
     >>> filematch = finder.find_matches("20120101_20120131.txt")
     >>> filematch["start"]
     datetime.datetime(2012, 1, 1, 0, 0)
     >>> filematch["end"]
     datetime.datetime(2012, 1, 31, 0, 0)
 
+:meth:`~.FileMatch.get_values` and :meth:`~.FileMatch.get_value` can be given a
+*default_date* argument to specify the values of missing date elements: see the
+methods documentation and :ref:`dates` for details.
+
+.. _directories-in-pattern:
+
 Directories in pattern
 ++++++++++++++++++++++
 
-If pattern can contain directory separators the :class:`~.finder.Finder` will
+If the pattern contains directory separators the :class:`~.finder.Finder` will
 explore sub-directories to find the files.
 
 .. important::
@@ -406,9 +433,9 @@ two methods.
    arriving at the correct depth.
    However, it cannot deal with some patterns in which a group contains a path
    separator.
-2. For those more complicated patterns, by setting the attribute/parameter
+2. For those more complicated patterns, by setting the parameter
    :attr:`.Finder.scan_everything` to true, we will explore all sub-directories
-   up to a depth of :attr:`.Finder.max_scan_depth`.
+   up to a depth of :attr:`.Finder.MAX_SCAN_DEPTH`.
 
 The second method can be more costly for some directory structures ---with many
 siblings folders for instance--- but can deal with more exotic patterns. A
@@ -418,8 +445,8 @@ likely example could be that of an optional directory::
   basedir/rest_of_pattern
   basedir/subdir_name/rest_of_pattern
 
-In both cases, when a file is found, the whole regular expression is immediately
-applied and if it is successful the filters are applied next.
+In both cases, when a file is found, the whole regular expression is applied and
+if it is successful the filters are applied next.
 
 .. _create-filenames:
 
@@ -445,13 +472,14 @@ As always, we can use an equivalent datetime object::
 
   finder.make_filename(param=1.5, date=date(2012, 1, 5))
 
-If a group is fixed, we do not need to supply a value::
+If a group is fixed, we do not need to supply a value. It can be overridden
+though without affecting it::
 
   >>> finder.fix(param=2., Y=2014)
   >>> finder.make_filename(m=5, d=1)
   "/data/param_2.0/2014-05-01.txt"
-  >>> finder.make_filename(m=6, d=1)
-  "/data/param_2.0/2014-06-01.txt"
+  >>> finder.make_filename(Y=2015, m=6, d=1)
+  "/data/param_2.0/2015-06-01.txt"  # Y is still fixed to 2014
 
 As for fixing, a value will be appropriately formatted but a string will be left
 untouched (note the prefix is not added when using a string)::

@@ -67,16 +67,17 @@ that group when fixing groups or retrieving matches.
    that name.
 
 Filefinder tries to simplify working with dates (see :ref:`dates`). To create a
-group that correspond to a date element you can use the following name structure
-``<date name>:<date element>`` (for instance ``start:Y``). The date element must
-be contained in the table below. It will dictate the regex and format string
-used for that group (unless overridden by the :ref:`fmt<fmt>` and
-:ref:`rgx<rgx>` properties). By having multiple groups with the same date name
-they can be managed as a single peusdo-group.
+group that corresponds to a date element you can use the following name
+structure ``<date name>__<date element>`` (with a double underscore): for
+instance ``start__Y``. The date element must be contained in the table below.
+It will dictate the regex and format string used for that group (unless
+overridden by the :ref:`fmt<fmt>` and :ref:`rgx<rgx>` properties). By having
+multiple groups with the same date name they can be managed as a single
+pseudo-group.
 
 The date name can be omitted, in that case it will default to 'date', but the
 group name will remain unchanged (*ie* "%(Y)" will be not be available as
-"date:Y").
+"date__Y").
 
 +------+-------------------+---------------------+--------+
 | Name |                   | Regex               | Format |
@@ -107,6 +108,15 @@ group name will remain unchanged (*ie* "%(Y)" will be not be available as
 This follow the specification of :ref:`strftime-strptime-behavior` and `strftime
 <https://linux.die.net/man/3/strftime>`__.
 
+.. note::
+
+   Creating many date groups can be a bit verbose, so the function
+   :func:`.make_date_groups` helps mitigate this problem::
+
+        >>> make_date_groups("%Y%m%d", name="start")
+        "%(start__Y)%(start__m)%(start__d)"
+        >>> make_date_groups("%Y-%m-%d %H:%M:%S")
+        "%(Y)%(m)%(d) %(H):%(M):%(S)"
 
 .. _fmt:
 
@@ -117,22 +127,15 @@ A simple way to specify a group is by using a format string following the
 `Format Mini Language Specification
 <https://docs.python.org/3/library/string.html#formatspec>`__. This will
 automatically be transformed into a regular expression.
-
-Having a format specified has other benefits: it can be used to convert values
-into strings to generate a filename from parameters values (using
-:func:`Finder.make_filename<finder.Finder.make_filename>`), or vice-versa to
-parse filenames matches into parameters values.
-
 It's easy as ``scale_%(scale:fmt=.1f)`` which will find files such as
-``scale_15.0`` or ``scale_-5.6``. Because we know how to transform a value into
-a string we can fix the group directly with a value::
+``scale_15.0`` or ``scale_-5.6``.
+
+Because we know how to transform a value into a string we can fix the group
+directly with a value::
 
   finder.fix(scale=15.)
-
-or we can generate a filename::
-
-  >>> finder.make_filename(scale=2.5)
-  'scale_2.5'
+  # or
+  finder.make_filename(scale=2.5)
 
 In the opposite direction, we can retrieve a value from a filename::
 
@@ -204,7 +207,8 @@ regex. They will not be added when fixing to a string (strings are fixed as-is).
 They are removed before parsing values.
 
 It can be useful when a group is optional, for instance
-``A%(idx:fmt=d:pre=_).txt`` would match "A.txt" and "A_0.txt".
+``A%(idx:fmt=d:pre=_:opt).txt`` would match "A.txt" and "A_0.txt", and correctly
+parse the value as an integer when present.
 
 .. _rgx:
 
@@ -221,8 +225,8 @@ It can be done like so::
 
 .. important::
 
-   We rely on the indices of matching groups. There must be as many groups in
-   the pattern as matching groups in the final regular expression. Therefore
+   Finder relies on the indices of matching groups. There must be as many groups
+   in the pattern as matching groups in the final regular expression. Therefore
    only use non-capturing groups ``(?:...)``.
 
 Regex outside groups

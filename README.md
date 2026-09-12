@@ -26,7 +26,7 @@ groups, similarly to a regular expression. Once setup, it can:
 
 The following example will find all files with the structure ``Data/param_[parameter]/[year]/Temperature_[date].nc``:
 ``` python
-finder = Finder('/.../Data', 'param_%(parameter:fmt=.1f)/%(Y)/Temperature_%(Y)%(m)%(d).nc')
+finder = Finder('param_%(parameter:fmt=.1f)/%(Y)/Temperature_%(Y)%(m)%(d).nc', root='/.../Data')
 files = finder.get_files()
 ```
 

@@ -48,8 +48,6 @@ class Finder:
     """Find files using a filename pattern.
 
     The Finder object is the main entrance point to this library.
-    Given a root directory and a filename pattern, it can search for all
-    corresponding files.
 
     Parameters
     ----------
@@ -57,15 +55,15 @@ class Finder:
         The filename pattern. See :doc:`/pattern` for details.
     root:
         The root directory of the filetree where all files can be found. If not
-        supplied, the current directory will be used.
+        supplied, the current working directory will be used.
     use_regex:
         If True, characters outside of groups are considered as valid regex (and
         not escaped). Default is False.
     scan_everything:
-        If true, look into all sub-directories up to a depth of :attr:`max_scan_depth` .
+        If true, look into all sub-directories up to a depth of :attr:`MAX_SCAN_DEPTH`.
         This is appropriate if the pattern contains optional sub-directories. If false
         (default), only explore every sub-directory that match the corresponding part of
-        the regular expression.
+        the regular expression. See :ref:`directories-in-pattern`.
     follow_symlinks:
         If true, follow symbolic links pointing to directories when scanning for files.
         This may lead to infinite recursion.
@@ -122,7 +120,10 @@ class Finder:
     def pattern(self) -> str:
         """Filename pattern.
 
-        Property can be set. It will clear the cache and parse for groups.
+        .. note::
+
+            Property can be set. If the given value is different from the current one,
+            the cache will be cleared, group objects re-created, all filters removed.
         """
         return self._pattern
 
@@ -147,8 +148,10 @@ class Finder:
     def use_regex(self) -> bool:
         """If True, characters outside of groups are considered as valid regex.
 
-        Property can be set, if the given value is different from the current one, the
-        cache will be cleared.
+        .. note::
+
+            Property can be set. If the given value is different from the current one,
+            the cache will be cleared.
         """
         return self._use_regex
 
@@ -162,8 +165,10 @@ class Finder:
     def scan_everything(self) -> bool:
         """Whether to scan all subdirectories.
 
-        Property can be set, if the given value is different from the current one, the
-        cache will be cleared.
+        .. note::
+
+            Property can be set. If the given value is different from the current one,
+            the cache will be cleared.
         """
         return self._scan_everything
 
@@ -177,8 +182,10 @@ class Finder:
     def follow_symlinks(self) -> bool:
         """Whether to follow symbolic links to directories when scanning files.
 
-        Property can be set, if the given value is different from the current one, the
-        cache will be cleared.
+        .. note::
+
+            Property can be set. If the given value is different from the current one,
+            the cache will be cleared.
         """
         return self._follow_symlinks
 
@@ -196,8 +203,10 @@ class Finder:
         balanced within the group. Prefix can be empty. If None, the default `%()` is
         used.
 
-        Property can be set, if the given value is different from the current one, the
-        cache will be cleared.
+        .. note::
+
+            Property can be set. If the given value is different from the current one,
+            the cache will be cleared, group objects re-created, all filters removed.
         """
         return self._group_delimiters
 
@@ -211,8 +220,7 @@ class Finder:
         group_delimiters = cast(tuple[str, str, str], tuple(group_delimiters))
         if self._group_delimiters != group_delimiters:
             self._group_delimiters = group_delimiters
-            # re-parse groups
-            self.pattern = self._pattern
+            self.set_pattern(self._pattern)
 
     @property
     def n_groups(self) -> int:
@@ -458,8 +466,9 @@ class Finder:
         Parameters
         ----------
         func
-            Callable that takes in: the Finder instance, a `class:FileMatch` object, and
-            optional kwargs. Returns True if the file is to be kept, False otherwise.
+            Callable that takes in: the Finder instance, a :class:`.FileMatch` object,
+            and optional kwargs. Returns True if the file is to be kept, False
+            otherwise.
         kwargs
             Will be passed to the function when executed.
         """
@@ -477,7 +486,7 @@ class Finder:
         pass_unparsed: bool = False,
         **kwargs: Any,
     ) -> None:
-        """Fix a group value by using a filter function.
+        """Add a filter acting on a group match value.
 
         When a file is scanned, if it matches the pattern, it will only be kept if
         `func` returns True when called with the group parsed value. If the group cannot
@@ -489,19 +498,18 @@ class Finder:
         ----------
         key:
             Can be the index of a group in the pattern (starts at 0), or the name of a
-            group. If multiple groups share the same name, they are all fixed. If it is
-            the name of a date pseudo-group, the function will receive a datetime
-            object.
+            group. If multiple groups share the same name, values from all groups will
+            be tested successively. If it is the name of a date pseudo-group, the
+            function will receive a datetime object.
         func
             A function that takes the parsed value of the group and returns True if the
-            corresponding file should be kept, or False otherwise. If multiple groups
-            correspond to the key, **all** values will be tested successively.
+            corresponding file should be kept, or False otherwise.
         pass_unparsed
             In case the group cannot parse the string, if True pass the unparsed string
             to the predicate function `func` anyway. If False (default) the file will
             not be kept.
         default_date
-            Default date elements to use when retrieving date.
+            Default date elements to use when retrieving date. See :ref:`dates`.
         kwargs
             Will be passed to the function.
         """

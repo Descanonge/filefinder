@@ -3,6 +3,8 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+from sphinx.application import Sphinx
+
 import filefinder
 
 ## Project information
@@ -104,3 +106,27 @@ html_theme_options = dict(
 html_last_updated_fmt = "%Y-%m-%d"
 
 html_sidebars = {"**": ["sidebar-nav.html"]}
+
+
+def remove_none_return_type(
+    app: Sphinx,
+    obj_type: str,
+    name: str,
+    obj: Any,
+    options,
+    signature: str,
+    return_annotation: str,
+) -> tuple[str, str]:
+    print(name, signature, return_annotation)
+    if return_annotation == "None":
+        return_annotation = ""
+    return signature, return_annotation
+
+
+def setup(app: Sphinx) -> dict:
+    app.connect("autodoc-process-signature", remove_none_return_type)
+
+    return {
+        "parallel_read_safe": True,
+        "parallel_write_safe": True,
+    }

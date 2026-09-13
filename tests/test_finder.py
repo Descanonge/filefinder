@@ -44,8 +44,12 @@ pattern_dates = PatternExample(
     pattern="%(Y)/%(Y)%(m)%(d)-%(j)_%(date2__Y)%(date2__m)%(date2__d)-%(date2__j).txt",
     names=["Y", "Y", "m", "d", "j", "date2__Y", "date2__m", "date2__d", "date2__j"],
 )
+pattern_datetime = PatternExample(
+    pattern="%(F)_%(H)%(M)%(S)_%(date2__x)_%(date2__X).txt",
+    names=["F", "H", "M", "S", "date2__x", "date2__X"],
+)
 
-pattern_examples = [pattern, pattern_double, pattern_dates]
+pattern_examples = [pattern, pattern_double, pattern_dates, pattern_datetime]
 
 
 class TestCreation:
@@ -410,6 +414,28 @@ class TestFixing:
         assert_fixed(finder.groups[7], 3, "03", "03")
         assert_fixed(finder.groups[8], 93, "093", "093")
 
+    def test_fix_datetime(self) -> None:
+        finder = Finder(pattern_datetime.pattern)
+
+        date = dt.datetime(2086, 3, 2, 15, 16, 17)
+        date2 = dt.datetime(2087, 4, 3, 18, 19, 20)
+
+        finder.fix(date=date)
+        assert_fixed(finder.groups[0], "2086-03-02", "2086-03-02", r"2086\-03\-02")
+        assert_fixed(finder.groups[1], 15, "15", "15")
+        assert_fixed(finder.groups[2], 16, "16", "16")
+        assert_fixed(finder.groups[3], 17, "17", "17")
+
+        for group in finder.groups[4:]:
+            assert_unfixed(group)
+
+        finder.fix(date2=date2)
+        for i, v in enumerate(["2086-03-02", 15, 16, 17]):
+            assert finder.groups[i].fixed_value == v
+
+        assert_fixed(finder.groups[4], 20870403, "20870403", "20870403")
+        assert_fixed(finder.groups[5], 181920, "181920", "181920")
+
     def test_fix_date_wrong(self) -> None:
         finder = Finder("%(Y).ext")
         with pytest.raises(TypeError):
@@ -561,6 +587,22 @@ class TestMatches:
 
         assert filematch["date"] == dt.datetime(2086, 3, 2)
         assert filematch["date2"] == dt.datetime(2087, 4, 3)
+
+    def test_datetime(self) -> None:
+        finder = Finder(pattern_datetime.pattern)
+        filematch = finder.find_matches(Path("2086-03-02_151617_20870403_181920.txt"))
+        assert filematch is not None
+
+        assert filematch["F"] == "2086-03-02"
+        assert filematch["H"] == 15
+        assert filematch["M"] == 16
+        assert filematch["S"] == 17
+
+        assert filematch["date2__x"] == 20870403
+        assert filematch["date2__X"] == 181920
+
+        assert filematch["date"] == dt.datetime(2086, 3, 2, 15, 16, 17)
+        assert filematch["date2"] == dt.datetime(2087, 4, 3, 18, 19, 20)
 
     @pytest.mark.parametrize("pattern", pattern_examples)
     def test_wrong_filename(self, pattern: PatternExample) -> None:

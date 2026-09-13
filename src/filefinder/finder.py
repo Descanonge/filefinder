@@ -6,7 +6,7 @@ import logging
 import os
 import re
 import warnings
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Generator, Sequence
 from pathlib import Path
 from typing import Any, cast, overload
 
@@ -774,6 +774,11 @@ class Finder:
         if self.scanned:
             self.clear_cache()
 
+        if not self.root.is_dir(follow_symlinks=self.follow_symlinks):
+            raise RuntimeError(
+                f"Root directory '{self.root!s}' is inaccessible, or not a directory."
+            )
+
         if self.scan_everything:
             self._find_files_scan_everything()
         else:
@@ -793,6 +798,31 @@ class Finder:
         if matches is not None and self.filters.is_valid(self, matches):
             self._matches.append(matches)
 
+    def _walk(self) -> Generator[tuple[int, Path, list[str], list[str]]]:
+        """Recursively iterate over directories and files.
+
+        A thin wrapper over :func:`os.walk`.
+
+        Returns
+        -------
+        depth: int
+            Depth of current directory.
+        dirpath: Path
+            Path of current directory, relative to root directory.
+        dirnames: list[str]
+            List of directories in current directory. May be edited in-place to select
+            sub-directories to explore.
+        filenames: list[str]
+            List of filenames in current directory.
+        """
+        # to replace by self.root.walk when dropping 3.11 support
+        for dirpath_str, dirnames, filenames in os.walk(
+            self.root, followlinks=self.follow_symlinks, onerror=_handle_walk_error
+        ):
+            dirpath = Path(dirpath_str)
+            depth = len(dirpath.relative_to(self.root).parts)
+            yield depth, dirpath, dirnames, filenames
+
     def _find_files_scan_everything(self) -> None:
         """Find files in all sub-directories.
 
@@ -805,10 +835,7 @@ class Finder:
         """
         pattern = re.compile(self.get_regex())
 
-        for dirpath, dirnames, filenames in self.root.walk(
-            follow_symlinks=self.follow_symlinks, on_error=_handle_walk_error
-        ):
-            depth = len(dirpath.relative_to(self.root).parts)
+        for depth, dirpath, dirnames, filenames in self._walk():
             logger.debug(
                 "Scanning in %s (depth %d/%d)", dirpath, depth, self.MAX_SCAN_DEPTH
             )
@@ -831,10 +858,7 @@ class Finder:
         full_pattern = re.compile(self.get_regex())
         subpatterns = [re.compile(rgx) for rgx in self.get_regex_subdirs()]
         maxdepth = len(subpatterns) - 1
-        for dirpath, dirnames, filenames in self.root.walk(
-            follow_symlinks=self.follow_symlinks, on_error=_handle_walk_error
-        ):
-            depth = len(dirpath.relative_to(self.root).parts)
+        for depth, dirpath, dirnames, filenames in self._walk():
             pattern = subpatterns[depth]
 
             logger.debug("Looking in %s (depth %d/%d)", dirpath, depth, maxdepth)

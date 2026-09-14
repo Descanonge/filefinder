@@ -774,7 +774,7 @@ class Finder:
         if self.scanned:
             self.clear_cache()
 
-        if not self.root.is_dir(follow_symlinks=self.follow_symlinks):
+        if not self.root.is_dir():
             raise RuntimeError(
                 f"Root directory '{self.root!s}' is inaccessible, or not a directory."
             )

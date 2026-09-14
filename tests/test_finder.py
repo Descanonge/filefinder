@@ -604,6 +604,26 @@ class TestMatches:
         assert filematch["date"] == dt.datetime(2086, 3, 2, 15, 16, 17)
         assert filematch["date2"] == dt.datetime(2087, 4, 3, 18, 19, 20)
 
+    def test_date_wrong(self) -> None:
+        """Two groups gives different date elements."""
+        finder = Finder(pattern_dates.pattern)
+        filematch = finder.find_matches(Path("2080", "20860302-061_20870403-093.txt"))
+        assert filematch is not None
+        with pytest.raises(ValueError):
+            filematch["date"]
+
+        finder = Finder("%(F)_%(m).txt")
+        filematch = finder.find_matches(Path("2086-03-02_05.txt"))
+        assert filematch is not None
+        with pytest.raises(ValueError):
+            filematch["date"]
+
+        finder = Finder("%(Y)%(m)%(d)_%(j).txt")
+        filematch = finder.find_matches(Path("20860302_015.txt"))
+        assert filematch is not None
+        with pytest.raises(ValueError):
+            filematch["date"]
+
     @pytest.mark.parametrize("pattern", pattern_examples)
     def test_wrong_filename(self, pattern: PatternExample) -> None:
         """Test obviously wrong filenames that won't match."""

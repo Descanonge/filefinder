@@ -308,7 +308,10 @@ class FormatFloat(FormatNumberAbstract):
 
             return self.add_outer_alignement(rgx)
 
-        assert self.type in "eE"
+        if self.type not in "eE":
+            raise RuntimeError(
+                f"Expected eE format type at this point (received '{self.type}')"
+            )
         rgx = self.get_sign_regex(capture=capture)
         number = (
             self.get_left_of_decimal()

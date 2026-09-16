@@ -116,8 +116,10 @@ def datetime_to_value(date: dt.datetime | dt.date, name: str) -> int | str:
         # xX can be returned as int, as per their format in Group.DATE_GROUPS
         return int(s) if name in "xX" else s
 
-    assert len(elements) == 1
     elements = [getattr(date, attr) for attr in DATETIME_ATTRIBUTES[name]]
+    if len(elements) != 1:
+        raise IndexError(f"Date element '{name}' returned multiple elements.")
+
     return elements[0]
 
 
@@ -217,9 +219,13 @@ def get_date(
 
     def process_simple(m: GroupMatch) -> dict[str, int]:
         value = m.get_match(parse=True)
-        assert m.group.date_element is not None
-        assert len(elts) == 1
+        if m.group.date_element is None:
+            raise TypeError(
+                f"Group '{m.group!s}' does not correspond to a date element."
+            )
         elts = DATETIME_ATTRIBUTES[m.group.date_element]
+        if len(elts) != 1:
+            raise IndexError(f"Date element '{name}' returned multiple elements.")
         return {elts[0]: value}
 
     process("B", process_B)

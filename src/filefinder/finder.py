@@ -114,7 +114,7 @@ class Finder:
         """List of filters to apply to found files."""
 
         self._pattern: str = ""
-        self.pattern = pattern
+        self.set_pattern(pattern)
 
     @property
     def pattern(self) -> str:
@@ -394,14 +394,6 @@ class Finder:
                 raise KeyError(f"{name} is not in Finder groups.")
         return nest(self._matches, nested, relative=relative)
 
-    def get_relative(self, filename: str | Path) -> Path:
-        """Get filename path relative to root."""
-        return _to_path(filename).relative_to(self.root)
-
-    def get_absolute(self, filename: str | Path) -> Path:
-        """Concatenate the finder root directory and a filename."""
-        return self.root / _to_path(filename)
-
     def fix(
         self,
         fixes: dict[Any, str | Any] | None = None,
@@ -589,10 +581,9 @@ class Finder:
         matches
             A :class:`~.matches.Matches` object, or None if the filename did not match.
         """
-        if not isinstance(filename, Path):
-            filename = Path(filename)
+        filename = _to_path(filename)
         if not relative:
-            filename = self.get_relative(filename)
+            filename = filename.relative_to(self.root)
 
         if pattern is None:
             pattern = self.get_regex()
@@ -684,7 +675,7 @@ class Finder:
 
         filename = Path("".join(segments).replace("/", os.sep))
         if not relative:
-            filename = self.get_absolute(filename)
+            filename = self.root / filename
         return filename
 
     def _find_groups(self, pattern: str) -> list[tuple[str, int, int]]:
@@ -845,7 +836,7 @@ class Finder:
             logger.debug("Found %d files", len(filenames))
             _log_list(logger, filenames, level=logging.DEBUG)
             for f in filenames:
-                self._add_file(self.get_relative(dirpath / f), pattern)
+                self._add_file((dirpath / f).relative_to(self.root), pattern)
 
     def _find_files_subdirectories(self) -> None:
         """Find files checking sub-directories along the way.
@@ -882,7 +873,7 @@ class Finder:
                 _log_list(logger, filenames, level=logging.DEBUG)
 
                 for f in filenames:
-                    self._add_file(self.get_relative(dirpath / f), full_pattern)
+                    self._add_file((dirpath / f).relative_to(self.root), full_pattern)
 
     def clear_cache(self) -> None:
         """Clear the cache."""

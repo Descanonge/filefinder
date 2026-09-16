@@ -175,19 +175,27 @@ class FormatNumberAbstract(FormatAbstract):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        self.reject_unparsable()
 
-        # Reject dubious formats
+    def reject_unparsable(self) -> None:
+        """Reject unparsable formats."""
         digits = list(map(str, range(10)))
-        if self.width > 0 and (
-            (self.fill in digits and self.align in "<^")
-            or (self.fill in digits[1:] and self.align == "=")
-            or (self.fill in digits and self.align == ">" and self.sign == "-")
-            or (self.fill == "-" and self.align in ">^=" and self.sign == "-")
-        ):
+
+        bad = [
+            # digits fill with left or center align (-10xxx)
+            self.fill in digits and self.align in "<^",
+            # digits fill with right align if sign is absent (xxx-10)
+            self.fill in digits and self.align == ">" and self.sign == "-",
+            # non-zero digits fill with padding after sign (-xxx10)
+            self.fill in digits[1:] and self.align == "=",
+            # negative sign fill if sign is not always present (----10)
+            self.fill == "-" and self.align in ">^=" and self.sign == "-",
+        ]
+        if self.width > 0 and any(bad):
             raise DangerousFormatError(
-                f"Dangerous combination of fill character ({self.fill}), "
-                f"alignement ({self.align}) and sign ({self.sign}) for "
-                f"format ({self.fmt})"
+                f"Dangerous combination of fill character '{self.fill}', "
+                f"alignement '{self.align}' and sign '{self.sign}' for "
+                f"format '{self.fmt}'"
             )
 
     def prepare_parse(self, s: str) -> str:

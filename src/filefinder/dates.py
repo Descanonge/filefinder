@@ -15,10 +15,10 @@ if TYPE_CHECKING:
 DefaultDate = dt.datetime | Mapping[str, int] | None
 """Type for default_date argument."""
 
-datetime_keys = "YBmdjHMSFxX"
-time_keys = "XHMS"
+DATETIME_KEYS = "YBmdjHMSFxX"
+TIME_KEYS = "XHMS"
 
-datetime_attributes = {
+DATETIME_ATTRIBUTES = {
     "F": ["year", "month", "day"],
     "x": ["year", "month", "day"],
     "Y": ["year"],
@@ -33,7 +33,7 @@ datetime_attributes = {
 }
 """Attributes of datetime objects for each group name."""
 
-datetime_format = {
+DATETIME_FORMAT = {
     "F": "{:04d}-{:02d}-{:02d}",
     "x": "{:04d}{:02d}{:02d}",
     "Y": "{:04d}",
@@ -74,7 +74,7 @@ def make_date_groups(date_format: str, name: str = "") -> str:
         group = match.group(1)
         if group == "%":
             return "%"
-        if group in datetime_keys:
+        if group in DATETIME_KEYS:
             return f"%({name}{group})"
         raise KeyError(f"Unknown datetime key '{match.group(0)}'.")
 
@@ -82,11 +82,11 @@ def make_date_groups(date_format: str, name: str = "") -> str:
 
 
 def _check_input(date: dt.datetime | dt.date, name: str) -> None:
-    if name in time_keys and not isinstance(date, dt.datetime):
+    if name in TIME_KEYS and not isinstance(date, dt.datetime):
         raise TypeError(
             f"'{name}' group needs time information (received a {type(date)} object)"
         )
-    if name not in datetime_attributes:
+    if name not in DATETIME_ATTRIBUTES:
         raise KeyError(f"'{name}' group name not registered in util.datetime_format")
 
 
@@ -99,8 +99,8 @@ def datetime_to_str(date: dt.datetime | dt.date, name: str) -> str:
     if name == "B":
         return date.strftime("%B")
 
-    elements = [getattr(date, attr) for attr in datetime_attributes[name]]
-    fmt = datetime_format[name]
+    elements = [getattr(date, attr) for attr in DATETIME_ATTRIBUTES[name]]
+    fmt = DATETIME_FORMAT[name]
     return fmt.format(*elements)
 
 
@@ -116,8 +116,8 @@ def datetime_to_value(date: dt.datetime | dt.date, name: str) -> int | str:
         # xX can be returned as int, as per their format in Group.DATE_GROUPS
         return int(s) if name in "xX" else s
 
-    elements = [getattr(date, attr) for attr in datetime_attributes[name]]
     assert len(elements) == 1
+    elements = [getattr(date, attr) for attr in DATETIME_ATTRIBUTES[name]]
     return elements[0]
 
 
@@ -130,7 +130,7 @@ def get_doy(date: dt.date | dt.datetime) -> int:
 
 def date_from_doy(doy: int, year: int) -> dict[str, int]:
     """Get month and day from a dayofyear value (and its year)."""
-    day = dt.date(year, 1, 1) + dt.timedelta(days=(doy - 1))
+    day = dt.date(year, 1, 1) + dt.timedelta(days=doy - 1)
     return {"month": day.month, "day": day.day}
 
 
@@ -218,8 +218,8 @@ def get_date(
     def process_simple(m: GroupMatch) -> dict[str, int]:
         value = m.get_match(parse=True)
         assert m.group.date_element is not None
-        elts = datetime_attributes[m.group.date_element]
         assert len(elts) == 1
+        elts = DATETIME_ATTRIBUTES[m.group.date_element]
         return {elts[0]: value}
 
     process("B", process_B)

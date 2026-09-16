@@ -146,7 +146,7 @@ class Finder:
             self.groups.append(Group(specs, idx))
             splits += [start, end]
 
-        self._segments = [
+        self.segments = [
             pattern[i:j] for i, j in zip(splits, [*splits[1:], None], strict=False)
         ]
 
@@ -656,7 +656,7 @@ class Finder:
             fixes = {}
         fixes.update(**kw_fixes)
 
-        segments = self._segments.copy()
+        segments = self.segments.copy()
 
         fixed_strings: list[str | list[str] | None] = []
         for group in self.groups:
@@ -744,7 +744,7 @@ class Finder:
             If True (default), replace "/" in the regex by the correct directory
             separator for the current OS.
         """
-        segments = self._segments.copy()
+        segments = self.segments.copy()
         if not self.use_regex:
             # escape regex outside groups
             segments = [

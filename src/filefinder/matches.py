@@ -80,7 +80,7 @@ class GroupMatch:
                 except ValueError as e:
                     self._parsed = ParseStatus.FAILED
                     logger.debug(
-                        "Failed to parse for group %s, got error %s",
+                        "Failed to parse for group %s, got error: %s",
                         str(self.group),
                         str(e),
                     )

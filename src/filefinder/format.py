@@ -166,7 +166,9 @@ class FormatString(FormatAbstract):
         pattern = self.get_regex(capture=True)
         m = re.fullmatch(pattern, s)
         if m is None:
-            raise ValueError(f"Error parsing '{s}' with pattern '{pattern}'")
+            raise ValueError(
+                f"Error parsing '{s}' with format '{self.fmt}' and pattern '{pattern}'"
+            )
         return m.group(1)
 
     def get_regex(self, *, capture: bool = False) -> str:
@@ -221,7 +223,9 @@ class FormatNumberAbstract(FormatAbstract):
         pattern = self.get_regex(capture=True)
         m = re.fullmatch(pattern, s)
         if m is None:
-            raise ValueError(f"Error parsing '{s}' with pattern '{pattern}'")
+            raise ValueError(
+                f"Error parsing '{s}' with format '{self.fmt}' and pattern '{pattern}'"
+            )
         # join all capturing groups (sign, number)
         s = "".join(m.groups(""))
         # remove grouping characters

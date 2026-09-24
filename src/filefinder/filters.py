@@ -187,11 +187,6 @@ class FilterByDate(Filter):
         self.on_parse_failure = on_parse_failure
         """How to act if a group fails to parse its value."""
 
-        if on_parse_failure == "pass_unparsed":
-            raise KeyError(
-                "Cannot use 'on_parse_failure=\"pass_unparsed\"' for pseudo-date group."
-            )
-
         super().__init__(user_func, **kwargs)
 
     def get_filter_func(self) -> FilterFunc:
@@ -270,11 +265,11 @@ class FilterList:
         func: Callable[..., bool],
         indices: Sequence[int],
         *,
-        pass_unparsed: bool = False,
+        on_parse_failure: Literal["raise", "pass_unparsed", "pass", "fail"] = "raise",
         **kwargs: Any,
     ) -> FilterByGroup:
         """Add a group filter."""
-        filt = FilterByGroup(func, indices, pass_unparsed=pass_unparsed, **kwargs)
+        filt = FilterByGroup(func, indices, on_parse_failure=on_parse_failure, **kwargs)
         self.filters.append(filt)
         return filt
 
@@ -283,10 +278,17 @@ class FilterList:
         func: Callable[..., bool],
         date_name: str,
         default_date: DefaultDate = None,
+        on_parse_failure: Literal["raise", "pass", "fail"] = "raise",
         **kwargs: Any,
     ) -> FilterByDate:
         """Add a date filter."""
-        filt = FilterByDate(func, date_name, default_date=default_date, **kwargs)
+        filt = FilterByDate(
+            func,
+            date_name,
+            default_date=default_date,
+            on_parse_failure=on_parse_failure,
+            **kwargs,
+        )
         self.filters.append(filt)
         return filt
 

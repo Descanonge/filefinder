@@ -517,6 +517,12 @@ class Finder:
         """
         filt: FilterByGroup | FilterByDate
         if key in self.get_date_names():
+            if on_parse_failure == "pass_unparsed":
+                raise KeyError(
+                    "Cannot use 'on_parse_failure=\"pass_unparsed\"' "
+                    "for pseudo-date groups."
+                )
+
             filt = self.filters.add_by_date(
                 func,
                 key,

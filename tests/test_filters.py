@@ -267,10 +267,6 @@ class TestParseFailure:
         with pytest.raises(ValueError):
             is_valid(filt, filematch)
 
-        # pass_unparsed
-        with pytest.raises(KeyError):
-            filt = FilterByDate(func, "date", on_parse_failure="pass_unparsed")  # type: ignore[arg-type]
-
         # pass
         filt = FilterByDate(func, "date", on_parse_failure="pass")
         assert is_valid(filt, filematch)

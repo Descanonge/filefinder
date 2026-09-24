@@ -620,7 +620,7 @@ class Finder:
         match_list = [
             GroupMatch.from_match(grp, m, i) for i, grp in enumerate(self.groups)
         ]
-        return FileMatch(self.root, filename, match_list, self.groups)
+        return FileMatch(self.root, filename, match_list)
 
     def make_filename(
         self,

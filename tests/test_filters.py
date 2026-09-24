@@ -137,7 +137,7 @@ class TestFilterExecute:
             GroupMatch(group, str(value), -1, -1)
             for group, value in zip(groups, values, strict=True)
         ]
-        return FileMatch(Path(), Path(filename), matches, groups)
+        return FileMatch(Path(), Path(filename), matches)
 
     def get_int_groups(self, length: int) -> list[Group]:
         return [Group(f"{chr(97 + i)}:fmt=d", i) for i in range(length)]
@@ -147,20 +147,20 @@ class TestFilterExecute:
             return str(filematch.filename).isupper()
 
         filt = Filter(func)
-        assert is_valid(filt, FileMatch(Path(), Path("ABC"), [], []))
-        assert not is_valid(filt, FileMatch(Path(), Path("abc"), [], []))
+        assert is_valid(filt, FileMatch(Path(), Path("ABC"), []))
+        assert not is_valid(filt, FileMatch(Path(), Path("abc"), []))
 
     def test_kwargs(self) -> None:
         def func(finder: Finder, filematch: FileMatch, legal: list[str]) -> bool:  # noqa: ARG001
             return str(filematch.filename) in legal
 
         filt = Filter(func, legal=["a", "b"])
-        assert is_valid(filt, FileMatch(Path(), Path("a"), [], []))
-        assert not is_valid(filt, FileMatch(Path(), Path("c"), [], []))
+        assert is_valid(filt, FileMatch(Path(), Path("a"), []))
+        assert not is_valid(filt, FileMatch(Path(), Path("c"), []))
 
         filt = Filter(func, legal=["b", "c"])
-        assert not is_valid(filt, FileMatch(Path(), Path("a"), [], []))
-        assert is_valid(filt, FileMatch(Path(), Path("c"), [], []))
+        assert not is_valid(filt, FileMatch(Path(), Path("a"), []))
+        assert is_valid(filt, FileMatch(Path(), Path("c"), []))
 
     def test_by_group(self) -> None:
         groups = self.get_int_groups(3)
@@ -221,7 +221,6 @@ class TestParseFailure:
             Path(),
             Path("abc_1"),
             [GroupMatch(g1, "abc", 0, 0), GroupMatch(g2, "2", 0, 0)],
-            [g1, g2],
         )
 
         def func(x: int | str) -> bool:
@@ -256,7 +255,6 @@ class TestParseFailure:
             Path(),
             Path("2086_2087"),
             [GroupMatch(g1, "2086", 0, 0), GroupMatch(g2, "2087", 0, 0)],
-            [g1, g2],
         )
 
         def func(_: Any) -> bool:

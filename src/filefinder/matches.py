@@ -137,20 +137,14 @@ class FileMatch:
         root: Path,
         filename: Path,
         matches: Sequence[GroupMatch],
-        groups: Sequence[Group],
     ) -> None:
-        if len(matches) != len(groups):
-            raise IndexError(
-                f"Not as many group matches ({len(matches)}) as groups ({len(groups)})"
-            )
-
         self.root: Path = root
         """Root directory containing files."""
         self.filename: Path = root / filename
         """Corresponding filename, absolute path."""
         self.matches: list[GroupMatch] = list(matches)
         """Matches for every group."""
-        self.groups: list[Group] = list(groups)
+        self.groups: list[Group] = [m.group for m in matches]
         """Groups present in the pattern."""
 
     def __repr__(self) -> str:

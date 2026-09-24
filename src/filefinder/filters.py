@@ -18,7 +18,7 @@ FilterFunc = Callable[["Finder", FileMatch], bool]
 
 
 class Filter:
-    """Manage a filter.
+    """Basic filter.
 
     Parameters
     ----------
@@ -61,7 +61,7 @@ class Filter:
 
 
 class FilterByGroup(Filter):
-    """Manage a filter applied on specific groups.
+    """Filter applied on specific groups.
 
     The list of indices of those groups must be supplied at initialization to avoid
     having to find them at each validation from a more generic key.
@@ -78,8 +78,8 @@ class FilterByGroup(Filter):
 
         * "raise": Raise a ValueError (default).
         * "pass_unparsed": Pass the unparsed string to the filter function.
-        * "fail": The filter fails for this value (as if returning False).
-        * "pass": The filter passes for this value (as if returning True).
+        * "fail": fail the filter for this value (as if returning False).
+        * "pass": pass the filter for this value (as if returning True).
     kwargs:
         Passed to the filter function.
     """
@@ -110,7 +110,7 @@ class FilterByGroup(Filter):
         """Return filter function.
 
         Wrap so the partial function is applied on every match specified by the
-        :attr:`indices` and :attr:`pass_unparsed` attributes.
+        :attr:`indices`.
         """
 
         def filt(finder: Finder, filematch: FileMatch) -> bool:  # noqa: ARG001
@@ -139,13 +139,13 @@ class FilterByGroup(Filter):
         return filt
 
     def reset(self) -> None:
-        """Reset the filter function and name if the group indices have changed."""
+        """Recompute the filter function and name if the group indices have changed."""
         self.filter_func = self.get_filter_func()
         self.name = self._get_name()
 
 
 class FilterByDate(Filter):
-    """Manage a filter for the date.
+    """Filter for date pseudo-groups.
 
     The user function will receive a date recovered from the matches.
 
@@ -162,8 +162,8 @@ class FilterByDate(Filter):
         How to act if the group fails to parse its value:
 
         * "raise": Raise a ValueError (default).
-        * "fail": The filter fails for this value (as if returning False).
-        * "pass": The filter passes for this value (as if returning True).
+        * "fail": fail the filter for this value (as if returning False).
+        * "pass": pass the filter for this value (as if returning True).
     kwargs:
         Passed to the filter function.
     """

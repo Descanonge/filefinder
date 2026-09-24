@@ -50,9 +50,9 @@ class InvalidFormatTypeError(FormatError):
 class FormatAbstract:
     """Represent a format string.
 
-    Can generate an appropriate regular expression corresponding to that format string
-    (to some limitations), generate a string from a value, or parse such a string into
-    a value.
+    Can generate an appropriate regular expression corresponding to a format string (to
+    some limitations), generate a string from a value, or parse such a string into a
+    value.
 
     Users are not meant to instanciate those objects directly, use :func:`Format`
     instead.
@@ -73,14 +73,23 @@ class FormatAbstract:
         self.fmt: str = fmt
 
         self.type: str = params["type"]
+        """Format type (sdfeE)."""
         self.fill: str = params["fill"]
+        """Fill character."""
         self.align: str = params["align"]
+        """Alignment specification (<>=^)."""
         self.sign: str = params["sign"]
+        """Sign (-+ or space)."""
         self.alternate: bool = params["alternate"]
+        """Alternate form."""
         self.zero: bool = params["zero"]
+        """Coerce float to positive zero after rounding to format precision."""
         self.width: int = params["width"]
+        """Width of the string."""
         self.grouping: str = params["grouping"]
+        """Grouping character for integers (,_ or empty)."""
         self.precision: int = params["precision"]
+        """Precision for floats."""
 
         if self.type not in self.ALLOWED_TYPES:
             raise InvalidFormatTypeError(
@@ -294,10 +303,10 @@ class FormatFloat(FormatNumberAbstract):
         return float(s)
 
     def get_left_of_decimal(self) -> str:
-        """Get regex for the numbers left of decimal point.
+        r"""Get regex for the numbers left of decimal point.
 
-        Will deal with grouping if present. Some simplifications for eE formats.
-        Only use groupings for '0=' alignment and enforce single digits grouping.
+        Will deal with grouping if present. For eE formats: there can only be grouping
+        for '0=' alignement, and groupings can only be 00\\d.
         """
         if self.type == "f":
             return super().get_left_of_decimal()

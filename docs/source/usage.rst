@@ -13,14 +13,14 @@ The main entry point of this package is the :class:`.Finder` class.
 It takes in a pattern specifying the filename structure to scan for.
 The parts that vary from file to file are indicated in the pattern by
 parentheses, preceded by a percent sign. Within the parentheses are
-specifications for a :class:`~.Group`, that will handle creating
+specifications for a :class:`~.Group` that will handle creating
 the regular expression to find files and formatting values appropriately.
 
 For instance, to find files contained in the ``/data`` directory and that follow
-the structure ``param_[parameter]/[year]/variable_[year]-[month]-[day].nc``::
+the structure ``depth_[depth]/[year]/variable_[year]-[month]-[day].nc``::
 
     finder = Finder(
-        "param_%(param:fmt=.1f)/%(Y)/variable_%(Y)-%(m)-%(d).nc",
+        "depth_%(depth:fmt=.1f)/%(Y)/variable_%(Y)-%(m)-%(d).nc",
         root="/data"
     )
 
@@ -29,20 +29,20 @@ the structure ``param_[parameter]/[year]/variable_[year]-[month]-[day].nc``::
     Details on how to write the pattern are available at: :doc:`pattern`.
 
 Behind the scenes, the Finder object will transform the pattern into a regular
-expression for filenames to match against.
+expression to match against filenames.
 
 .. _cache:
 
 Cache
 +++++
 
-Whenever the :class:`.Finder` scans for files, it will cache the results (see
-:ref:`retrieve-files` for how to scan files and access the results).
-Changing some parameters may clear the cache:
+Whenever the :class:`.Finder` scans for files, it will cache the results (check
+:ref:`retrieve-files` to see how to scan files and access the results).
+Changing some options may clear the cache:
 
 * changing the value of properties :attr:`~.Finder.scan_everything`,
-  :attr:`~.Finder.use_regex`, :attr:`~.Finder.follow_symlinks` will clear the
-  cache
+  :attr:`~.Finder.regex_outside_groups`, :attr:`~.Finder.follow_symlinks` will
+  clear the cache
 * changing the value of :attr:`~.Finder.pattern` or
   :attr:`~.Finder.group_delimiters` will clear the cache, re-create group
   objects, and remove all filters.
@@ -93,15 +93,10 @@ Each group can be fixed to one value or to a set of possible values. This will
 adapt the regular expression used and thus restrict the filenames kept when
 scanning.
 
-.. note::
-
-   When :ref:`creating filenames<create-filenames>`, if a group already
-   has a fixed value it will be used by default.
-
 Fixing groups is done with the :meth:`.Finder.fix` method. Groups can be
 selected either by their index in the filename pattern (starting from 0), or by
-their name. If using a name, groups with the same name can be fixed to the same
-value all at once.
+their name. If using a name, all groups with that name will be fixed to the same
+value.
 
 The given value can be:
 
@@ -113,7 +108,7 @@ The given value can be:
   string.
 * a :mod:`datetime` object when fixing a date pseudo-group. Each group will
   be fixed to the appropriate date element (year, month, ...).
-* **None** if the group is marked as :ref:`optional<opt>`: it will then not
+* **None** if the group is marked as :ref:`optional<opt>`: the group will *not*
   appear in the filename.
 * a **string**: the value is directly interpreted as a regular expression and
   used as-is when scanning files or creating filenames, without further escaping
@@ -123,11 +118,11 @@ The given value can be:
   with *OR* (``(value1|value2|...)``), and when creating files only the
   **first** element of the list is used.
 
-So with the same example as previously::
+So with the pattern ``%(depth:fmt=.1f)/%(Y)/Temperature_%(Y)-%(m)-%(d).nc``::
 
-  >>> finder.fix(param=3.0)
+  >>> finder.fix(depth=3.0)
   will be formatted as "3\.0"
-  >>> finder.fix(param="[a-z]+")
+  >>> finder.fix(depth="[a-z]+")
   will be kept as is
 
 We could keep only the files corresponding to january::
@@ -141,15 +136,15 @@ We could also select specific days using a list::
 When fixing a date pseudo-group to a :mod:`datetime` object, all individual
 groups will be fixed with the corresponding element::
 
-    finder = Finder("%(start:Y)-%(start:m)-%(start:d).txt")
-    finder.fix(start=datetime(2000, 1, 1))
-    # is equivalent to
-    finder.fix(start__Y=2000, start__m=1, start__d=1)
-
     finder = Finder("%(Y)-%(m)-%(d).txt")
     finder.fix(date=datetime(2000, 1, 1))
     # is equivalent to
     finder.fix(Y=2000, m=1, d=1)
+
+    finder = Finder("%(start:Y)-%(start:m)-%(start:d).txt")
+    finder.fix(start=datetime(2000, 1, 1))
+    # is equivalent to
+    finder.fix(start__Y=2000, start__m=1, start__d=1)
 
 .. important::
 
@@ -196,7 +191,7 @@ A basic filter is a function has the following signature:
 Any number of filters can be added using :meth:`.Finder.add_filter`. They will
 be applied to each file, in the order they were added. If any filter discards
 the file (*ie* it returns False), the file will not be kept (and the next
-filters won't run).
+filters won't run). Filters can be removed with :meth:`.Finder.clear_filters`.
 
 .. important::
 
@@ -237,9 +232,10 @@ Group filters can be removed with :meth:`.Finder.remove_group_filters`.
 
 .. note::
 
-   If the parsing of a group fails, its filters will be ignored unless
-   *pass_unparsed=True* is passed to *add_group_filter*, in which case the
-   matched string will be passed to the filter.
+   If the parsing of a group fails, the filter behavior is dictated by the
+   *on_parse_failure* option: it can raise an error, pass the unparsed string
+   to the filter function, and pass or fail that value (and continue as normal).
+   See :meth:`.Finder.add_group_filter`.
 
 .. _find-files:
 
@@ -259,9 +255,9 @@ Found files can be accessed with:
   a filename and group values parsed from it.
 * :attr:`.Finder.get_files()` which provides some additional options.
 
-All three will automatically scan the disk for files and cache the results for
-later access. Files can be scanned manually with :meth:`.Finder.find_files`. The
-files are stored in alphabetical order.
+All three will automatically scan the disk for files if needed and cache the
+results for later access. Files can be scanned manually with
+:meth:`.Finder.find_files`. The files are stored in alphabetical order.
 
 :meth:`~.Finder.get_files` can return paths relative to the root directory by
 passing *relative=True*. It can also return filenames in nested lists. To that
@@ -273,44 +269,44 @@ order in which groups must be nested. Each element of the list gives:
 * multiple groups, by a tuple of indices or names, so files are grouped based
   on the combination of values from those groups.
 
-For instance with the pattern ``param_%(param:fmt=.1f)/%(Y)-%(m)-%(d).nc``, if
-we ask to group by values of 'param'::
+For instance with the pattern ``depth_%(depth:fmt=.1f)/%(Y)-%(m)-%(d).nc``, if
+we ask to group by values of 'depth'::
 
-  >>> finder.get_files(nested=["param"])
+  >>> finder.get_files(nested=["depth"])
   [
     [
-      "/data/param_0.0/2012-01-01.nc",
-      "/data/param_0.0/2012-01-02.nc",
+      "/data/depth_0.0/2012-01-01.nc",
+      "/data/depth_0.0/2012-01-02.nc",
       ...
     ],
     [
-      "/data/param_1.5/2012-01-01.nc",
-      "/data/param_1.5/2012-01-02.nc",
+      "/data/depth_1.5/2012-01-01.nc",
+      "/data/depth_1.5/2012-01-02.nc",
       ...
     ],
     ...
   ]
 
-We obtain as many lists as different values found for 'param'. Because we
+We obtain as many lists as different values found for 'depth'. Because we
 did not specify any other group, the nesting stop there. But we could chose
 to *also* group by the year::
 
-  >>> finder.get_files(nested=["param", "Y"])
+  >>> finder.get_files(nested=["depth", "Y"])
   [
-    [  # param = 0
+    [  # depth = 0
       [  # Y = 2012
-        "/data/param_0.0/2012-01-01.nc",
-        "/data/param_0.0/2012-01-02.nc",
+        "/data/depth_0.0/2012-01-01.nc",
+        "/data/depth_0.0/2012-01-02.nc",
         ...
       ],
       [  # Y = 2013
-        "/data/param_0.0/2013-01-01.nc",
-        "/data/param_0.0/2013-01-02.nc",
+        "/data/depth_0.0/2013-01-01.nc",
+        "/data/depth_0.0/2013-01-02.nc",
         ...
       ],
       ...
     ],
-    [  # param = 1.5
+    [  # depth = 1.5
       ...
     ],
     ...
@@ -319,16 +315,16 @@ to *also* group by the year::
 Or if we wanted to group by date as well we can specify multiple groups for
 one nesting level::
 
-  >>> finder.get_files(nested=["param", ("Y", "m", "d")])
+  >>> finder.get_files(nested=["depth", ("Y", "m", "d")])
   [
-    [  # param = 0
-      ["/data/param_0.0/2012-01-01.nc"],
-      ["/data/param_0.0/2012-01-02.nc"],
+    [  # depth = 0
+      ["/data/depth_0.0/2012-01-01.nc"],
+      ["/data/depth_0.0/2012-01-02.nc"],
       ...
     ],
-    [  # param = 1.5
-      ["/data/param_1.5/2012-01-01.nc"],
-      ["/data/param_1.5/2012-01-02.nc"],
+    [  # depth = 1.5
+      ["/data/depth_1.5/2012-01-01.nc"],
+      ["/data/depth_1.5/2012-01-02.nc"],
       ...
     ],
     ...
@@ -336,7 +332,7 @@ one nesting level::
 
 .. note::
 
-   In the example above, it would be equivalent to use ``nested=["param",
+   In the example above, it would be equivalent to use ``nested=["depth",
    "date"]``, see :ref:`dates`.
 
 .. note::
@@ -363,7 +359,7 @@ Accessing the FileMatch with a group index or name will return a **parsed**
 value::
 
   >>> filematch = finder.matches[0]
-  >>> filematch["param"]
+  >>> filematch["depth"]
   0.0  # a float, parsed from the filename
 
 This method is fine for most cases, but for some more complex patterns it is
@@ -417,8 +413,8 @@ explore sub-directories to find the files.
    forward slash ``/``, even on Windows where a backslash would normally be
    used. It will be replaced by the correct character when necessary.
 
-   We do this because the backslash has special meanings in regular expressions,
-   and it is difficult to disambiguate the two.
+   We do this because the backslash has a special meaning in regular
+   expressions, and it is difficult to disambiguate the two.
 
 The scanning process is as follows. The Finder first generates a regular
 expression based on the pattern and the fixed values. This expression is meant
@@ -434,7 +430,7 @@ two methods.
    However, it cannot deal with some patterns in which a group contains a path
    separator.
 2. For those more complicated patterns, by setting the parameter
-   :attr:`.Finder.scan_everything` to true, we will explore all sub-directories
+   :attr:`~.Finder.scan_everything` to true, we will explore all sub-directories
    up to a depth of :attr:`.Finder.MAX_SCAN_DEPTH`.
 
 The second method can be more costly for some directory structures ---with many
@@ -458,31 +454,31 @@ arbitrary filenames. This is done with :meth:`.Finder.make_filename`. Any group
 that does not already have its value :ref:`fixed<fixing>` must have a value
 supplied as argument, excepted for :ref:`optional<opt>` groups.
 
-So for pattern ``param_%(param:fmt=.1f)/%(Y)-%(m)-%(d)%(id:fmt=d:pre=_:opt).txt``::
+So for the pattern ``depth_%(depth:fmt=.1f)/%(Y)-%(m)-%(d)%(id:fmt=d:pre=_:opt).txt``::
 
-  >>> finder.make_filename(param=1.5, Y=2012, m=1, d=5, id=0)
-  "/data/param_1.5/2012-01-05_0.txt"
+  >>> finder.make_filename(depth=1.5, Y=2012, m=1, d=5, id=0)
+  "/data/depth_1.5/2012-01-05_0.txt"
 
 Optional groups can be left empty::
 
-  >>> finder.make_filename(param=1.5, Y=2012, m=1, d=5)
-  "/data/param_1.5/2012-01-05.txt"
+  >>> finder.make_filename(depth=1.5, Y=2012, m=1, d=5)
+  "/data/depth_1.5/2012-01-05.txt"
 
 As always, we can use an equivalent datetime object::
 
-  finder.make_filename(param=1.5, date=date(2012, 1, 5))
+  finder.make_filename(depth=1.5, date=date(2012, 1, 5))
 
-If a group is fixed, we do not need to supply a value. It can be overridden
-though without affecting it::
+If a group is fixed, we do not need to supply a value. It can always be
+overridden without affecting it::
 
-  >>> finder.fix(param=2., Y=2014)
+  >>> finder.fix(depth=2., Y=2014)
   >>> finder.make_filename(m=5, d=1)
-  "/data/param_2.0/2014-05-01.txt"
+  "/data/depth_2.0/2014-05-01.txt"
   >>> finder.make_filename(Y=2015, m=6, d=1)
-  "/data/param_2.0/2015-06-01.txt"  # Y is still fixed to 2014
+  "/data/depth_2.0/2015-06-01.txt"  # Y is still fixed to 2014
 
 As for fixing, a value will be appropriately formatted but a string will be left
 untouched (note the prefix is not added when using a string)::
 
-  >>> finder.make_filename(param="this-feels-wrong", m=6, d=1, id="_a")
-  "/data/param_this-feels-wrong/2014-06-01_a.txt"
+  >>> finder.make_filename(depth="this-feels-wrong", m=6, d=1, id="_a")
+  "/data/depth_this-feels-wrong/2014-06-01_a.txt"

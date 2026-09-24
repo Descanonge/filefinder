@@ -47,7 +47,7 @@ autodoc_typehints_description_target = "all"
 autodoc_class_content = "both"
 autodoc_class_signature = "mixed"
 autodoc_type_aliases = {
-    "traitlets.traitlets.Int": "~traitlets.Int",
+    # "dt.datetime": "datetime.datetime",
 }
 
 python_use_unqualified_type_names = True

@@ -19,7 +19,9 @@ class ParseStatus(StrEnum):
     """Status of parsing."""
 
     FAILED = "The match string could not be parsed successfully."
+    """"""  # force sphinx to document
     NOT_PARSED = "The match string has not been parsed yet."
+    """"""
 
 
 class GroupMatch:
@@ -66,7 +68,7 @@ class GroupMatch:
     def match_parsed(self) -> Any | ParseStatus:
         """Return value or status if failing to parse.
 
-        Returns :attr:`ParseStatus.PARSE_FAIL` if an exception is thrown when trying to
+        Returns :attr:`ParseStatus.FAILED` if an exception is thrown when trying to
         parse the match.
         """
         if self._parsed is ParseStatus.NOT_PARSED:
@@ -125,18 +127,12 @@ class FileMatch:
         Root directory containing files.
     filename
         Filename from which matches are extracted, relative to root directory.
-    match
-        Regex match object obtained from a filename. It should have as much capturing
-        groups as the pattern.
-    groups
-        Sequence of Groups objects present in the pattern.
+    matches
+        Matches for every group.
     """
 
     def __init__(
-        self,
-        root: Path,
-        filename: Path,
-        matches: Sequence[GroupMatch],
+        self, root: Path, filename: Path, matches: Sequence[GroupMatch]
     ) -> None:
         self.root: Path = root
         """Root directory containing files."""
@@ -175,8 +171,8 @@ class FileMatch:
     def get_filename(self, *, relative: bool = False) -> Path:
         """Get filename corresponding to matches.
 
-        :param relative: If True (default), return relative to the finder root
-            directory. If not, return as absolute path.
+        :param relative: If True, return relative to the finder root directory. If not,
+            return as absolute path (default).
         """
         if relative:
             return self.filename.relative_to(self.root)
@@ -226,8 +222,9 @@ class FileMatch:
     ) -> Any:
         """Get matched value corresponding to key.
 
-        Return a single value. If multiple groups correspond to ``key``,
-        the value of the first one to appear in the pattern is returned.
+        Return a single value. If multiple groups correspond to ``key``, the value of
+        the first one to appear in the pattern is returned. Warn if not all values are
+        equal.
 
         Parameters
         ----------
@@ -244,7 +241,7 @@ class FileMatch:
         Raises
         ------
         KeyError
-            No group with was found.
+            No group was found for key.
         """
         values = self.get_values(key, parse=parse, default_date=default_date)
         if len(values) == 0:
@@ -263,10 +260,6 @@ class FileMatch:
         ----------
         key:
             Group(s) to select, either by index or name.
-
-        Returns
-        -------
-        List of GroupMatch corresponding to the key.
         """
         selected = get_groups_indices(self.groups, key)
         return [self.matches[k] for k in selected]

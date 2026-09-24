@@ -1,7 +1,7 @@
 
 # FileFinder
 
-> Find files using a simple syntax.
+> Glob on steroids!
 
 <div align="left">
 
@@ -24,36 +24,43 @@ groups, similarly to a regular expression. Once setup, it can:
 
 ## Quick examples
 
-The following example will find all files with the structure ``Data/param_[parameter]/[year]/Temperature_[date].nc``:
+The following example will find all files with the structure ``Data/depth_[depth]/[year]/Temperature_[date].nc``:
 ``` python
-finder = Finder('param_%(parameter:fmt=.1f)/%(Y)/Temperature_%(Y)%(m)%(d).nc', root='/.../Data')
+finder = Finder(
+    'depth_%(depth:fmt=.1f)/%(Y)/Temperature_%(Y)%(m)%(d).nc',
+    root='/.../Data'
+)
 files = finder.get_files()
 ```
 
-We can also select only some files, for instance only in january:
+We can restrict the values of some parameters, for instance if we only
+want the files for January::
 ``` python
 finder.fix(m=1)
 files = finder.get_files()
 ```
 
-Or apply more complicated filters:
+Or we can apply more complicated filters::
 ``` python
 finder.add_group_filter("m", lambda m: m % 2 == 0)
 ```
 
-We can retrieve values from found files:
+We can retrieve values parsed from found files:
 ``` python
-filematch = finder.files[0]
-parameter = filematch["parameter"]
-# the date as a datetime object
-date = filematch["date"]
+filematch = finder.matches[0]
+filematch["depth"]  # a float
+filematch["date"]  # a datetime object
 ```
 
-And we can generate a filename with a set of parameters:
+By supplying values for all parameters, we can generate a filename:
 ``` python
-finder.make_filename(parameter=0.5, Y=2000, m=1, d=1)
+finder.make_filename(depth=0.5, Y=2000, m=1, d=1)
 # Specifying the month is optional since we already fixed it to 1.
 ```
+
+## Documentation
+
+Documentation is available at [filefinder.readthedocs.io](https://filefinder.readthedocs.io).
 
 ## Requirements
 
@@ -72,11 +79,4 @@ git clone https://github.com/Descanonge/filefinder.git
 cd filefinder
 pip install -e .
 ```
-or
-``` sh
-pip install -e https://github.com/Descanonge/filefinder.git#egg=filefinder
-```
 
-## Documentation
-
-Documentation is available at [filefinder.readthedocs.io](https://filefinder.readthedocs.io).

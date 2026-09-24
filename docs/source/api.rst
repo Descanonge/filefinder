@@ -9,14 +9,15 @@ API References
    :nosignatures:
 
    finder.Finder
+   dates.make_date_groups
 
 .. rubric:: Submodules
 .. autosummary::
    :toctree: _api
 
    dates
-   finder
    filters
+   finder
    format
    group
    matches

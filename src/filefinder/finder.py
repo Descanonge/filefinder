@@ -47,8 +47,6 @@ def _handle_walk_error(exc: OSError) -> None:
 class Finder:
     """Find files using a filename pattern.
 
-    The Finder object is the main entrance point to this library.
-
     Parameters
     ----------
     pattern:
@@ -60,12 +58,12 @@ class Finder:
         If True, characters outside of groups are considered as valid regex (and
         not escaped). Default is False.
     scan_everything:
-        If true, look into all sub-directories up to a depth of :attr:`MAX_SCAN_DEPTH`.
-        This is appropriate if the pattern contains optional sub-directories. If false
-        (default), only explore every sub-directory that match the corresponding part of
-        the regular expression. See :ref:`directories-in-pattern`.
+        If True, look into all sub-directories up to a depth of :attr:`MAX_SCAN_DEPTH`.
+        This is appropriate if the pattern contains optional sub-directories. If False
+        (default), only explore sub-directories that match the corresponding part of the
+        regular expression. See :ref:`directories-in-pattern`.
     follow_symlinks:
-        If true, follow symbolic links pointing to directories when scanning for files.
+        If True, follow symbolic links pointing to directories when scanning for files.
         This may lead to infinite recursion.
     group_delimiters:
         Tuple of (prefix, start characters, end characters) that defines how groups are
@@ -170,7 +168,9 @@ class Finder:
 
     @property
     def scan_everything(self) -> bool:
-        """Whether to scan all subdirectories.
+        """Whether to scan all subdirectories or filter them using the pattern.
+
+        See :ref:`directories-in-pattern` for details.
 
         .. note::
 
@@ -207,8 +207,7 @@ class Finder:
         """Tuple of (prefix, start characters, end characters).
 
         Defines how groups are delimited in the pattern. Start and end character must be
-        balanced within the group. Prefix can be empty. If None, the default `%()` is
-        used.
+        balanced within the group. Prefix can be empty.
 
         .. note::
 
@@ -232,7 +231,7 @@ class Finder:
 
     @property
     def n_groups(self) -> int:
-        """Number of groups in pre-regex."""
+        """Number of groups in the pattern."""
         return len(self.groups)
 
     @property
@@ -248,7 +247,7 @@ class Finder:
 
     @property
     def files(self) -> list[Path]:
-        """List of filenames.
+        """List of filenames scanned (absolute paths).
 
         Lazily scan files: if files were already scanned, just return
         the stored list of filenames.
@@ -299,7 +298,7 @@ class Finder:
         return {g.name for g in groups}
 
     def get_date_names(self) -> set[str]:
-        """Get the names of date pseudo-groups.
+        """Get the names of date pseudo-groups in the pattern.
 
         Examples
         --------
@@ -337,7 +336,7 @@ class Finder:
         nested:
             If not None, return nested list of filenames with each level
             corresponding to a group, or set of group. Last set in the list
-            is at the innermost level.
+            is at the innermost level. See :ref:`retrieve-files` for details.
 
         Raises
         ------
@@ -409,8 +408,8 @@ class Finder:
 
         Values can be a string, or a value that will be formatted using the group format
         string. A string will be interpreted as a regular expression, so all special
-        characters should be properly escaped. A list of values will be joined by the
-        regex '|' OR.
+        characters should be properly escaped. A list of values will be joined by the OR
+        regex '|'. See :ref:`fixing` for details.
 
         Parameters
         ----------
@@ -445,7 +444,7 @@ class Finder:
         Parameters
         ----------
         keys:
-           Keys to find groups to unfix. If no key is provided, all groups will be
+           Keys to select groups to unfix. If no key is provided, all groups will be
            unfixed.
         """
         if not keys:
@@ -461,7 +460,9 @@ class Finder:
     def add_filter(self, func: Callable[..., bool], **kwargs: Any) -> None:
         """Add a filter with which to select scanned files.
 
-        The filter will be applied to files already in the cache.
+        When a file is scanned, if it matches the pattern, it will only be kept if
+        `func` returns True when called. The filter will be applied to files already in
+        the cache.
 
         Parameters
         ----------
@@ -471,6 +472,7 @@ class Finder:
             otherwise.
         kwargs
             Will be passed to the function when executed.
+
         """
         filt = self.filters.add(func, **kwargs)
 
@@ -489,10 +491,8 @@ class Finder:
         """Add a filter acting on a group match value.
 
         When a file is scanned, if it matches the pattern, it will only be kept if
-        `func` returns True when called with the group parsed value. If the group cannot
-        parse the value: if `pass_unparse` is True the unparsed string will be passed to
-        the predicate function nonetheless, otherwise it will not keep the file
-        (default).
+        `func` returns True when called with the group parsed value. The filter will be
+        applied to files already in the cache.
 
         Parameters
         ----------
@@ -510,8 +510,8 @@ class Finder:
             * "raise": Raise a ValueError (default).
             * "pass_unparsed": Pass the unparsed string to the filter function. Cannot
               be used for date pseudo-groups.
-            * "fail": The filter fails for this value (as if returning False).
-            * "pass": The filter passes for this value (as if returning True).
+            * "fail": fail the filter for this value (as if returning False).
+            * "pass": pass the filter for this value (as if returning True).
         default_date
             Default date elements to use when retrieving date. See :ref:`dates`.
         kwargs
@@ -548,7 +548,7 @@ class Finder:
         Parameters
         ----------
         keys:
-            Name of date pseudo-groups to remove filters from. If empty, all group
+            Name of date pseudo-groups to remove filters for. If empty, all group
             filters will be removed.
         """
         date_names = self.get_date_names()
@@ -577,8 +577,9 @@ class Finder:
     ) -> FileMatch | None:
         """Find matches for a given filename.
 
-        Apply regex to `filename` and return the results as a :class:`~.matches.Matches`
-        object. Fixed values are applied as normal.
+        Apply regex to `filename` and return the results as a
+        :class:`~.matches.FileMatch` object. Fixed values are applied as normal. Filters
+        are *not* applied.
 
         Parameters
         ----------
@@ -595,7 +596,8 @@ class Finder:
         Returns
         -------
         matches
-            A :class:`~.matches.Matches` object, or None if the filename did not match.
+            A :class:`~.matches.FileMatch` object, or None if the filename did not
+            match.
         """
         filename = _to_path(filename)
         if not relative:
@@ -629,10 +631,11 @@ class Finder:
         relative: bool = False,
         **kw_fixes: Any,
     ) -> Path:
-        """Return a filename.
+        """Create a filename by supplying values for all groups.
 
         Replace groups with provided values.
-        All groups must be fixed prior, or with `fixes` argument.
+        All groups must be either be fixed or given a value via arguments, except for
+        optional groups.
 
         Only works if :attr:`regex_outside_groups` is set to False (default).
 
@@ -640,8 +643,8 @@ class Finder:
         ----------
         fixes:
             Dictionnary of fixes (group name or index: value). For details, see
-            :func:`fix`. Will (temporarily) supplant group fixed prior. If fix is a
-            list, first item will be used.
+            :func:`fix`. Will (temporarily) override a previously fixed value. If fix is
+            a list, first item will be used.
         relative:
             If the filename should be relative to the finder root directory.
             Default is False.
@@ -775,8 +778,8 @@ class Finder:
     def find_files(self) -> None:
         """Find files to scan and store them in cache.
 
-        Is automatically called when accessing :attr:`matches` or :func:`get_files`.
-        Apply all filters and sort files alphabetically.
+        See :ref:`find-files` for details. Is automatically called when accessing
+        :attr:`matches`, :attr:`files` or :func:`get_files`.
         """
         if self.scanned:
             self.clear_cache()

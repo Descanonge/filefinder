@@ -33,7 +33,7 @@ multiple optional properties, separated by colons (in no particular order):
    |:ref:`Optional      |``:opt``                  |Mark the group as optional.     |
    |flag<opt>`          |                          |                                |
    +--------------------+--------------------------+--------------------------------+
-   |:ref:`pre-post`     |``:pre=<prefix>`` et      |Add prefix or suffix to the     |
+   |:ref:`pre-post`     |``:pre=<prefix>`` and     |Add prefix or suffix to the     |
    |                    |``:post=<suffix>``        |group.                          |
    +--------------------+--------------------------+--------------------------------+
 
@@ -127,8 +127,8 @@ A simple way to specify a group is by using a format string following the
 `Format Mini Language Specification
 <https://docs.python.org/3/library/string.html#formatspec>`__. This will
 automatically be transformed into a regular expression.
-It's easy as ``scale_%(scale:fmt=.1f)`` which will find files such as
-``scale_15.0`` or ``scale_-5.6``.
+It's easy as ``scale_%(scale:fmt=.1f)`` which will match ``scale_15.0`` or
+``scale_-5.6``.
 
 Because we know how to transform a value into a string we can fix the group
 directly with a value::
@@ -150,7 +150,7 @@ If the format is never specified, it defaults to a ``s`` format.
    Only s, d, f, e, and E format types are supported.
 
    Parsing of numbers will fail in some ambiguous (and quite unrealistic) cases
-   that involves alignment padding with numbers or the minus signs. Creating a
+   that involve alignment padding with numbers or the minus signs. Creating a
    format object where we can't unambiguously remove the padding character is
    not allowed and will raise a :class:`~format.DangerousFormatError`.
 
@@ -169,12 +169,12 @@ The boolean format allows to easily select between two *strings*. It is
 specified as ``:bool=<true>[:<false>]``. The second option (false) can be
 omitted if empty.
 
-Here are a couple of examples. ``my_file%(special:bool=_special).txt`` would
-match both ``my_file.txt`` and ``my_file_special.txt``. We would select only
-'special' files using ``finder.fix(special=True)``.
+For example ``my_file%(special:bool=_special).txt`` would match both
+"my_file.txt" and "my_file_special.txt". We can select only 'special'
+files using ``finder.fix(special=True)``.
 
-We can also specify both options with ``my_file_%(is_good:bool=good:bad).txt``, and
-select either like so:
+We can also specify both options with ``my_file_%(is_good:bool=good:bad).txt``,
+and select either like so:
 
     >>> finder.make_filename(is_good=True)
     my_file_good.txt
@@ -190,7 +190,7 @@ Optional flag
 The optional flag ``:opt`` marks the group as an optional part of the pattern.
 It can be thought as appending a ``?`` to the group regular expression.
 
-For instance, ``A%(param:fmt=d).txt`` would match "A.txt", "A0.txt", etc.
+For instance, ``A%(param:fmt=d:opt).txt`` would match "A.txt" and "A0.txt".
 If the group is not present, the parsed value will be `None`. When fixed to
 the value `None`, this will only match files without the group (*ie* "A.txt")
 
@@ -215,10 +215,10 @@ parse the value as an integer when present.
 Custom regex
 ============
 
-Finally, one can directly use a regular expression. This will supersede
-the default regex, or the one generated from the format string if specified.
-
-It can be done like so::
+Finally, one can directly specify the regular expression to use. This will
+supersede the regex from a date element or the one generated from the format
+string if specified.
+For instance::
 
   idx_%(idx:rgx=\d+?)
 
@@ -233,9 +233,10 @@ Regex outside groups
 ====================
 
 By default, special characters (``()[]{}?*+-|^$\\.&~# \t\n\r\v\f``) outside of
-groups are escaped, and thus not interpreted as a regular expression.
-To use regular expressions outside of groups, it is necessary
-to pass ``use_regex=True`` when creating the Finder object.
+groups are escaped, and thus not interpreted as a regular expression. To use
+regular expressions outside of groups, it is necessary to set
+:attr:`~.Finder.regex_outside_groups` to True (as a property or when creating
+the Finder).
 
 .. note::
 

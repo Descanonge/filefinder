@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 GroupKey = int | str
-"""Can be used to select one or more groups in a pattern."""
+"""Type to use to select one or more groups in a pattern."""
 
 
 class GroupParseError(Exception):
@@ -26,7 +26,9 @@ class GroupSpecs:
     """Parse and validate definition."""
 
     KEYVALS: ClassVar[list[str]] = ["fmt", "rgx", "pre", "post", "bool"]
+    """Specs in the group definition that correspond to key-values."""
     FLAGS: ClassVar[list[str]] = ["opt"]
+    """Specs in the group definition that correspond to flags."""
     DEF_PATTERN: ClassVar[re.Pattern] = re.compile(
         "(?P<name>[^:]+)(?:"
         "(?P<fmt>:fmt.+?)"
@@ -37,6 +39,7 @@ class GroupSpecs:
         "|(?P<opt>:opt)"
         "){,6}"
     )
+    """Regex pattern to find definition specs."""
 
     def __init__(
         self,
@@ -148,12 +151,12 @@ class Group:
     }
     """Regex and format strings for various default groups.
 
-    See the :ref:`name` section of documentation for details.
+    See :ref:`name` for details.
     """
 
     def __init__(self, definition: str, idx: int) -> None:
         self.definition: str = definition
-        """The string that created the group: ``%(definition)``."""
+        """The string that created the group ``%(definition)``."""
         self.idx: int = idx
         """Index inside the pre-regex."""
 
@@ -259,7 +262,7 @@ class Group:
         return self.fmt.format(value)
 
     def parse(self, string: str) -> Any:
-        """Return parsed value from string."""
+        """Parse value from string."""
         if self.prefix:
             string = string.removeprefix(self.prefix)
         if self.suffix:
@@ -282,7 +285,7 @@ class Group:
         Parameters
         ----------
         fix:
-            String or value to fix.
+            String or value to fix:
 
         Returns
         -------

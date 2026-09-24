@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable, Iterator, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from .matches import FileMatch
 
@@ -73,9 +73,13 @@ class FilterByGroup(Filter):
         keyword arguments, and return whether to keep the file or not.
     indices:
         The indices of groups that should be used to retrieve the value.
-    pass_unparsed:
-        If True and a group has failed to parse its value do not raise and pass the
-        unparsed matched string. Default is False (raise on parsing failure).
+    on_parse_failure:
+        How to act if the group fails to parse its value:
+
+        * "raise": Raise a ValueError (default).
+        * "pass_unparsed": Pass the unparsed string to the filter function.
+        * "fail": The filter fails for this value (as if returning False).
+        * "pass": The filter passes for this value (as if returning True).
     kwargs:
         Passed to the filter function.
     """
@@ -88,13 +92,13 @@ class FilterByGroup(Filter):
         user_func: Callable[..., bool],
         indices: Sequence[int],
         *,
-        pass_unparsed: bool = False,
+        on_parse_failure: Literal["raise", "pass_unparsed", "pass", "fail"] = "raise",
         **kwargs: Any,
     ) -> None:
         self.indices: list[int] = list(indices)
         """List of group indices to apply this filter upon."""
-        self.pass_unparsed: bool = pass_unparsed
-        """Whether to pass unparsed groups to the filter."""
+        self.on_parse_failure = on_parse_failure
+        """How to act if a group fails to parse its value."""
         super().__init__(user_func, **kwargs)
 
     def _get_name(self) -> str:
@@ -113,8 +117,20 @@ class FilterByGroup(Filter):
             values: list[Any] = []
             for i in self.indices:
                 m = filematch.matches[i]
-                if not m.can_parse() and self.pass_unparsed:
-                    values.append(m.match_str)
+                if not m.can_parse():
+                    match self.on_parse_failure:
+                        case "raise":
+                            raise ValueError(f"Failed to parse value for group {m}")
+                        case "pass_unparsed":
+                            values.append(m.match_str)
+                        case "pass":
+                            continue
+                        case "fail":
+                            return False
+                        case x:
+                            raise KeyError(
+                                f"Unrecognised value '{x}' for on_parse_failure."
+                            )
                 else:
                     values.append(m.match_parsed)
 
@@ -142,6 +158,12 @@ class FilterByDate(Filter):
         Name of the date pseudo-group that will be used to retrieve a value.
     default_date:
         Default date elements that will be used if missing from the filename.
+    on_parse_failure:
+        How to act if the group fails to parse its value:
+
+        * "raise": Raise a ValueError (default).
+        * "fail": The filter fails for this value (as if returning False).
+        * "pass": The filter passes for this value (as if returning True).
     kwargs:
         Passed to the filter function.
     """
@@ -155,12 +177,21 @@ class FilterByDate(Filter):
         date_name: str,
         *,
         default_date: DefaultDate = None,
+        on_parse_failure: Literal["raise", "pass", "fail"] = "raise",
         **kwargs: Any,
     ) -> None:
         self.date_name: str = date_name
         """Name of the corresponding pseudo-group."""
         self.default_date: DefaultDate = default_date
         """Default date elements to use when recovering date."""
+        self.on_parse_failure = on_parse_failure
+        """How to act if a group fails to parse its value."""
+
+        if on_parse_failure == "pass_unparsed":
+            raise KeyError(
+                "Cannot use 'on_parse_failure=\"pass_unparsed\"' for pseudo-date group."
+            )
+
         super().__init__(user_func, **kwargs)
 
     def get_filter_func(self) -> FilterFunc:
@@ -171,7 +202,26 @@ class FilterByDate(Filter):
         """
 
         def filt(finder: Finder, filematch: FileMatch) -> bool:  # noqa: ARG001
-            date = filematch.get_value(self.date_name, default_date=self.default_date)
+            try:
+                date = filematch.get_value(
+                    self.date_name, default_date=self.default_date
+                )
+            except Exception as e:
+                match self.on_parse_failure:
+                    case "raise":
+                        raise ValueError(
+                            f"Error when parsing date '{self.date_name}' "
+                            f"for filename '{filematch.filename}'"
+                        ) from e
+                    case "pass":
+                        return True
+                    case "fail":
+                        return False
+                    case x:
+                        raise KeyError(
+                            f"Unrecognised value '{x}' for on_parse_failure."
+                        ) from None
+
             return self.partial_func(date)
 
         return filt

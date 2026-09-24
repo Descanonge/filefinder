@@ -75,9 +75,13 @@ class GroupMatch:
             else:
                 try:
                     self._parsed = self.group.parse(self.match_str)
-                except ValueError:
+                except ValueError as e:
                     self._parsed = ParseStatus.FAILED
-                    logger.debug("Failed to parse for group %s", str(self.group))
+                    logger.debug(
+                        "Failed to parse for group %s, got error %s",
+                        str(self.group),
+                        str(e),
+                    )
         return self._parsed
 
     def can_parse(self) -> bool:

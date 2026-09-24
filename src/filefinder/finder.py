@@ -8,7 +8,7 @@ import re
 import warnings
 from collections.abc import Callable, Generator, Sequence
 from pathlib import Path
-from typing import Any, cast, overload
+from typing import Any, Literal, cast, overload
 
 from .filters import FilterByDate, FilterByGroup, FilterList
 from .group import Group, GroupKey, get_date_names, get_groups_indices
@@ -481,7 +481,7 @@ class Finder:
         func: Callable[..., bool],
         *,
         default_date: DefaultDate = None,
-        pass_unparsed: bool = False,
+        on_parse_failure: Literal["raise", "pass_unparsed", "pass", "fail"] = "raise",
         **kwargs: Any,
     ) -> None:
         """Add a filter acting on a group match value.
@@ -502,10 +502,14 @@ class Finder:
         func
             A function that takes the parsed value of the group and returns True if the
             corresponding file should be kept, or False otherwise.
-        pass_unparsed
-            In case the group cannot parse the string, if True pass the unparsed string
-            to the predicate function `func` anyway. If False (default) the file will
-            not be kept.
+        on_parse_failure
+            How to act if the group fails to parse its value:
+
+            * "raise": Raise a ValueError (default).
+            * "pass_unparsed": Pass the unparsed string to the filter function. Cannot
+              be used for date pseudo-groups.
+            * "fail": The filter fails for this value (as if returning False).
+            * "pass": The filter passes for this value (as if returning True).
         default_date
             Default date elements to use when retrieving date. See :ref:`dates`.
         kwargs
@@ -514,13 +518,17 @@ class Finder:
         filt: FilterByGroup | FilterByDate
         if key in self.get_date_names():
             filt = self.filters.add_by_date(
-                func, key, default_date=default_date, **kwargs
+                func,
+                key,
+                default_date=default_date,
+                on_parse_failure=on_parse_failure,
+                **kwargs,
             )
 
         else:
             indices = get_groups_indices(self.groups, key)
             filt = self.filters.add_by_group(
-                func, indices, pass_unparsed=pass_unparsed, **kwargs
+                func, indices, on_parse_failure=on_parse_failure, **kwargs
             )
 
         if self.scanned:
@@ -785,9 +793,9 @@ class Finder:
 
     def _add_file(self, filename: Path, pattern: re.Pattern) -> None:
         """Add file to cache if it matches pattern and pass filters."""
-        matches = self.find_matches(filename, relative=True, pattern=pattern)
-        if matches is not None and self.filters.is_valid(self, matches):
-            self._matches.append(matches)
+        filematch = self.find_matches(filename, relative=True, pattern=pattern)
+        if filematch is not None and self.filters.is_valid(self, filematch):
+            self._matches.append(filematch)
 
     def _walk(self) -> Generator[tuple[int, Path, list[str], list[str]]]:
         """Recursively iterate over directories and files.

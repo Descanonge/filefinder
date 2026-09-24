@@ -4,6 +4,8 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from filefinder.filters import Filter, FilterByDate, FilterByGroup, FilterList
 from filefinder.finder import Finder
 from filefinder.group import Group
@@ -209,3 +211,75 @@ class TestFilterExecute:
         filters.remove_by_group([2])
         assert is_valid_([1, 0, 0])
         assert not is_valid_([0, 0, 2])
+
+
+class TestParseFailure:
+    def test_by_group(self) -> None:
+        g1 = Group("a:fmt=d", 0)
+        g2 = Group("b:fmt=d", 1)
+        filematch = FileMatch(
+            Path(),
+            Path("abc_1"),
+            [GroupMatch(g1, "abc", 0, 0), GroupMatch(g2, "2", 0, 0)],
+            [g1, g2],
+        )
+
+        def func(x: int | str) -> bool:
+            return isinstance(x, str) or x % 2 == 0
+
+        # raise
+        filt = FilterByGroup(func, indices=[0, 1], on_parse_failure="raise")
+        with pytest.raises(ValueError):
+            is_valid(filt, filematch)
+
+        # pass_unparsed
+        filt = FilterByGroup(func, indices=[0, 1], on_parse_failure="pass_unparsed")
+        assert is_valid(filt, filematch)
+
+        # pass
+        filt = FilterByGroup(func, indices=[0, 1], on_parse_failure="pass")
+        assert is_valid(filt, filematch)
+
+        # fail
+        filt = FilterByGroup(func, indices=[0, 1], on_parse_failure="fail")
+        assert not is_valid(filt, filematch)
+
+        # unsupported option
+        filt = FilterByGroup(func, indices=[0, 1], on_parse_failure="wrong")  # type: ignore[arg-type]
+        with pytest.raises(KeyError):
+            is_valid(filt, filematch)
+
+    def test_by_date(self) -> None:
+        g1 = Group("Y", 0)
+        g2 = Group("Y", 1)
+        filematch = FileMatch(
+            Path(),
+            Path("2086_2087"),
+            [GroupMatch(g1, "2086", 0, 0), GroupMatch(g2, "2087", 0, 0)],
+            [g1, g2],
+        )
+
+        def func(_: Any) -> bool:
+            return True
+
+        # raise
+        filt = FilterByDate(func, "date", on_parse_failure="raise")
+        with pytest.raises(ValueError):
+            is_valid(filt, filematch)
+
+        # pass_unparsed
+        with pytest.raises(KeyError):
+            filt = FilterByDate(func, "date", on_parse_failure="pass_unparsed")  # type: ignore[arg-type]
+
+        # pass
+        filt = FilterByDate(func, "date", on_parse_failure="pass")
+        assert is_valid(filt, filematch)
+
+        # fail
+        filt = FilterByDate(func, "date", on_parse_failure="fail")
+        assert not is_valid(filt, filematch)
+
+        # unsupported option
+        filt = FilterByDate(func, "date", on_parse_failure="wrong")  # type: ignore[arg-type]
+        with pytest.raises(KeyError):
+            is_valid(filt, filematch)

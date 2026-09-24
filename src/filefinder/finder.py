@@ -56,7 +56,7 @@ class Finder:
     root:
         The root directory of the filetree where all files can be found. If not
         supplied, the current working directory will be used.
-    use_regex:
+    regex_outside_groups:
         If True, characters outside of groups are considered as valid regex (and
         not escaped). Default is False.
     scan_everything:
@@ -81,7 +81,7 @@ class Finder:
         pattern: str,
         *,
         root: str | Path | None = None,
-        use_regex: bool = False,
+        regex_outside_groups: bool = False,
         scan_everything: bool = False,
         follow_symlinks: bool = False,
         group_delimiters: tuple[str, str, str] | None = None,
@@ -91,7 +91,7 @@ class Finder:
         self.root: Path = _to_path(root)
         """The root directory containing files."""
 
-        self._use_regex: bool = use_regex
+        self._regex_outside_groups: bool = regex_outside_groups
         self._scan_everything: bool = scan_everything
         self._follow_symlinks: bool = follow_symlinks
         if group_delimiters is None:
@@ -122,8 +122,9 @@ class Finder:
 
         .. note::
 
-            Property can be set. If the given value is different from the current one,
-            the cache will be cleared, group objects re-created, all filters removed.
+            This property can be set. If the given value is different from the current
+            one, the cache will be cleared, group objects re-created, all filters
+            removed.
         """
         return self._pattern
 
@@ -151,20 +152,20 @@ class Finder:
         ]
 
     @property
-    def use_regex(self) -> bool:
+    def regex_outside_groups(self) -> bool:
         """If True, characters outside of groups are considered as valid regex.
 
         .. note::
 
-            Property can be set. If the given value is different from the current one,
-            the cache will be cleared.
+            This property can be set. If the given value is different from the current
+            one, the cache will be cleared.
         """
-        return self._use_regex
+        return self._regex_outside_groups
 
-    @use_regex.setter
-    def use_regex(self, use_regex: bool) -> None:
-        if use_regex != self._use_regex:
-            self._use_regex = use_regex
+    @regex_outside_groups.setter
+    def regex_outside_groups(self, regex_outside_groups: bool) -> None:
+        if regex_outside_groups != self._regex_outside_groups:
+            self._regex_outside_groups = regex_outside_groups
             self.clear_cache()
 
     @property
@@ -173,8 +174,8 @@ class Finder:
 
         .. note::
 
-            Property can be set. If the given value is different from the current one,
-            the cache will be cleared.
+            This property can be set. If the given value is different from the current
+            one, the cache will be cleared.
         """
         return self._scan_everything
 
@@ -190,8 +191,8 @@ class Finder:
 
         .. note::
 
-            Property can be set. If the given value is different from the current one,
-            the cache will be cleared.
+            This property can be set. If the given value is different from the current
+            one, the cache will be cleared.
         """
         return self._follow_symlinks
 
@@ -211,8 +212,9 @@ class Finder:
 
         .. note::
 
-            Property can be set. If the given value is different from the current one,
-            the cache will be cleared, group objects re-created, all filters removed.
+            This property can be set. If the given value is different from the current
+            one, the cache will be cleared, group objects re-created, all filters
+            removed.
         """
         return self._group_delimiters
 
@@ -632,7 +634,7 @@ class Finder:
         Replace groups with provided values.
         All groups must be fixed prior, or with `fixes` argument.
 
-        Only works if :attr:`use_regex` is set to False (default).
+        Only works if :attr:`regex_outside_groups` is set to False (default).
 
         Parameters
         ----------
@@ -651,10 +653,10 @@ class Finder:
         KeyError
             Some group has no fixed value.
         """
-        if self.use_regex:
+        if self.regex_outside_groups:
             raise ValueError(
                 "Cannot generate a valid filename if regex "
-                "is present outside groups (`use_regex=True`)."
+                "is present outside groups (`regex_outside_groups=True`)."
             )
 
         if fixes is None:
@@ -750,7 +752,7 @@ class Finder:
             separator for the current OS.
         """
         segments = self.segments.copy()
-        if not self.use_regex:
+        if not self.regex_outside_groups:
             # escape regex outside groups
             segments = [
                 s if (i % 2 == 1) else re.escape(s) for i, s in enumerate(segments)

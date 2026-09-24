@@ -196,7 +196,7 @@ class TestClearCache:
         with self.assert_cleared(finder, clear=False):
             finder.scan_everything = False
         with self.assert_cleared(finder, clear=False):
-            finder.use_regex = False
+            finder.regex_outside_groups = False
         with self.assert_cleared(finder, clear=False):
             finder.follow_symlinks = False
 
@@ -204,7 +204,7 @@ class TestClearCache:
         with self.assert_cleared(finder):
             finder.scan_everything = True
         with self.assert_cleared(finder):
-            finder.use_regex = True
+            finder.regex_outside_groups = True
         with self.assert_cleared(finder):
             finder.follow_symlinks = True
 
@@ -677,7 +677,7 @@ class TestMakeFilename:
         with pytest.raises(KeyError):
             finder.make_filename(fmt_int=1, bool=True)
 
-        finder = Finder("", use_regex=True, root="")
+        finder = Finder("", regex_outside_groups=True, root="")
         with pytest.raises(ValueError):
             finder.make_filename()
 

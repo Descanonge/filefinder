@@ -30,7 +30,7 @@ def assert_fixed(
     value: Any | None = None,
     string: str | list[str] | None = None,
     regex: str | None = None,
-):
+) -> None:
     assert group.fixed
     assert group.fixed_value == value  # check even if None for optional groups
     if string is not None:
@@ -39,7 +39,7 @@ def assert_fixed(
         assert group.fixed_regex == regex
 
 
-def assert_unfixed(group: Group):
+def assert_unfixed(group: Group) -> None:
     assert group.fixed_value is None
     assert group.fixed_string is None
     assert group.fixed_regex is None

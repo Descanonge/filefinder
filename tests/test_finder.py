@@ -17,7 +17,7 @@ from lib import assert_fixed, assert_unfixed
 from lib.tmp_dir import TmpDirectory, TmpDirectoryExample, date_range
 
 from filefinder import Finder
-from filefinder.group import Group
+from filefinder.group import Group, get_date_names, get_groups_indices
 from filefinder.matches import FileMatch, ParseStatus
 
 log = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ class PatternExample:
     names: list[str]
 
 
-pattern = PatternExample(
+pattern_general = PatternExample(
     pattern=(
         "A_%(fmt_int:fmt=02d)_%(fmt_str:fmt=s)_%(custom_rgx:rgx=.*)_"
         "%(bool:bool=true.:false.)%(optional:fmt=.1f:pre=_:opt).txt"
@@ -49,14 +49,72 @@ pattern_datetime = PatternExample(
     names=["F", "H", "M", "S", "date2__x", "date2__X"],
 )
 
-pattern_examples = [pattern, pattern_double, pattern_dates, pattern_datetime]
+pattern_examples = [pattern_general, pattern_double, pattern_dates, pattern_datetime]
+
+
+class TestGetGroupIndices:
+    @pytest.mark.parametrize("pattern", pattern_examples)
+    def test_int(self, pattern: PatternExample) -> None:
+        finder = Finder(pattern.pattern)
+        groups = finder.groups
+
+        for i in range(len(groups)):
+            assert get_groups_indices(groups, i) == [i]
+
+        with pytest.raises(IndexError):
+            get_groups_indices(groups, len(groups))
+
+    def test_str(self) -> None:
+        finder = Finder(pattern_general.pattern)
+        groups = finder.groups
+        assert get_groups_indices(groups, "fmt_int") == [0]
+        assert get_groups_indices(groups, "fmt_str") == [1]
+        assert get_groups_indices(groups, "custom_rgx") == [2]
+        assert get_groups_indices(groups, "bool") == [3]
+        assert get_groups_indices(groups, "optional") == [4]
+
+        finder = Finder(pattern_double.pattern)
+        groups = finder.groups
+        assert get_groups_indices(groups, "fmt_int") == [0, 1]
+        assert get_groups_indices(groups, "other") == [2]
+
+        finder = Finder(pattern_dates.pattern)
+        groups = finder.groups
+        assert get_groups_indices(groups, "Y") == [0, 1]
+        assert get_groups_indices(groups, "m") == [2]
+        assert get_groups_indices(groups, "d") == [3]
+        assert get_groups_indices(groups, "j") == [4]
+        assert get_groups_indices(groups, "date2__Y") == [5]
+        assert get_groups_indices(groups, "date2__m") == [6]
+        assert get_groups_indices(groups, "date2__d") == [7]
+        assert get_groups_indices(groups, "date2__j") == [8]
+
+    def test_dates(self) -> None:
+        finder = Finder(pattern_general.pattern)
+        groups = finder.groups
+        with pytest.raises(IndexError):
+            assert get_groups_indices(groups, "date")
+
+        finder = Finder(pattern_dates.pattern)
+        groups = finder.groups
+        assert get_groups_indices(groups, "date") == [0, 1, 2, 3, 4]
+        assert get_groups_indices(groups, "date2") == [5, 6, 7, 8]
+
+        finder = Finder(pattern_datetime.pattern)
+        groups = finder.groups
+        assert get_groups_indices(groups, "date") == [0, 1, 2, 3]
+        assert get_groups_indices(groups, "date2") == [4, 5]
+
+        finder = Finder("%(start__Y)%(start__j)_%(end__Y)%(end__j)")
+        groups = finder.groups
+        assert get_groups_indices(groups, "start") == [0, 1]
+        assert get_groups_indices(groups, "end") == [2, 3]
+        with pytest.raises(IndexError):
+            assert get_groups_indices(groups, "date")
 
 
 class TestCreation:
-    @pytest.mark.parametrize(
-        "pattern",
-        pattern_examples,
-    )
+    @pytest.mark.parametrize("pattern", pattern_examples)
     def test_group_names(self, pattern: PatternExample) -> None:
         """Test that we retain group names, and the correct number of groups."""
         f = Finder(pattern.pattern)
@@ -71,6 +129,23 @@ class TestCreation:
             f.fix({name: "a"})
             fixed.add(name)
         assert f.get_group_names(fixed=True) == fixed
+
+    def test_get_date_names(self) -> None:
+        finder = Finder(pattern_general.pattern)
+        assert get_date_names(finder.groups) == set()
+        assert finder.get_date_names() == set()
+
+        finder = Finder(pattern_dates.pattern)
+        assert get_date_names(finder.groups) == {"date", "date2"}
+        assert finder.get_date_names() == {"date", "date2"}
+
+        finder = Finder(pattern_datetime.pattern)
+        assert get_date_names(finder.groups) == {"date", "date2"}
+        assert finder.get_date_names() == {"date", "date2"}
+
+        finder = Finder("%(start__Y)%(start__j)_%(end__Y)%(end__j)")
+        assert get_date_names(finder.groups) == {"start", "end"}
+        assert finder.get_date_names() == {"start", "end"}
 
     def test_find_groups(self) -> None:
         """Groups are found at the right place."""
@@ -119,8 +194,8 @@ class TestCreation:
             groups = f.get_groups(key)
             assert [g.idx for g in groups] == indices
 
-        f = Finder(pattern.pattern)
-        for i, name in enumerate(pattern.names):
+        f = Finder(pattern_general.pattern)
+        for i, name in enumerate(pattern_general.names):
             assert_indices(f, name, [i])
 
         f = Finder(pattern_double.pattern)
@@ -179,7 +254,7 @@ class TestCreation:
 
     def test_regex(self) -> None:
         """Test that the correct regex is generated."""
-        f = Finder(pattern.pattern)
+        f = Finder(pattern_general.pattern)
         assert f.get_regex() == (
             r"A_(-?0*\d+)_(.*?\ *)_(.*)_"
             r"(true\.|false\.)((?:_-?\d+\.\d{1})?)\.txt"
@@ -216,7 +291,7 @@ class AssertClear:
 
 class TestClearCache:
     def get_finder(self) -> Finder:
-        return Finder(pattern.pattern)
+        return Finder(pattern_general.pattern)
 
     def assert_cleared(self, finder: Finder, **kwargs: bool) -> AssertClear:
         return AssertClear(finder, **kwargs)
@@ -312,7 +387,7 @@ class TestClearCache:
 
 class TestFixing:
     def test_fix(self) -> None:
-        finder = Finder(pattern.pattern)
+        finder = Finder(pattern_general.pattern)
         groups = {g.name: g for g in finder.groups}
 
         # Fix a single group
@@ -363,7 +438,7 @@ class TestFixing:
 
         Also test fixing of group with prefix.
         """
-        finder = Finder(pattern.pattern)
+        finder = Finder(pattern_general.pattern)
         groups = {grp.name: grp for grp in finder.groups}
 
         # Format with a number
@@ -407,7 +482,7 @@ class TestFixing:
 
     def test_fix_multiple(self) -> None:
         """Test fixing list of values."""
-        finder = Finder(pattern.pattern)
+        finder = Finder(pattern_general.pattern)
         groups = {grp.name: grp for grp in finder.groups}
 
         # Format int
@@ -536,7 +611,7 @@ class TestMatches:
         if filename is None:
             filename = "A_05_abc_def_true._-15.2.txt"
 
-        finder = Finder(pattern.pattern)
+        finder = Finder(pattern_general.pattern)
         filematch = finder.find_matches(filename)
 
         assert filematch is not None
@@ -673,7 +748,7 @@ class TestMatches:
 
 class TestMakeFilename:
     def test_by_value(self) -> None:
-        finder = Finder(pattern.pattern, root="base")
+        finder = Finder(pattern_general.pattern, root="base")
 
         fixes: dict[str, Any] = {
             "fmt_int": 1,
@@ -692,7 +767,7 @@ class TestMakeFilename:
 
     def test_by_str(self) -> None:
         """String values are not escaped."""
-        finder = Finder(pattern.pattern, root="base")
+        finder = Finder(pattern_general.pattern, root="base")
 
         fixes: dict[str, Any] = {
             "fmt_int": "a+",
@@ -710,7 +785,7 @@ class TestMakeFilename:
         assert finder.make_filename() == filename
 
     def test_wrong(self) -> None:
-        finder = Finder(pattern.pattern, root="base")
+        finder = Finder(pattern_general.pattern, root="base")
 
         with pytest.raises(KeyError):
             finder.make_filename()
@@ -723,7 +798,7 @@ class TestMakeFilename:
 
     def test_fixed(self) -> None:
         """Test that only some values can be fixed, and correct overwrite."""
-        finder = Finder(pattern.pattern, root="base")
+        finder = Finder(pattern_general.pattern, root="base")
 
         finder.fix(
             fmt_int=1,
@@ -740,7 +815,7 @@ class TestMakeFilename:
 
     def test_optional(self) -> None:
         """Optional groups do not have to be fixed."""
-        finder = Finder(pattern.pattern, root="base")
+        finder = Finder(pattern_general.pattern, root="base")
 
         finder.fix(
             fmt_int=1,
@@ -753,7 +828,7 @@ class TestMakeFilename:
 
     def test_multiple_fix(self) -> None:
         """The first value is used when fixed to multiple values."""
-        finder = Finder(pattern.pattern, root="base")
+        finder = Finder(pattern_general.pattern, root="base")
 
         finder.fix(
             fmt_int=[1, 2, 3],

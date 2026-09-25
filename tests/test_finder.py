@@ -72,6 +72,46 @@ class TestCreation:
             fixed.add(name)
         assert f.get_group_names(fixed=True) == fixed
 
+    def test_find_groups(self) -> None:
+        """Groups are found at the right place."""
+        finder = Finder(pattern_general.pattern)
+        assert finder._find_groups(pattern_general.pattern) == [
+            ("fmt_int:fmt=02d", 2, 19),
+            ("fmt_str:fmt=s", 21, 36),
+            ("custom_rgx:rgx=.*", 38, 57),
+            ("bool:bool=true.:false.", 59, 83),
+            ("optional:fmt=.1f:pre=_:opt", 84, 112),
+        ]
+
+        with pytest.raises(ValueError):
+            finder._find_groups("A%(group_without_end]")
+
+        # dates + no space between groups
+        pattern = "%(start__Y)%(start__m)"
+        finder = Finder(pattern)
+        assert finder._find_groups(pattern) == [
+            ("start__Y", 0, 10),
+            ("start__m", 11, 21),
+        ]
+
+        # group definition contains parenthesis or percent
+        pattern = "A_%(b:rgx=(some_regex.*))"
+        finder = Finder(pattern)
+        assert finder._find_groups(pattern) == [("b:rgx=(some_regex.*)", 2, 24)]
+
+        # different group delimiters
+        pattern = "A_{{b:rgx=(some_regex.*)}}_{{c:fmt=02d}}"
+        finder = Finder(pattern, group_delimiters=("", "{{", "}}"))
+        assert finder._find_groups(pattern) == [
+            ("b:rgx=(some_regex.*)", 2, 25),
+            ("c:fmt=02d", 27, 39),
+        ]
+
+        # long prefix
+        pattern = "A_abc(a:fmt=02d)_abcB"
+        finder = Finder(pattern, group_delimiters=("abc", "(", ")"))
+        assert finder._find_groups(pattern) == [("a:fmt=02d", 2, 15)]
+
     def test_get_groups(self) -> None:
         """Test that Finder.get_groups return the correct indices given a group name."""
 

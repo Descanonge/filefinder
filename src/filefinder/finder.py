@@ -131,24 +131,6 @@ class Finder:
         if pattern != self._pattern:
             self.set_pattern(pattern)
 
-    def set_pattern(self, pattern: str) -> None:
-        """Set pattern, re-create group objects, remove all filters."""
-        self.clear_cache()
-        self.clear_filters()
-        self._pattern = pattern
-
-        found_groups = self._find_groups(pattern)
-
-        self.groups = []
-        splits = [0]  # separation between groups
-        for idx, (specs, start, end) in enumerate(found_groups):
-            self.groups.append(Group(specs, idx))
-            splits += [start, end]
-
-        self.segments = [
-            pattern[i:j] for i, j in zip(splits, [*splits[1:], None], strict=False)
-        ]
-
     @property
     def regex_outside_groups(self) -> bool:
         """If True, characters outside of groups are considered as valid regex.
@@ -697,6 +679,23 @@ class Finder:
             filename = self.root / filename
         return filename
 
+    def set_pattern(self, pattern: str) -> None:
+        """Set pattern, re-create group objects, remove all filters."""
+        self.clear_cache()
+        self.clear_filters()
+        self._pattern = pattern
+
+        found_groups = self._find_groups(pattern)
+
+        self.groups = []
+        splits = [0]  # separation between groups
+        for idx, (specs, start, end) in enumerate(found_groups):
+            self.groups.append(Group(specs, idx))
+            splits += [start, end + 1]
+        splits.append(len(pattern))
+
+        self.segments = [pattern[i:j] for i, j in itertools.pairwise(splits)]
+
     def _find_groups(self, pattern: str) -> list[tuple[str, int, int]]:
         """Find the groups within the pattern and their corresponding string indices.
 
@@ -705,8 +704,8 @@ class Finder:
         and last characters of the group (including delimiters).
 
         This implementation finds the matching pair defined by the attribute
-        :attr:`_group_delimiters`. A match of the start of a group that does not have a
-        matching end will raise.
+        :attr:`_group_delimiters`. If a group opening is found without an ending it will
+        raise.
         """
         grp_prefix, grp_start, grp_end = self.group_delimiters
         pattern_starts = re.escape(f"{grp_prefix}{grp_start}")
@@ -715,7 +714,6 @@ class Finder:
         groups_starts = [m.start() for m in re.finditer(pattern_starts, pattern)]
 
         output: list[tuple[str, int, int]] = []
-        # This finds the matching end characters for each group start
         for start in groups_starts:
             end = None
             level = 1
@@ -726,22 +724,22 @@ class Finder:
                 elif m.group() == grp_end:
                     level -= 1
                     if level == 0:  # matching parenthesis
-                        end = m.end()
-                        end_spec = end - len(grp_end)
+                        end = m.end() - 1
+                        end_spec = m.start() - 1
                         if end_spec <= 0:
                             raise RuntimeError(
                                 f"Error finding groups in pattern '{pattern}'"
                             )
                         break
 
-            if end is None:  # did not find matching parenthesis :(
+            if end is None:  # did not find matching parenthesis
                 end = start + 6
                 substr = pattern[start:end]
                 if end < len(self._pattern):
                     substr += "..."
                 raise ValueError(f"No group end found for '{substr}'")
 
-            output.append((pattern[start_spec:end_spec], start, end))
+            output.append((pattern[start_spec : end_spec + 1], start, end))
 
         return output
 
@@ -904,7 +902,7 @@ class Finder:
 
         Parameters
         ----------
-        key: int, str, or list of int
+        key
             Can be group index or name.
 
         Returns
@@ -913,8 +911,8 @@ class Finder:
 
         Raises
         ------
-        KeyError
-            No group found.
+        IndexError
+            No group found for key.
         TypeError
             Key type is not valid.
         """

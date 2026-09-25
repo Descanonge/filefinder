@@ -8,7 +8,8 @@ from typing import Any
 from hypothesis import strategies as st
 
 from filefinder.format import Format, FormatError
-from lib import MAX_CODEPOINT, MAX_TEXT_SIZE, Drawer, build_exclude, form
+
+from . import MAX_CODEPOINT, MAX_TEXT_SIZE, Drawer, build_exclude, form
 
 
 @dataclass

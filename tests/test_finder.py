@@ -704,6 +704,57 @@ class TestMatches:
         assert filematch["date"] == dt.datetime(2086, 3, 2)
         assert filematch["date2"] == dt.datetime(2087, 4, 3)
 
+    def test_all_date_formats(self) -> None:
+        finder = Finder("%(Y)_%(m)_%(d)_%(j)_%(H)_%(M)_%(S)_%(x)_%(X)_%(F)_%(B)")
+        d = dt.datetime(2086, 2, 4, 9, 7, 15)
+        filematch = finder.find_matches(
+            Path("2086_02_04_035_09_07_15_20860204_090715_2086-02-04_Feb")
+        )
+        assert filematch is not None
+        assert filematch["Y"] == 2086
+        assert filematch["m"] == 2
+        assert filematch["d"] == 4
+        assert filematch["j"] == 35
+        assert filematch["H"] == 9
+        assert filematch["M"] == 7
+        assert filematch["S"] == 15
+        assert filematch["x"] == 20860204
+        assert filematch["X"] == 90715
+        assert filematch["F"] == "2086-02-04"
+        assert filematch["B"] == "Feb"
+        assert filematch["date"] == d
+
+    def test_default_date(self) -> None:
+        finder = Finder("%(m)_%(d)_%(M)")
+        filematch = finder.find_matches(Path("04_28_17"))
+        assert filematch is not None
+        assert filematch["date"] == dt.datetime(1970, 4, 28, 0, 17)
+
+        # Use same as default
+        assert filematch.get_value(
+            "date", default_date=dt.datetime(1970, 1, 1)
+        ) == dt.datetime(1970, 4, 28, 0, 17)
+        assert filematch.get_value("date", default_date={}) == dt.datetime(
+            1970, 4, 28, 0, 17
+        )
+
+        # Change default time
+        assert filematch.get_value(
+            "date", default_date=dt.datetime(1970, 1, 1, 8, 35, 55)
+        ) == dt.datetime(1970, 4, 28, 8, 17, 55)
+        assert filematch.get_value(
+            "date",
+            default_date={"hour": 8, "minute": 35, "second": 55},
+        ) == dt.datetime(1970, 4, 28, 8, 17, 55)
+
+        # Change default date
+        assert filematch.get_value(
+            "date", default_date=dt.datetime(2012, 5, 6)
+        ) == dt.datetime(2012, 4, 28, 0, 17)
+        assert filematch.get_value(
+            "date", default_date={"year": 2012, "month": 5, "day": 6}
+        ) == dt.datetime(2012, 4, 28, 0, 17)
+
     def test_month(self) -> None:
         finder = Finder("%(Y)_%(B)")
 

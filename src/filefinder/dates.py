@@ -137,7 +137,7 @@ def date_from_doy(doy: int, year: int) -> dict[str, int]:
 
 
 def get_date(
-    matches: Sequence[GroupMatch], default_date: Mapping[str, int] | None = None
+    matches: Sequence[GroupMatch], default_date: DefaultDate | None = None
 ) -> dt.datetime:
     """Retrieve date from matched elements.
 
@@ -157,6 +157,12 @@ def get_date(
     """
     if default_date is None:
         default_date = {}
+    if isinstance(default_date, dt.datetime):
+        default_date = {
+            attr: getattr(default_date, attr)
+            for attr in ["year", "month", "day", "hour", "minute", "second"]
+        }
+
     # fill missing inputs
     default_date = {
         "year": 1970,

@@ -1,6 +1,5 @@
 """Matches management."""
 
-import datetime
 import logging
 import re
 import warnings
@@ -204,11 +203,6 @@ class FileMatch:
         matches = self.get_matches(key)
 
         if key in get_date_names(self.groups):
-            if isinstance(default_date, datetime.datetime):
-                default_date = {
-                    attr: getattr(default_date, attr)
-                    for attr in ["year", "month", "day", "hour", "minute", "second"]
-                }
             return [get_date(matches, default_date)]
 
         return [m.get_match(parse=parse) for m in matches]
@@ -218,7 +212,7 @@ class FileMatch:
         key: GroupKey,
         *,
         parse: bool = True,
-        default_date: DefaultDate = None,
+        default_date: DefaultDate | None = None,
     ) -> Any:
         """Get matched value corresponding to key.
 

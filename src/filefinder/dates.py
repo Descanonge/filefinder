@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .matches import GroupMatch
 
-DefaultDate = dt.datetime | Mapping[str, int] | None
+DefaultDate = dt.datetime | Mapping[str, int]
 """Type for default_date argument."""
 
 DATETIME_KEYS = "YBmdjHMSFxX"

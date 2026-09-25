@@ -176,13 +176,13 @@ class FilterByDate(Filter):
         user_func: Callable[..., bool],
         date_name: str,
         *,
-        default_date: DefaultDate = None,
+        default_date: DefaultDate | None = None,
         on_parse_failure: Literal["raise", "pass", "fail"] = "raise",
         **kwargs: Any,
     ) -> None:
         self.date_name: str = date_name
         """Name of the corresponding pseudo-group."""
-        self.default_date: DefaultDate = default_date
+        self.default_date: DefaultDate | None = default_date
         """Default date elements to use when recovering date."""
         self.on_parse_failure = on_parse_failure
         """How to act if a group fails to parse its value."""
@@ -277,7 +277,7 @@ class FilterList:
         self,
         func: Callable[..., bool],
         date_name: str,
-        default_date: DefaultDate = None,
+        default_date: DefaultDate | None = None,
         on_parse_failure: Literal["raise", "pass", "fail"] = "raise",
         **kwargs: Any,
     ) -> FilterByDate:

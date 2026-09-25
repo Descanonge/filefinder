@@ -466,7 +466,7 @@ class Finder:
         key: GroupKey,
         func: Callable[..., bool],
         *,
-        default_date: DefaultDate = None,
+        default_date: DefaultDate | None = None,
         on_parse_failure: Literal["raise", "pass_unparsed", "pass", "fail"] = "raise",
         **kwargs: Any,
     ) -> None:

@@ -183,7 +183,7 @@ class FileMatch:
         key: GroupKey,
         *,
         parse: bool = True,
-        default_date: DefaultDate = None,
+        default_date: DefaultDate | None = None,
     ) -> list[Any]:
         """Get matched values corresponding to key.
 

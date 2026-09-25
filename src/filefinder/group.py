@@ -421,11 +421,13 @@ def get_groups_indices(groups: list[Group], key: GroupKey) -> list[int]:
     Raises
     ------
     IndexError
-        No group found corresponding to the key
+        No group corresponding to the key
     TypeError
         Key is not int or str
     """
     if isinstance(key, int):
+        if key < 0 or key >= len(groups):
+            raise IndexError(f"Group index {key} out of range ({len(groups)} groups)")
         return [key]
     if isinstance(key, str):
         selected = [

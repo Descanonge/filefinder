@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import calendar
 import datetime as dt
 import logging
 import os
@@ -702,6 +703,24 @@ class TestMatches:
 
         assert filematch["date"] == dt.datetime(2086, 3, 2)
         assert filematch["date2"] == dt.datetime(2087, 4, 3)
+
+    def test_month(self) -> None:
+        finder = Finder("%(Y)_%(B)")
+
+        name = calendar.month_name[2]
+        names = [
+            name,
+            name.lower(),
+            name.upper(),
+            name[:3],
+            name[:3].lower(),
+            name[:3].upper(),
+        ]
+        for name in names:
+            filematch = finder.find_matches(Path(f"2012_{name}"))
+            assert filematch is not None
+            assert filematch["B"] == name
+            assert filematch["date"] == dt.datetime(2012, 2, 1)
 
     def test_datetime(self) -> None:
         finder = Finder(pattern_datetime.pattern)

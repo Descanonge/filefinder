@@ -7,12 +7,12 @@ import datetime as dt
 import re
 import warnings
 from collections.abc import Callable, Mapping, Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     from .matches import GroupMatch
 
-DefaultDate = dt.datetime | Mapping[str, int]
+DefaultDate = dt.datetime | dt.date | Mapping[str, int]
 """Type for default_date argument."""
 
 DATETIME_KEYS = "YBmdjHMSFxX"
@@ -90,22 +90,22 @@ def _check_input(date: dt.datetime | dt.date, name: str) -> None:
         raise KeyError(f"'{name}' group name not registered in util.datetime_format")
 
 
-def datetime_to_str(date: dt.datetime | dt.date, name: str) -> str:
-    """Format a group from a date object."""
-    _check_input(date, name)
+def datetime_to_str(date: dt.datetime | dt.date, element: str) -> str:
+    """Format a date element (Y, m, F, ...) from a datetime object."""
+    _check_input(date, element)
 
-    if name == "j":
+    if element == "j":
         return f"{get_doy(date):03d}"
-    if name == "B":
+    if element == "B":
         return date.strftime("%B")
 
-    elements = [getattr(date, attr) for attr in DATETIME_ATTRIBUTES[name]]
-    fmt = DATETIME_FORMAT[name]
+    elements = [getattr(date, attr) for attr in DATETIME_ATTRIBUTES[element]]
+    fmt = DATETIME_FORMAT[element]
     return fmt.format(*elements)
 
 
 def datetime_to_value(date: dt.datetime | dt.date, name: str) -> int | str:
-    """Extract value of date group name (Y, m, F, ...) from a datetime object."""
+    """Extract value of date element (Y, m, F, ...) from a datetime object."""
     _check_input(date, name)
 
     if name == "j":
@@ -136,129 +136,185 @@ def date_from_doy(doy: int, year: int) -> dict[str, int]:
     return {"month": day.month, "day": day.day}
 
 
-def get_date(
-    matches: Sequence[GroupMatch], default_date: DefaultDate | None = None
-) -> dt.datetime:
-    """Retrieve date from matched elements.
+class DateParser:
+    """Parse date from matches.
 
-    Matches that can be used are in ``YBmdjHMSFxX``. If a matcher is *not* found in the
-    filename, it will be replaced by the element of the default date argument. All
-    values deduced from these matches will be compared. If different matchers give
-    different values (for instance the group Y and F give a different year), an
-    exception will be raised.
+    Matches that can be used are in ``YBmdjHMSFxX``. If different matchers give
+    different values for the same element (for instance the group Y and F give a
+    different year), an exception will be raised.
 
     Parameters
     ----------
     matches:
         Matches obtained from a filename.
     default_date:
-        Default date. Dictionnary with keys: year, month, day, hour, minute,
-        and second. Defaults to 1970-01-01 00:00:00
+        If an element is not found in the filename, use the element from this default
+        date. It can be a :mod:`datetime` object or a mapping with keys among: year,
+        month, day, hour, minute, and second. Missing elements will default to
+        1970-01-01 00:00:00
     """
-    if default_date is None:
-        default_date = {}
-    if isinstance(default_date, dt.datetime):
-        default_date = {
-            attr: getattr(default_date, attr)
-            for attr in ["year", "month", "day", "hour", "minute", "second"]
-        }
 
-    # fill missing inputs
-    default_date = {
+    DEFAULT_DATE_DEFAULT: ClassVar[dict[str, int]] = {
         "year": 1970,
         "month": 1,
         "day": 1,
         "hour": 0,
         "minute": 0,
         "second": 0,
-    } | dict(default_date)
+    }
 
-    # list of values found in the matches: year, month, ...
-    elts: dict[str, list[int]] = {}
+    def __init__(
+        self, matches: Sequence[GroupMatch], default_date: DefaultDate | None = None
+    ) -> None:
+        self.matches: list[GroupMatch] = list(matches)
+        for m in self.matches:
+            if m.group.date_element is None:
+                raise TypeError(
+                    f"Group '{m.group!s}' does not correspond to a date element."
+                )
 
-    def process(key: str, callback: Callable[[GroupMatch], dict[str, int]]) -> None:
-        """Run *callback* on matches selected by *key*.
+        if default_date is None:
+            default_date = {}
+        if isinstance(default_date, dt.datetime):
+            default_date = {
+                attr: getattr(default_date, attr)
+                for attr in ["year", "month", "day", "hour", "minute", "second"]
+            }
+        elif isinstance(default_date, dt.date):
+            default_date = {
+                attr: getattr(default_date, attr) for attr in ["year", "month", "day"]
+            }
 
-        The callback returns a dictionnary with the datetime arguments (elements) it
-        found. Each new value is added to the list of values found for that element.
+        self.default_date = self.DEFAULT_DATE_DEFAULT | dict(default_date)
+        self.elements: dict[str, list[int]] = {}
+
+    @classmethod
+    def parse(
+        cls, matches: Sequence[GroupMatch], default_date: DefaultDate | None = None
+    ) -> dt.datetime:
+        """Retrieve a date from matches."""
+        parser = cls(matches, default_date)
+        return parser.retrieve_date()
+
+    def retrieve_date(self) -> dt.datetime:
+        """Retrieve a date from matches."""
+        self.fill_elements()
+        self.validate_elements()
+        return self.create_date()
+
+    def fill_elements(self) -> None:
+        """Fill the elements attributes from values found in matches."""
+        self.elements = {}
+
+        self.process("B", self.process_B)
+        self.process("F", self.process_F)
+        self.process("x", self.process_x)
+        self.process("X", self.process_X)
+
+        for name in "YmdHMS":
+            self.process(name, self.process_YmdHMS)
+
+        # process j last, it needs month and year set
+        self.process("j", self.process_j)
+
+    def validate_elements(self) -> None:
+        """Validate the elements.
+
+        Warn if no element were found, raise if they are different values for the same
+        element.
         """
-        for m in matches:
-            if m.group.date_element != key:
-                continue
-            for elt, val in callback(m).items():
-                if elt not in elts:
-                    elts[elt] = []
-                elts[elt].append(val)
+        if len(self.elements) == 0:
+            warnings.warn(
+                "No date elements could be recovered. Returning default date.",
+                stacklevel=1,
+            )
 
-    def process_B(m: GroupMatch) -> dict[str, int]:  # noqa: N802
+        for elt, values in self.elements.items():
+            if any(v != values[0] for v in values):
+                raise ValueError(f"Different values found for {elt}: {values}")
+
+    def create_date(self) -> dt.datetime:
+        """Create a datetime object from found elements."""
+        date = dict(self.default_date)
+        for elt, values in self.elements.items():
+            date[elt] = values[0]
+
+        return dt.datetime(**date)  # type: ignore[arg-type]
+
+    def process(
+        self,
+        date_element: str,
+        callback: Callable[[GroupMatch], Mapping[str, int]],
+    ) -> None:
+        """Find values for a given date element.
+
+        Callback is a bound method that takes the group match and return a dictionary
+        of elements to values.
+        """
+        for m in self.matches:
+            if m.group.date_element == date_element:
+                for elt, val in callback(m).items():
+                    if elt not in self.elements:
+                        self.elements[elt] = []
+                    self.elements[elt].append(val)
+
+    def process_YmdHMS(self, m: GroupMatch) -> dict[str, int]:  # noqa: N802
+        """Process match for YmdHMS elements."""
+        value = m.get_match(parse=True)
+        assert m.group.date_element is not None
+        attrs = DATETIME_ATTRIBUTES[m.group.date_element]
+        if len(attrs) != 1:
+            raise IndexError(
+                f"Date element '{m.group.date_element}' returned multiple elements."
+            )
+        return {attrs[0]: value}
+
+    def process_B(self, m: GroupMatch) -> dict[str, int]:  # noqa: N802
+        """Process match for full month."""
         return {"month": _find_month_number(m.match_str)}
 
-    def process_F(m: GroupMatch) -> dict[str, int]:  # noqa: N802
-        # YYYY-mm-dd
-        # 0123456789
+    def process_F(self, m: GroupMatch) -> dict[str, int]:  # noqa: N802
+        """Process match for full date (YYYY-mm-dd)."""
         value = m.match_str
-        out = {"year": value[:4], "month": value[5:7], "day": value[8:10]}
+        splits = value.split("-")
+        if len(splits) != 3:
+            raise ValueError(f"Could not parse date '{value}' (expected YYYY-mm-dd).")
+
+        return dict(
+            zip(
+                ["year", "month", "day"],
+                [int(x) for x in splits],
+                strict=True,
+            )
+        )
+
+    def process_x(self, m: GroupMatch) -> dict[str, int]:
+        """Process match for full date (YYYYmmdd)."""
+        value = m.match_str
+        if len(value) < 5:
+            raise ValueError(f"Could not parse date '{value}' (expected YYYYmmdd).")
+        out = {"year": value[:-4], "month": value[-4:-2], "day": value[-2:]}
         return {elt: int(val) for elt, val in out.items()}
 
-    def process_x(m: GroupMatch) -> dict[str, int]:
-        # YYYYmmdd
-        # 012345678
+    def process_X(self, m: GroupMatch) -> dict[str, int]:  # noqa: N802
+        """Process match for time (HHMMSS)."""
         value = m.match_str
-        out = {"year": value[:4], "month": value[4:6], "day": value[6:8]}
+        if len(value) != 6:
+            raise ValueError(f"Could not parse time '{value}' (expected HHMMSS).")
+        out = {"hour": value[:2], "minute": value[2:4], "second": value[4:6]}
         return {elt: int(val) for elt, val in out.items()}
 
-    def process_X(m: GroupMatch) -> dict[str, int]:  # noqa: N802
-        # HHMMSS (seconds optional)
-        # 0123456
-        value = m.match_str
-        out = {"hour": value[:2], "minute": value[2:4]}
-        if len(value) > 4:
-            out["second"] = value[4:6]
-        return {elt: int(val) for elt, val in out.items()}
-
-    def process_j(m: GroupMatch) -> dict[str, int]:
+    def process_j(self, m: GroupMatch) -> dict[str, int]:
+        """Process match for day of year."""
         doy = m.get_match(parse=True)
         # This depend on the value of year, we take the first one discovered, or from
         # the default one if none was processed yet
-        year = elts["year"][0] if "year" in elts else default_date["year"]
-        return date_from_doy(doy, year)
-
-    def process_simple(m: GroupMatch) -> dict[str, int]:
-        value = m.get_match(parse=True)
-        if m.group.date_element is None:
-            raise TypeError(
-                f"Group '{m.group!s}' does not correspond to a date element."
-            )
-        elts = DATETIME_ATTRIBUTES[m.group.date_element]
-        if len(elts) != 1:
-            raise IndexError(f"Date element '{name}' returned multiple elements.")
-        return {elts[0]: value}
-
-    process("B", process_B)
-    process("F", process_F)
-    process("x", process_x)
-    process("X", process_X)
-
-    for name in "YmdHMS":
-        process(name, process_simple)
-
-    # process j last, it needs month and year set
-    process("j", process_j)
-
-    if len(elts) == 0:
-        warnings.warn(
-            "No date elements could be recovered. Returning default date.", stacklevel=1
+        year = (
+            self.elements["year"][0]
+            if "year" in self.elements
+            else self.default_date["year"]
         )
-
-    for elt, values in elts.items():
-        if any(v != values[0] for v in values):
-            raise ValueError(f"Different values found for {elt}: {values}")
-
-    date = dict(default_date)
-    for elt, values in elts.items():
-        date[elt] = values[0]
-
-    return dt.datetime(**date)  # type: ignore[arg-type]
+        return date_from_doy(doy, year)
 
 
 def _find_month_number(name: str) -> int:

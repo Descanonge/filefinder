@@ -8,7 +8,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Self
 
-from .dates import DefaultDate, get_date
+from .dates import DateParser, DefaultDate
 from .group import Group, GroupKey, get_date_names, get_groups_indices
 
 logger = logging.getLogger(__name__)
@@ -203,7 +203,7 @@ class FileMatch:
         matches = self.get_matches(key)
 
         if key in get_date_names(self.groups):
-            return [get_date(matches, default_date)]
+            return [DateParser.parse(matches, default_date)]
 
         return [m.get_match(parse=parse) for m in matches]
 

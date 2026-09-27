@@ -17,15 +17,15 @@ class FormatSpecs:
     """Store format specs and generate format string."""
 
     align: str = ""
-    """Alignement. Empty or [ <>=^]."""
+    """Alignement. Empty or [<>=^]."""
     fill: str = ""
     """Fill character. Empty or any character."""
     sign: str = ""
     """Sign indication. Empty or [ +-]."""
     alt: str = ""
-    """Alternate form. Empty or '#.'"""
+    """Alternate form. Empty or '#'."""
     zero: str = ""
-    """Zero fill. Empty or '0'."""
+    """Zero coercion. Empty or '0'."""
     grouping: str = ""
     """Thousands grouping character. Empty or [_,]"""
     width: int | None = None

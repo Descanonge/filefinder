@@ -495,7 +495,8 @@ class Finder:
             * "fail": fail the filter for this value (as if returning False).
             * "pass": pass the filter for this value (as if returning True).
         default_date
-            Default date elements to use when retrieving date. See :ref:`dates`.
+            Default date elements to use when retrieving date. See :ref:`dates` and
+            :class:`.DateParser`.
         kwargs
             Will be passed to the function.
         """

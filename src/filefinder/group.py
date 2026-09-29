@@ -137,17 +137,30 @@ class Group:
     """
 
     DATE_GROUPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "Y": (r"\d{4}", "04d"),  # year
-        "m": (r"\d\d", "02d"),  # month
+        "a": (r"\w+", "s"),  # weekday abbreviated
+        "A": (r"\w+", "s"),  # weekday
+        "b": (r"\w+", "s"),  # month name abbreviated
+        "B": (r"\w+", "s"),  # month name
         "d": (r"\d\d", "02d"),  # day
-        "j": (r"\d{3}", "03d"),  # dayofyear
-        "H": (r"\d\d", "02d"),  # hour
-        "M": (r"\d\d", "02d"),  # minute
-        "S": (r"\d\d", "02d"),  # second
-        "x": (r"\d{8}", "08d"),  # date
-        "X": (r"\d{6}", "06d"),  # time
+        "f": (r"\d{6}", "06d"),  # microsecond
         "F": (r"\d{4}-\d\d-\d\d", "s"),  # formated date
-        "B": (r"\w+", "s"),  # month / month abbreviation
+        "H": (r"\d\d", "02d"),  # hour (24 hour clock)
+        "I": (r"\d\d", "02d"),  # hour (12 hour clock, 1-12)
+        "j": (r"\d{3}", "03d"),  # dayofyear
+        "m": (r"\d\d", "02d"),  # month
+        "M": (r"\d\d", "02d"),  # minute
+        "p": (r"(:?AM|PM)", "s"),  # AM/PM
+        "P": (r"(:?am|pm)", "s"),  # am/pm
+        "s": (r"\d{6}", "06d"),  # timestamp (seconds since epoch)
+        "S": (r"\d\d", "02d"),  # second
+        "T": (r"\d{6}", "06d"),  # time (HHMMSS)
+        "x": (r"\d{8}", "08d"),  # date (YYYYmmdd)
+        "u": (r"\d", "d"),  # weekday (1-7, Monday=1)
+        "U": (r"\d\d", "02d"),  # weeknumber, starting from first Sunday
+        "w": (r"\d", "d"),  # weekday (0-6, Sunday=0)
+        "W": (r"\d\d", "02d"),  # weeknumber, starting from first Monday
+        "Y": (r"\d{4}", "04d"),  # year
+        "z": (r"-?\d{4}", "04d"),  # timezone (-hhmm)
     }
     """Regex and format strings for various default groups.
 

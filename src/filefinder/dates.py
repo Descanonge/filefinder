@@ -15,38 +15,29 @@ if TYPE_CHECKING:
 DefaultDate = dt.datetime | dt.date | Mapping[str, int]
 """Type for default_date argument."""
 
-DATETIME_KEYS = "YBmdjHMSFxX"
-TIME_KEYS = "XHMS"
+DATETIME_ELEMENTS = "aAbBdfFHIjmMpPsSTuUwWYz"
+TIME_ELEMENTS = "HIMpPSTz"
+STRING_ELEMENTS = "aAbBFpPTxz"
 
-DATETIME_ATTRIBUTES = {
-    "F": ["year", "month", "day"],
-    "x": ["year", "month", "day"],
-    "Y": ["year"],
-    "m": ["month"],
-    "d": ["day"],
-    "B": ["month"],
-    "j": ["month", "day"],
-    "X": ["hour", "minute", "second"],
-    "H": ["hour"],
-    "M": ["minute"],
-    "S": ["second"],
-}
-"""Attributes of datetime objects for each group name."""
 
-DATETIME_FORMAT = {
-    "F": "{:04d}-{:02d}-{:02d}",
-    "x": "{:04d}{:02d}{:02d}",
-    "Y": "{:04d}",
-    "m": "{:02d}",
-    "d": "{:02d}",
-    "B": "{:s}",
-    "j": "{:03d}",
-    "X": "{:02d}{:02d}{:02d}",
-    "H": "{:02d}",
-    "M": "{:02d}",
-    "S": "{:02d}",
-}
-"""Format for each group name"""
+def _has_any_keys(d: dict, keys: Sequence) -> bool:
+    return len(set(keys) & d.keys()) > 0
+
+
+def _datetime_to_dict(date: dt.datetime) -> dict:
+    return {
+        attr: getattr(date, attr)
+        for attr in [
+            "year",
+            "month",
+            "day",
+            "hour",
+            "minute",
+            "second",
+            "microsecond",
+            "tzinfo",
+        ]
+    }
 
 
 def make_date_groups(date_format: str, name: str = "") -> str:
@@ -74,7 +65,7 @@ def make_date_groups(date_format: str, name: str = "") -> str:
         group = match.group(1)
         if group == "%":
             return "%"
-        if group in DATETIME_KEYS:
+        if group in DATETIME_ELEMENTS:
             return f"%({name}{group})"
         raise KeyError(f"Unknown datetime key '{match.group(0)}'.")
 
@@ -82,58 +73,36 @@ def make_date_groups(date_format: str, name: str = "") -> str:
 
 
 def _check_input(date: dt.datetime | dt.date, name: str) -> None:
-    if name in TIME_KEYS and not isinstance(date, dt.datetime):
+    if name in TIME_ELEMENTS and not isinstance(date, dt.datetime):
         raise TypeError(
             f"'{name}' group needs time information (received a {type(date)} object)"
         )
-    if name not in DATETIME_ATTRIBUTES:
+    if name not in DATETIME_ELEMENTS:
         raise KeyError(f"'{name}' group name not registered in util.datetime_format")
 
 
-def datetime_to_str(date: dt.datetime | dt.date, element: str) -> str:
+def datetime_to_str(date: dt.datetime | dt.date, group_name: str) -> str:
     """Format a date element (Y, m, F, ...) from a datetime object."""
-    _check_input(date, element)
+    _check_input(date, group_name)
 
-    if element == "j":
-        return f"{get_doy(date):03d}"
-    if element == "B":
-        return date.strftime("%B")
+    if group_name == "T":
+        return date.strftime("%H%M%S")
+    if group_name == "x":
+        return date.strftime("%Y%m%d")
+    if group_name == "z":
+        return date.strftime("%z") if date.tzinfo is not None else "+0000"
+    return date.strftime(f"%{group_name}")
 
-    elements = [getattr(date, attr) for attr in DATETIME_ATTRIBUTES[element]]
-    fmt = DATETIME_FORMAT[element]
-    return fmt.format(*elements)
 
-
-def datetime_to_value(date: dt.datetime | dt.date, name: str) -> int | str:
+def datetime_to_value(date: dt.datetime | dt.date, group_name: str) -> int | str:
     """Extract value of date element (Y, m, F, ...) from a datetime object."""
-    _check_input(date, name)
+    _check_input(date, group_name)
 
-    if name == "j":
-        return get_doy(date)
+    s = datetime_to_str(date, group_name)
+    if group_name in "aAbBFpPTxz":
+        return s
 
-    if name in "xXFB":
-        s = datetime_to_str(date, name)
-        # xX can be returned as int, as per their format in Group.DATE_GROUPS
-        return int(s) if name in "xX" else s
-
-    elements = [getattr(date, attr) for attr in DATETIME_ATTRIBUTES[name]]
-    if len(elements) != 1:
-        raise IndexError(f"Date element '{name}' returned multiple elements.")
-
-    return elements[0]
-
-
-def get_doy(date: dt.date | dt.datetime) -> int:
-    """Return the dayofyear of a date."""
-    if isinstance(date, dt.datetime):
-        date = date.date()
-    return (date - dt.date(date.year, 1, 1)).days + 1
-
-
-def date_from_doy(doy: int, year: int) -> dict[str, int]:
-    """Get month and day from a dayofyear value (and its year)."""
-    day = dt.date(year, 1, 1) + dt.timedelta(days=doy - 1)
-    return {"month": day.month, "day": day.day}
+    return int(s)
 
 
 class DateParser:
@@ -154,13 +123,14 @@ class DateParser:
         1970-01-01 00:00:00
     """
 
-    DEFAULT_DATE_DEFAULT: ClassVar[dict[str, int]] = {
+    DEFAULT_DATE_DEFAULT: ClassVar[dict] = {
         "year": 1970,
         "month": 1,
         "day": 1,
         "hour": 0,
         "minute": 0,
         "second": 0,
+        "tzinfo": None,
     }
 
     def __init__(
@@ -176,17 +146,18 @@ class DateParser:
         if default_date is None:
             default_date = {}
         if isinstance(default_date, dt.datetime):
-            default_date = {
-                attr: getattr(default_date, attr)
-                for attr in ["year", "month", "day", "hour", "minute", "second"]
-            }
+            default_date = _datetime_to_dict(default_date)
         elif isinstance(default_date, dt.date):
             default_date = {
                 attr: getattr(default_date, attr) for attr in ["year", "month", "day"]
             }
 
         self.default_date = self.DEFAULT_DATE_DEFAULT | dict(default_date)
-        self.elements: dict[str, list[int]] = {}
+
+        self.elements: dict[str, str] = {}
+        self.date_args: dict[str, int | dt.timezone] = {}
+
+        self.matches_to_elements()
 
     @classmethod
     def parse(
@@ -194,91 +165,129 @@ class DateParser:
     ) -> dt.datetime:
         """Retrieve a date from matches."""
         parser = cls(matches, default_date)
+        parser.matches_to_elements()
         return parser.retrieve_date()
+
+    def matches_to_elements(self) -> None:
+        for m in self.matches:
+            name = m.group.name
+            if name in self.elements and m.match_str != self.elements[name]:
+                raise ValueError
+            self.elements[name] = m.match_str
 
     def retrieve_date(self) -> dt.datetime:
         """Retrieve a date from matches."""
-        self.fill_elements()
-        self.validate_elements()
-        return self.create_date()
-
-    def fill_elements(self) -> None:
-        """Fill the elements attributes from values found in matches."""
         self.elements = {}
+        self.date_args = {}
+        self.matches_to_elements()
 
+        self.process("z", self.process_z)  # Better to have timezone for timestamp
+        self.process("s", self.process_s)
+        self.process("YmdHMSf", self.process_basic)
+        self.process("b", self.process_b)
         self.process("B", self.process_B)
         self.process("F", self.process_F)
         self.process("x", self.process_x)
-        self.process("X", self.process_X)
-
-        for name in "YmdHMS":
-            self.process(name, self.process_YmdHMS)
-
-        # process j last, it needs month and year set
+        self.process("T", self.process_T)
         self.process("j", self.process_j)
+        self.process("IpP", self.process_hour_12)
+        self.process("aAuUVwW", self.process_week_day)
 
-    def validate_elements(self) -> None:
-        """Validate the elements.
+        return self.create_date()
 
-        Warn if no element were found, raise if they are different values for the same
-        element.
-        """
-        if len(self.elements) == 0:
-            warnings.warn(
-                "No date elements could be recovered. Returning default date.",
-                stacklevel=1,
-            )
+    def process(self, names: str, callback: Callable[..., dict]) -> None:
+        if _has_any_keys(self.elements, names):
+            # TODO: check there is no rewrite
+            self.date_args |= callback()
 
-        for elt, values in self.elements.items():
-            if any(v != values[0] for v in values):
-                raise ValueError(f"Different values found for {elt}: {values}")
+    def get(self, arg: str) -> int | dt.timezone | None:
+        if arg in self.date_args:
+            return self.date_args[arg]
+        if arg in self.default_date:
+            return self.default_date[arg]
+        raise KeyError
 
     def create_date(self) -> dt.datetime:
         """Create a datetime object from found elements."""
-        date = dict(self.default_date)
-        for elt, values in self.elements.items():
-            date[elt] = values[0]
+        args = self.default_date | self.date_args
+        return dt.datetime(**args)  # type: ignore[arg-type]
 
-        return dt.datetime(**date)  # type: ignore[arg-type]
+    def process_z(self) -> dict[str, dt.timezone]:
+        m = re.fullmatch(r"([+-])(\d\d)(\d\d)(\d\d(?:\.\d{6})?)?", self.elements["z"])
+        if m is None:
+            raise ValueError
 
-    def process(
-        self,
-        date_element: str,
-        callback: Callable[[GroupMatch], Mapping[str, int]],
-    ) -> None:
-        """Find values for a given date element.
-
-        Callback is a bound method that takes the group match and return a dictionary
-        of elements to values.
-        """
-        for m in self.matches:
-            if m.group.date_element == date_element:
-                for elt, val in callback(m).items():
-                    if elt not in self.elements:
-                        self.elements[elt] = []
-                    self.elements[elt].append(val)
-
-    def process_YmdHMS(self, m: GroupMatch) -> dict[str, int]:  # noqa: N802
-        """Process match for YmdHMS elements."""
-        value = m.get_match(parse=True)
-        assert m.group.date_element is not None
-        attrs = DATETIME_ATTRIBUTES[m.group.date_element]
-        if len(attrs) != 1:
-            raise IndexError(
-                f"Date element '{m.group.date_element}' returned multiple elements."
+        sign = m.group(1)
+        elements = dict(
+            zip(
+                ["hours", "minutes", "seconds"],
+                [float(x) for x in m.groups()[1:] if x is not None],
+                strict=False,
             )
-        return {attrs[0]: value}
+        )
+        delta = dt.timedelta(**elements)
+        if sign == "-":
+            delta = -delta
 
-    def process_B(self, m: GroupMatch) -> dict[str, int]:  # noqa: N802
-        """Process match for full month."""
-        return {"month": _find_month_number(m.match_str)}
+        tz = dt.timezone(delta)
+        return {"tzinfo": tz}
 
-    def process_F(self, m: GroupMatch) -> dict[str, int]:  # noqa: N802
+    def process_s(self) -> dict[str, int]:
+        date = dt.datetime.fromtimestamp(
+            float(self.elements["s"]), tz=self.get("tzinfo")
+        )
+        return {
+            attr: getattr(date, attr)
+            for attr in [
+                "year",
+                "month",
+                "day",
+                "hour",
+                "minute",
+                "second",
+                "microsecond",
+            ]
+        }
+
+    def process_basic(self) -> dict[str, int]:
+        attributes = {
+            "Y": "year",
+            "m": "month",
+            "d": "day",
+            "H": "hour",
+            "M": "minute",
+            "S": "second",
+            "f": "microsecond",
+        }
+        result = {}
+        for element, attr in attributes.items():
+            if element in self.elements:
+                result[attr] = int(self.elements.pop(element))
+        return result
+
+    def process_B(self) -> dict[str, int]:  # noqa: N802
+        name = self.elements.pop("B").lower()
+        names = [m.lower() for m in calendar.month_name]
+        if name in names:
+            return {"month": names.index(name)}
+
+        raise KeyError
+
+    def process_b(self) -> dict[str, int]:
+        name = self.elements.pop("b").lower()
+        names = [m.lower() for m in calendar.month_name[1:]]
+
+        for i, ref in enumerate(names):
+            if ref.startswith(name):
+                return {"month": i + 1}
+        raise KeyError
+
+    def process_F(self) -> dict[str, int]:  # noqa: N802
         """Process match for full date (YYYY-mm-dd)."""
-        value = m.match_str
-        splits = value.split("-")
+        s = self.elements["F"]
+        splits = s.split("-")
         if len(splits) != 3:
-            raise ValueError(f"Could not parse date '{value}' (expected YYYY-mm-dd).")
+            raise ValueError(f"Could not parse date '{s}' (expected YYYY-mm-dd).")
 
         return dict(
             zip(
@@ -288,33 +297,61 @@ class DateParser:
             )
         )
 
-    def process_x(self, m: GroupMatch) -> dict[str, int]:
+    def process_x(self) -> dict[str, int]:
         """Process match for full date (YYYYmmdd)."""
-        value = m.match_str
-        if len(value) < 5:
-            raise ValueError(f"Could not parse date '{value}' (expected YYYYmmdd).")
-        out = {"year": value[:-4], "month": value[-4:-2], "day": value[-2:]}
+        s = self.elements["x"]
+        if len(s) < 5:
+            raise ValueError(f"Could not parse date '{s}' (expected YYYYmmdd).")
+        out = {"year": s[:-4], "month": s[-4:-2], "day": s[-2:]}
         return {elt: int(val) for elt, val in out.items()}
 
-    def process_X(self, m: GroupMatch) -> dict[str, int]:  # noqa: N802
+    def process_T(self) -> dict[str, int]:  # noqa: N802
         """Process match for time (HHMMSS)."""
-        value = m.match_str
-        if len(value) != 6:
-            raise ValueError(f"Could not parse time '{value}' (expected HHMMSS).")
-        out = {"hour": value[:2], "minute": value[2:4], "second": value[4:6]}
+        s = self.elements["T"]
+        if len(s) != 6:
+            raise ValueError(f"Could not parse time '{s}' (expected HHMMSS).")
+        out = {"hour": s[:2], "minute": s[2:4], "second": s[4:6]}
         return {elt: int(val) for elt, val in out.items()}
 
-    def process_j(self, m: GroupMatch) -> dict[str, int]:
-        """Process match for day of year."""
-        doy = m.get_match(parse=True)
-        # This depend on the value of year, we take the first one discovered, or from
-        # the default one if none was processed yet
-        year = (
-            self.elements["year"][0]
-            if "year" in self.elements
-            else self.default_date["year"]
-        )
-        return date_from_doy(doy, year)
+    def process_j(self) -> dict[str, int]:
+        s = self.elements["j"]
+        date = dt.date(self.get("year"), 1, 1) + dt.timedelta(days=int(s) - 1)
+        return {"month": date.month, "day": date.day}
+
+    def process_hour_12(self) -> dict[str, int]:
+        has_p = _has_any_keys(self.elements, "pP")
+        has_i = _has_any_keys(self.elements, "I")
+        if has_p != has_i:
+            raise ValueError
+
+        ampm = self.elements.get("p") or self.elements["P"]
+
+        # ampm = self.elements.get("p", self.elements["P"])
+        hour = int(self.elements["I"]) % 12
+        if ampm.lower() == "pm":
+            hour += 12
+        return {"hour": hour}
+
+    def process_week_day(self) -> dict[str, int]:
+        values = {c: self.elements[c] for c in "aAuwUVW" if c in self.elements}
+
+        if not _has_any_keys(values, "aAuw"):
+            if "weekday" in self.default_date:
+                values["w"] = str(self.default_date["weekday"])
+            else:
+                raise ValueError
+
+        if not _has_any_keys(values, "UVW"):
+            if "weeknumber" in self.default_date:
+                values["W"] = f"{self.default_date['weeknumber']:02d}"
+            else:
+                raise ValueError
+
+        fmt = "%Y_" + "_".join(f"%{c}" for c in values)
+        date_string = f"{self.get('year'):04d}" + "_" + "_".join(values.values())
+
+        date = dt.datetime.strptime(date_string, fmt)
+        return {"month": date.month, "day": date.day}
 
 
 def _find_month_number(name: str) -> int:

@@ -8,7 +8,7 @@ from typing import Any, TypeVar
 import hypothesis.strategies as st
 from hypothesis import example
 
-from filefinder.dates import DATETIME_KEYS
+from filefinder.dates import DATETIME_ELEMENTS
 from filefinder.group import Group
 
 from . import (
@@ -614,9 +614,9 @@ def st_time_segments(draw: Drawer) -> list[str]:
     """Generate pattern segments with date elements."""
     names = draw(
         st.lists(
-            st.sampled_from(DATETIME_KEYS),
+            st.sampled_from(DATETIME_ELEMENTS),
             min_size=1,
-            max_size=len(DATETIME_KEYS),
+            max_size=len(DATETIME_ELEMENTS),
         )
     )
 

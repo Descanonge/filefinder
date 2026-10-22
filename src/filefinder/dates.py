@@ -5,7 +5,6 @@ from __future__ import annotations
 import calendar
 import datetime as dt
 import re
-import warnings
 from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, ClassVar
 
@@ -15,29 +14,33 @@ if TYPE_CHECKING:
 DefaultDate = dt.datetime | dt.date | Mapping[str, int]
 """Type for default_date argument."""
 
-DATETIME_ELEMENTS = "aAbBdfFHIjmMpPsSTuUwWYz"
-TIME_ELEMENTS = "HIMpPSTz"
+DATETIME_ELEMENTS = "aAbBdfFHIjmMpPsSTuUxwWYz"
+TIME_ELEMENTS = "HIMpPsSTz"
 STRING_ELEMENTS = "aAbBFpPTxz"
 
 
-def _has_any_keys(d: dict, keys: Sequence) -> bool:
+def _has_any_keys(d: Mapping, keys: Sequence) -> bool:
     return len(set(keys) & d.keys()) > 0
 
 
+def _has_all_keys(d: Mapping, keys: Sequence) -> bool:
+    return len(set(keys) & d.keys()) == len(keys)
+
+
+_datetime_args = [
+    "year",
+    "month",
+    "day",
+    "hour",
+    "minute",
+    "second",
+    "microsecond",
+    "tzinfo",
+]
+
+
 def _datetime_to_dict(date: dt.datetime) -> dict:
-    return {
-        attr: getattr(date, attr)
-        for attr in [
-            "year",
-            "month",
-            "day",
-            "hour",
-            "minute",
-            "second",
-            "microsecond",
-            "tzinfo",
-        ]
-    }
+    return {attr: getattr(date, attr) for attr in _datetime_args}
 
 
 def make_date_groups(date_format: str, name: str = "") -> str:
@@ -72,37 +75,66 @@ def make_date_groups(date_format: str, name: str = "") -> str:
     return re.sub("%([a-zA-Z%])", replace, date_format)
 
 
-def _check_input(date: dt.datetime | dt.date, name: str) -> None:
-    if name in TIME_ELEMENTS and not isinstance(date, dt.datetime):
-        raise TypeError(
-            f"'{name}' group needs time information (received a {type(date)} object)"
-        )
-    if name not in DATETIME_ELEMENTS:
-        raise KeyError(f"'{name}' group name not registered in util.datetime_format")
-
-
-def datetime_to_str(date: dt.datetime | dt.date, group_name: str) -> str:
+def datetime_to_str(date: dt.datetime | dt.date, element: str) -> str:
     """Format a date element (Y, m, F, ...) from a datetime object."""
-    _check_input(date, group_name)
+    if element not in DATETIME_ELEMENTS:
+        raise KeyError(
+            f"Group name '{element}' not registered in dates.DATETIME_ELEMENTS"
+        )
+    if element in TIME_ELEMENTS:
+        if not isinstance(date, dt.datetime):
+            raise TypeError(
+                f"Element '{element}' needs time information, ie a datetime.datetime "
+                "object, not datetime.date."
+            )
+        if element == "z":
+            return date.strftime("%z") if date.tzinfo is not None else "+0000"
+        if element == "s":
+            return str(date.timestamp())
 
-    if group_name == "T":
-        return date.strftime("%H%M%S")
-    if group_name == "x":
+        # strftime will format to UTC, we want to stay local
+        date = date.replace(tzinfo=dt.UTC)
+        if element == "T":
+            return date.strftime("%H%M%S")
+
+    if element == "x":
         return date.strftime("%Y%m%d")
-    if group_name == "z":
-        return date.strftime("%z") if date.tzinfo is not None else "+0000"
-    return date.strftime(f"%{group_name}")
+
+    return date.strftime(f"%{element}")
 
 
-def datetime_to_value(date: dt.datetime | dt.date, group_name: str) -> int | str:
+def datetime_to_value(date: dt.datetime | dt.date, element: str) -> int | float | str:
     """Extract value of date element (Y, m, F, ...) from a datetime object."""
-    _check_input(date, group_name)
+    if element not in DATETIME_ELEMENTS:
+        raise KeyError(
+            f"Group name '{element}' not registered in dates.DATETIME_ELEMENTS"
+        )
+    if element in TIME_ELEMENTS:
+        if not isinstance(date, dt.datetime):
+            raise TypeError(
+                f"Element '{element}' needs time information, ie a datetime.datetime "
+                "object, not datetime.date."
+            )
+        if element == "s":
+            return date.timestamp()
 
-    s = datetime_to_str(date, group_name)
-    if group_name in "aAbBFpPTxz":
-        return s
+    attributes = {
+        "Y": "year",
+        "m": "month",
+        "d": "day",
+        "H": "hour",
+        "M": "minute",
+        "S": "second",
+        "f": "microsecond",
+    }
+    if element in attributes:
+        return getattr(date, attributes[element])
 
-    return int(s)
+    if element in "IjuUwW":
+        return int(datetime_to_str(date, element))
+
+    # aAbBFpPTxz
+    return datetime_to_str(date, element)
 
 
 class DateParser:
@@ -112,6 +144,15 @@ class DateParser:
     different values for the same element (for instance the group Y and F give a
     different year), an exception will be raised.
 
+    info about timestamp min/max
+
+    platform dependent
+
+    Use with either ``DateParser.parse(matches, default_date)`` or::
+
+        parser = DateParser(matches, default_date)
+        date = parser.retrieve_date()
+
     Parameters
     ----------
     matches:
@@ -120,7 +161,7 @@ class DateParser:
         If an element is not found in the filename, use the element from this default
         date. It can be a :mod:`datetime` object or a mapping with keys among: year,
         month, day, hour, minute, and second. Missing elements will default to
-        1970-01-01 00:00:00
+        1970-01-01 00:00:00 UTC.
     """
 
     DEFAULT_DATE_DEFAULT: ClassVar[dict] = {
@@ -130,18 +171,29 @@ class DateParser:
         "hour": 0,
         "minute": 0,
         "second": 0,
-        "tzinfo": None,
+        "microsecond": 0,
+        "tzinfo": dt.UTC,
+    }
+
+    PROCESS_ORDER: ClassVar[dict[str, str]] = {
+        "z": "z",
+        "s": "s",
+        "Ymd": "basic",
+        "b": "b",
+        "B": "B",
+        "F": "F",
+        "x": "x",
+        "j": "j",
+        "aAuUwW": "week_day",
+        "T": "T",
+        "HMSf": "basic",
+        "IpP": "hour_12",
     }
 
     def __init__(
         self, matches: Sequence[GroupMatch], default_date: DefaultDate | None = None
     ) -> None:
         self.matches: list[GroupMatch] = list(matches)
-        for m in self.matches:
-            if m.group.date_element is None:
-                raise TypeError(
-                    f"Group '{m.group!s}' does not correspond to a date element."
-                )
 
         if default_date is None:
             default_date = {}
@@ -152,12 +204,21 @@ class DateParser:
                 attr: getattr(default_date, attr) for attr in ["year", "month", "day"]
             }
 
-        self.default_date = self.DEFAULT_DATE_DEFAULT | dict(default_date)
+        self.default_args = self.DEFAULT_DATE_DEFAULT | dict(default_date)
+        """Default datetime arguments.
 
-        self.elements: dict[str, str] = {}
-        self.date_args: dict[str, int | dt.timezone] = {}
+        Used if an element is missing from the matches.
+        """
 
-        self.matches_to_elements()
+        self.elements: dict[str, str] = self.matches_to_elements()
+        """Dictionary of elements names to matched strings."""
+        self.date_args_all: dict[str, dict[str, int | float | dt.timezone]] = {}
+        """Parsed datetime arguments from all elements.
+
+        Store as ``{argument_name: {source_element(s): value}}``. For instance
+        ``{"second": {"s": 32, "S": 32}, ...}``. This allows to check that different
+        elements are parsed as the same datetime arguments.
+        """
 
     @classmethod
     def parse(
@@ -165,51 +226,88 @@ class DateParser:
     ) -> dt.datetime:
         """Retrieve a date from matches."""
         parser = cls(matches, default_date)
-        parser.matches_to_elements()
         return parser.retrieve_date()
 
-    def matches_to_elements(self) -> None:
+    @property
+    def date_args(self) -> dict[str, int | float | dt.timezone]:
+        """Arguments to pass to `datetime.datetime`."""
+        date_args = {}
+        for arg_name, from_names in self.date_args_all.items():
+            names = list(from_names.keys())
+            date_args[arg_name] = from_names[names[0]]
+        return date_args
+
+    def matches_to_elements(self) -> dict[str, str]:
+        """Create dictionary of elements name to matched strings.
+
+        Will check that multiple groups of the same element have the same value.
+        """
+        elements_all: dict[str, list[GroupMatch]] = {}
         for m in self.matches:
-            name = m.group.name
-            if name in self.elements and m.match_str != self.elements[name]:
-                raise ValueError
-            self.elements[name] = m.match_str
+            element = m.group.date_element
+            if element is None:
+                raise ValueError(f"'{m.group}' is not a date group.")
+            if element not in elements_all:
+                elements_all[element] = []
+            elements_all[element].append(m)
+
+        for element, matches in elements_all.items():
+            values = [m.match_str for m in matches]
+            if any(v != values[0] for v in values[1:]):
+                raise ValueError(
+                    f"Groups with the same element '{element}' received "
+                    f"different values: {', '.join(str(m) for m in matches)}."
+                )
+
+        return {
+            element: matches[0].match_str for element, matches in elements_all.items()
+        }
 
     def retrieve_date(self) -> dt.datetime:
         """Retrieve a date from matches."""
-        self.elements = {}
-        self.date_args = {}
-        self.matches_to_elements()
+        self.elements = self.matches_to_elements()
+        self.date_args_all = {}
 
-        self.process("z", self.process_z)  # Better to have timezone for timestamp
-        self.process("s", self.process_s)
-        self.process("YmdHMSf", self.process_basic)
-        self.process("b", self.process_b)
-        self.process("B", self.process_B)
-        self.process("F", self.process_F)
-        self.process("x", self.process_x)
-        self.process("T", self.process_T)
-        self.process("j", self.process_j)
-        self.process("IpP", self.process_hour_12)
-        self.process("aAuUVwW", self.process_week_day)
+        for element_names, method_name in self.PROCESS_ORDER.items():
+            method = getattr(self, f"process_{method_name}")
+            self.process(element_names, method)
 
         return self.create_date()
 
     def process(self, names: str, callback: Callable[..., dict]) -> None:
         if _has_any_keys(self.elements, names):
-            # TODO: check there is no rewrite
-            self.date_args |= callback()
+            date_args = callback()
+            for k, v in date_args.items():
+                if k not in self.date_args_all:
+                    self.date_args_all[k] = {names: v}
+                else:
+                    self.date_args_all[k][names] = v
 
-    def get(self, arg: str) -> int | dt.timezone | None:
-        if arg in self.date_args:
+                if any(v != old for old in self.date_args_all[k].values()):
+                    raise ValueError(
+                        f"Parsed different values for '{k}' in different groups. "
+                        f"Found {self.date_args_all[k]}."
+                    )
+
+    def get(self, arg: str) -> int | float | dt.timezone | None:
+        if arg in self.date_args_all:
             return self.date_args[arg]
-        if arg in self.default_date:
-            return self.default_date[arg]
+        if arg in self.default_args:
+            return self.default_args[arg]
         raise KeyError
 
     def create_date(self) -> dt.datetime:
         """Create a datetime object from found elements."""
-        args = self.default_date | self.date_args
+        args = dict(self.default_args)
+        args.pop("weeknumber", None)
+        args.pop("weekday", None)
+        for k in args:
+            if k not in _datetime_args:
+                raise TypeError(
+                    f"Unrecognized argument '{k}' for datetime.datetime. "
+                    "Check default_date parameter."
+                )
+        args |= self.date_args
         return dt.datetime(**args)  # type: ignore[arg-type]
 
     def process_z(self) -> dict[str, dt.timezone]:
@@ -232,22 +330,14 @@ class DateParser:
         tz = dt.timezone(delta)
         return {"tzinfo": tz}
 
-    def process_s(self) -> dict[str, int]:
+    def process_s(self) -> dict[str, int | float]:
         date = dt.datetime.fromtimestamp(
-            float(self.elements["s"]), tz=self.get("tzinfo")
+            float(self.elements["s"]),
+            tz=self.get("tzinfo"),  # type: ignore[arg-type]
         )
-        return {
-            attr: getattr(date, attr)
-            for attr in [
-                "year",
-                "month",
-                "day",
-                "hour",
-                "minute",
-                "second",
-                "microsecond",
-            ]
-        }
+        date_args = _datetime_to_dict(date)
+        date_args.pop("tzinfo")
+        return date_args
 
     def process_basic(self) -> dict[str, int]:
         attributes = {
@@ -315,18 +405,21 @@ class DateParser:
 
     def process_j(self) -> dict[str, int]:
         s = self.elements["j"]
-        date = dt.date(self.get("year"), 1, 1) + dt.timedelta(days=int(s) - 1)
+        date = dt.date(self.get("year"), 1, 1) + dt.timedelta(days=int(s) - 1)  # type: ignore[arg-type]
         return {"month": date.month, "day": date.day}
 
     def process_hour_12(self) -> dict[str, int]:
-        has_p = _has_any_keys(self.elements, "pP")
-        has_i = _has_any_keys(self.elements, "I")
+        present = {c for c in self.elements if c in "IpP"}
+        has_p = "p" in present or "P" in present
+        has_i = "I" in present
         if has_p != has_i:
-            raise ValueError
+            raise ValueError(
+                "Need both %I (12-hour clock) and %p/%P (am/pm) to retrieve hour"
+                f"received {present}."
+            )
 
         ampm = self.elements.get("p") or self.elements["P"]
 
-        # ampm = self.elements.get("p", self.elements["P"])
         hour = int(self.elements["I"]) % 12
         if ampm.lower() == "pm":
             hour += 12
@@ -335,17 +428,42 @@ class DateParser:
     def process_week_day(self) -> dict[str, int]:
         values = {c: self.elements[c] for c in "aAuwUVW" if c in self.elements}
 
-        if not _has_any_keys(values, "aAuw"):
-            if "weekday" in self.default_date:
-                values["w"] = str(self.default_date["weekday"])
-            else:
-                raise ValueError
+        def can_process(
+            elements_missing: str, default_equivalent: str, present: str, missing: str
+        ) -> bool:
+            if not _has_any_keys(values, elements_missing):
+                # we are missing weekday or weeknumber
+                if _has_all_keys(self.date_args_all, ["month", "day"]):
+                    # we have other group that found the date
+                    # we can ignore week day/number
+                    return False
+                if missing not in self.default_args:
+                    raise ValueError(
+                        f"Cannot determine date with only {present} and not {missing} "
+                        f"(only received elements {list(values.keys())}). Other groups "
+                        "do not have month/day information: parsing will fallback to "
+                        f"the default date. You may indicate the default {missing} with "
+                        f"``default_date={{'{missing}': ...}}``, "
+                        f"equivalent to %{default_equivalent}."
+                    )
+                    return False
+                values[default_equivalent] = str(self.default_args[missing])
+            return True
 
-        if not _has_any_keys(values, "UVW"):
-            if "weeknumber" in self.default_date:
-                values["W"] = f"{self.default_date['weeknumber']:02d}"
-            else:
-                raise ValueError
+        if not can_process(
+            elements_missing="aAuw",
+            default_equivalent="w",
+            present="weeknumber",
+            missing="weekday",
+        ):
+            return {}
+        if not can_process(
+            elements_missing="UVW",
+            default_equivalent="W",
+            present="weekday",
+            missing="weeknumber",
+        ):
+            return {}
 
         fmt = "%Y_" + "_".join(f"%{c}" for c in values)
         date_string = f"{self.get('year'):04d}" + "_" + "_".join(values.values())

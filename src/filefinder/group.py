@@ -151,16 +151,16 @@ class Group:
         "M": (r"\d\d", "02d"),  # minute
         "p": (r"(:?AM|PM)", "s"),  # AM/PM
         "P": (r"(:?am|pm)", "s"),  # am/pm
-        "s": (r"\d{6}", "06d"),  # timestamp (seconds since epoch)
+        "s": (r"[+-]?\d+(:?\.\d{6})", ".6f"),  # timestamp (seconds since epoch)
         "S": (r"\d\d", "02d"),  # second
-        "T": (r"\d{6}", "06d"),  # time (HHMMSS)
-        "x": (r"\d{8}", "08d"),  # date (YYYYmmdd)
+        "T": (r"\d{6}", "s"),  # time (HHMMSS)
         "u": (r"\d", "d"),  # weekday (1-7, Monday=1)
         "U": (r"\d\d", "02d"),  # weeknumber, starting from first Sunday
         "w": (r"\d", "d"),  # weekday (0-6, Sunday=0)
         "W": (r"\d\d", "02d"),  # weeknumber, starting from first Monday
+        "x": (r"\d{8}", "s"),  # date (YYYYmmdd)
         "Y": (r"\d{4}", "04d"),  # year
-        "z": (r"-?\d{4}", "04d"),  # timezone (-hhmm)
+        "z": (r"[+-]\d{4}(?:\d\d(?:\.\d{6})?)?", "s"),  # timezone (-HHMM[SS[.ffffff]])
     }
     """Regex and format strings for various default groups.
 

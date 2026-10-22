@@ -75,7 +75,7 @@ specify the year, we can use 2000 as a default::
 
 The default date can be a datetime object, or a mapping containing any elements
 among: year, month, day, hour, minute, second. They will replace the default of
-1970-01-01 00:00:00.
+1970-01-01 00:00:00 UTC.
 
 Restrict values
 ===============

@@ -2,6 +2,7 @@
 
 import calendar
 import datetime as dt
+from zoneinfo import ZoneInfo
 
 import pytest
 from hypothesis import given
@@ -9,6 +10,8 @@ from hypothesis import strategies as st
 
 from filefinder.dates import (
     DATETIME_ELEMENTS,
+    STRING_ELEMENTS,
+    TIME_ELEMENTS,
     DateParser,
     _datetime_to_dict,
     _find_month_number,
@@ -29,63 +32,95 @@ def test_make_date_groups() -> None:
     assert make_date_groups("%Y%m%dT%H:%M:%S") == "%(Y)%(m)%(d)T%(H):%(M):%(S)"
 
 
-def test_datetime_to_str() -> None:
-    date = dt.datetime(2086, 3, 2, 1, 34, 6)
-    assert datetime_to_str(date, "Y") == "2086"
-    assert datetime_to_str(date, "m") == "03"
-    assert datetime_to_str(date, "d") == "02"
-    assert datetime_to_str(date, "B") == calendar.month_name[3]
-    assert datetime_to_str(date, "j") == "061"
+class TestDatetimeToStr:
+    def test_manual(self) -> None:
+        date = dt.datetime(2026, 2, 3, 14, 34, 6, 654, tzinfo=ZoneInfo("Etc/GMT+1"))
+        assert datetime_to_str(date, "a") == calendar.day_abbr[1]
+        assert datetime_to_str(date, "A") == calendar.day_name[1]
+        assert datetime_to_str(date, "b") == calendar.month_abbr[2]
+        assert datetime_to_str(date, "B") == calendar.month_name[2]
+        assert datetime_to_str(date, "d") == "03"
+        assert datetime_to_str(date, "f") == "000654"
+        assert datetime_to_str(date, "F") == "2026-02-03"
+        assert datetime_to_str(date, "H") == "14"
+        assert datetime_to_str(date, "I") == "02"
+        assert datetime_to_str(date, "j") == "034"
+        assert datetime_to_str(date, "m") == "02"
+        assert datetime_to_str(date, "M") == "34"
+        assert datetime_to_str(date, "p") == "PM"
+        assert datetime_to_str(date, "P") == "pm"
+        assert datetime_to_str(date, "s") == "1770132846.000654"
+        assert datetime_to_str(date, "S") == "06"
+        assert datetime_to_str(date, "T") == "143406"
+        assert datetime_to_str(date, "u") == "2"
+        assert datetime_to_str(date, "U") == "05"
+        assert datetime_to_str(date, "w") == "2"
+        assert datetime_to_str(date, "W") == "05"
+        assert datetime_to_str(date, "x") == "20260203"
+        assert datetime_to_str(date, "Y") == "2026"
+        assert datetime_to_str(date, "z") == "-0100"
 
-    assert datetime_to_str(date, "H") == "01"
-    assert datetime_to_str(date, "M") == "34"
-    assert datetime_to_str(date, "S") == "06"
-
-    assert datetime_to_str(date, "x") == "20860302"
-    assert datetime_to_str(date, "T") == "013406"
-    assert datetime_to_str(date, "F") == "2086-03-02"
-
-    with pytest.raises(KeyError):
-        datetime_to_str(date, "NOT_A_KEY")
-    with pytest.raises(TypeError):
-        datetime_to_str(dt.date(2000, 1, 1), "H")
-
-
-def test_datetime_to_value_basic() -> None:
-    date = dt.datetime(2086, 3, 2, 1, 34, 6)
-    assert datetime_to_value(date, "Y") == 2086
-    assert datetime_to_value(date, "m") == 3
-    assert datetime_to_value(date, "d") == 2
-    assert datetime_to_value(date, "B") == calendar.month_name[3]
-    assert datetime_to_value(date, "j") == 61
-
-    assert datetime_to_value(date, "H") == 1
-    assert datetime_to_value(date, "M") == 34
-    assert datetime_to_value(date, "S") == 6
-
-    assert datetime_to_value(date, "x") == 20860302
-    assert datetime_to_value(date, "X") == 13406
-    assert datetime_to_value(date, "F") == "2086-03-02"
-
-    with pytest.raises(KeyError):
-        datetime_to_value(date, "NOT_A_KEY")
-    with pytest.raises(TypeError):
-        datetime_to_value(dt.date(2000, 1, 1), "H")
+        with pytest.raises(KeyError):
+            datetime_to_str(date, "NOT_A_KEY")
+        for name in TIME_ELEMENTS:
+            with pytest.raises(TypeError):
+                datetime_to_str(dt.date(2000, 1, 1), name)
 
 
-@given(date=st.datetimes())
-def test_datetime_to_value(date: dt.datetime) -> None:
-    assert datetime_to_value(date, "Y") == date.year
-    assert datetime_to_value(date, "m") == date.month
-    assert datetime_to_value(date, "d") == date.day
-    assert datetime_to_value(date, "H") == date.hour
-    assert datetime_to_value(date, "M") == date.minute
-    assert datetime_to_value(date, "S") == date.second
+class TestDatetimeToValue:
+    def test_manual(self) -> None:
+        date = dt.datetime(2026, 2, 3, 14, 34, 6, 654, tzinfo=ZoneInfo("Etc/GMT+1"))
+        assert datetime_to_value(date, "a") == calendar.day_abbr[1]
+        assert datetime_to_value(date, "A") == calendar.day_name[1]
+        assert datetime_to_value(date, "b") == calendar.month_abbr[2]
+        assert datetime_to_value(date, "B") == calendar.month_name[2]
+        assert datetime_to_value(date, "d") == 3
+        assert datetime_to_value(date, "f") == 654
+        assert datetime_to_value(date, "F") == "2026-02-03"
+        assert datetime_to_value(date, "H") == 14
+        assert datetime_to_value(date, "I") == 2
+        assert datetime_to_value(date, "j") == 34
+        assert datetime_to_value(date, "m") == 2
+        assert datetime_to_value(date, "M") == 34
+        assert datetime_to_value(date, "p") == "PM"
+        assert datetime_to_value(date, "P") == "pm"
+        assert datetime_to_value(date, "s") == 1770132846.000654
+        assert datetime_to_value(date, "S") == 6
+        assert datetime_to_value(date, "T") == "143406"
+        assert datetime_to_value(date, "u") == 2
+        assert datetime_to_value(date, "U") == 5
+        assert datetime_to_value(date, "w") == 2
+        assert datetime_to_value(date, "W") == 5
+        assert datetime_to_value(date, "x") == "20260203"
+        assert datetime_to_value(date, "Y") == 2026
+        assert datetime_to_value(date, "z") == "-0100"
 
-    for name in "FB":
-        assert datetime_to_value(date, name) == datetime_to_str(date, name)
-    for name in "xX":
-        assert datetime_to_value(date, name) == int(datetime_to_str(date, name))
+        with pytest.raises(KeyError):
+            datetime_to_str(date, "NOT_A_KEY")
+        for name in TIME_ELEMENTS:
+            with pytest.raises(TypeError):
+                datetime_to_str(dt.date(2000, 1, 1), name)
+
+    @given(date=st.datetimes(timezones=st.timezones()))
+    def test_hypothesis(self, date: dt.datetime) -> None:
+        assert datetime_to_value(date, "Y") == date.year
+        assert datetime_to_value(date, "m") == date.month
+        assert datetime_to_value(date, "d") == date.day
+        assert datetime_to_value(date, "j") == int(date.strftime("%j"))
+
+        assert datetime_to_value(date, "H") == date.hour
+        assert datetime_to_value(date, "M") == date.minute
+        assert datetime_to_value(date, "S") == date.second
+        assert datetime_to_value(date, "f") == date.microsecond
+        assert datetime_to_value(date, "s") == date.timestamp()
+
+        assert datetime_to_value(date, "u") == date.weekday() + 1
+        assert datetime_to_value(date, "U") == int(date.strftime("%U"))
+        assert datetime_to_value(date, "w") == int(date.strftime("%w"))
+        assert datetime_to_value(date, "W") == int(date.strftime("%W"))
+
+        for element in STRING_ELEMENTS:
+            assert datetime_to_value(date, element) == datetime_to_str(date, element)
 
 
 @given(month=st.integers(1, 12))
@@ -167,7 +202,9 @@ class TestDateParser:
         assert parser.process_basic() == {"second": second}
 
     @given(
-        date=st.datetimes(),
+        date=st.datetimes(
+            min_value=dt.datetime(1800, 1, 1), max_value=dt.datetime(2200, 1, 1)
+        ),
         offset_hr=st.integers(0, 23),
         offset_min=st.integers(0, 59),
         neg=st.booleans(),
@@ -179,16 +216,17 @@ class TestDateParser:
         if neg:
             delta = -delta
         tz_ref = dt.timezone(delta)
-        tz_str = f"{'-' if neg else ''}{offset_hr:02d}{offset_min:02d}"
+        tz_str = f"{'-' if neg else '+'}{offset_hr:02d}{offset_min:02d}"
 
-        date = date.replace(microsecond=0)  # , tzinfo=tz_ref)
+        # without tzinfo it is taken as local time
+        date = date.replace(tzinfo=tz_ref)
 
         matches = [
             GroupMatch(Group("z", 0), tz_str, 0, 0),
-            GroupMatch(Group("s", 0), date.strftime("%s"), 0, 0),
+            GroupMatch(Group("s", 0), str(date.timestamp()), 0, 0),
         ]
         parser = DateParser(matches)
-        # parser.process("z", parser.process_z)
+        parser.process("z", parser.process_z)
         assert parser.process_s() == {
             "year": date.year,
             "month": date.month,
@@ -280,11 +318,6 @@ class TestDateParser:
         """Test parsing a date from all elements."""
         # remove microsecond
         date = date.replace(microsecond=0)
-        # group_fmt = {x: f"%{x}" for x in DATETIME_ELEMENTS}
-        group_fmt = {x: f"%{x}" for x in "FT"}
-        group_fmt["F"] = "%Y-%m-%d"
-        group_fmt["x"] = "%Y%m%d"
-        group_fmt["T"] = "%H%M%S"
         matches = [
             GroupMatch(Group(name, 0), datetime_to_str(date, name), 0, 0)
             for name in DATETIME_ELEMENTS
@@ -296,8 +329,12 @@ class TestDateParser:
         assert parser.retrieve_date() == date
 
     @given(
-        date=st.datetimes(timezones=st.one_of([st.none(), st.timezones()])),
-        default_date=st.datetimes(timezones=st.one_of([st.none(), st.timezones()])),
+        date=st.datetimes(
+            min_value=dt.datetime(1800, 1, 1),
+            max_value=dt.datetime(2200, 1, 1),
+            timezones=st.timezones(),
+        ),
+        default_date=st.datetimes(timezones=st.timezones()),
         elements=st.lists(st.sampled_from(DATETIME_ELEMENTS), min_size=1),
     )
     def test_parse_with_default(
@@ -319,18 +356,19 @@ class TestDateParser:
             "M": ["minute"],
             "p": [],
             "P": [],
-            "s": ["year", "month", "day", "hour", "minute", "second"],
+            "s": ["year", "month", "day", "hour", "minute", "second", "microsecond"],
             "S": ["second"],
             "T": ["hour", "minute", "second"],
             "u": ["month", "day"],
             "U": ["month", "day"],
             "w": ["month", "day"],
             "W": ["month", "day"],
+            "x": ["year", "month", "day"],
             "Y": ["year"],
             "z": ["tzinfo"],
         }
 
-        if "z" in elements:
+        if "z" not in elements:
             date = date.replace(tzinfo=dt.UTC)
 
         date_ref_elements = _datetime_to_dict(default_date)
@@ -348,17 +386,53 @@ class TestDateParser:
         has_ampm = len(set("pP") & set(elements)) > 0
         has_hour12 = "I" in elements
         has_weekday = len(set("aAuw") & set(elements)) > 0
-        has_weeknum = len((set("UW")) & set(elements)) > 0
+        has_weeknum = len(set("UW") & set(elements)) > 0
+        has_month = len(set("bBmjFxs") & set(elements)) > 0
+        has_day = len(set("djFxs") & set(elements)) > 0
 
         if has_ampm != has_hour12:
             with pytest.raises(ValueError):
                 DateParser.parse(matches)
             return
+
         if has_weekday != has_weeknum:
-            with pytest.raises(ValueError):
-                DateParser.parse(matches)
-            return
+            # try specifying what is missing with default_date
+            default_date_with_missing = _datetime_to_dict(default_date)
+            if not has_weeknum:
+                default_date_with_missing["weeknumber"] = int(date_ref.strftime("%W"))
+            if not has_weekday:
+                default_date_with_missing["weekday"] = int(date_ref.strftime("%w"))
+
+            parser = DateParser(matches, default_date=default_date_with_missing)
+            parsed = parser.retrieve_date()
+            assert parsed == date_ref
+
+            if not has_month or not has_day:
+                with pytest.raises(ValueError):
+                    DateParser.parse(matches)
+                return
 
         parser = DateParser(matches, default_date=default_date)
         parsed = parser.retrieve_date()
         assert parsed == date_ref
+
+    def test_not_date_group(self):
+        matches = [
+            GroupMatch(Group("Y", 0), "2000", 0, 0),
+            GroupMatch(Group("not_a_date_group:fmt=d", 1), "5", 0, 0),
+        ]
+        with pytest.raises(
+            ValueError, match=r"'not_a_date_group:1' is not a date group."
+        ):
+            DateParser.parse(matches)
+
+    def test_duplicate_groups(self):
+        """Different groups for the same element have different values."""
+
+        matches = [
+            GroupMatch(Group("Y", 0), "2000", 0, 0),
+            GroupMatch(Group("m", 1), "05", 0, 0),
+            GroupMatch(Group("Y", 2), "2010", 0, 0),
+        ]
+        with pytest.raises(ValueError, match="Groups with the same element 'Y'"):
+            DateParser.parse(matches)

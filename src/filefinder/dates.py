@@ -381,12 +381,14 @@ class DateParser:
 
     def process_b(self) -> dict[str, int]:
         name = self.elements.pop("b").lower()
-        names = [m.lower() for m in calendar.month_name[1:]]
+        names = [m.lower() for m in calendar.month_abbr]
+        if name in names:
+            return {"month": names.index(name)}
 
-        for i, ref in enumerate(names):
-            if ref.startswith(name):
-                return {"month": i + 1}
-        raise KeyError
+        raise KeyError(
+            f"Abbreviated month name '{name}' unrecognised. Must be a name from the "
+            f"current locale, among {names[1:]} (not case dependent)."
+        )
 
     def process_F(self) -> dict[str, int]:  # noqa: N802
         """Process match for full date (YYYY-mm-dd)."""

@@ -279,6 +279,36 @@ class TestDateParser:
             tz_delta = dt.timedelta()
         assert parser.process_z() == {"tzinfo": dt.timezone(tz_delta)}
 
+    @given(
+        neg=st.booleans(),
+        hours=st.integers(0, 23),
+        minutes=st.integers(0, 59),
+        seconds=st.one_of(st.none(), st.integers(0, 59)),
+        microseconds=st.one_of(st.none(), st.integers(0, 999999)),
+    )
+    def test_process_z_elements(
+        self, neg: bool, hours: int, minutes: int, seconds: int, microseconds: int
+    ) -> None:
+        args = {
+            "hours": hours,
+            "minutes": minutes,
+            "seconds": seconds,
+            "microseconds": microseconds,
+        }
+        args = {k: v for k, v in args.items() if v is not None}
+        # timedelta does not accept None as input
+        delta = dt.timedelta(**args)
+        if neg:
+            delta = -delta
+
+        tz = dt.timezone(delta)
+
+        date = dt.datetime(2000, 1, 1, tzinfo=tz)
+        gm = GroupMatch(Group("z", 0), date.strftime("%z"), 0, 0)
+        parser = DateParser([gm])
+
+        assert parser.process_z() == {"tzinfo": tz}
+
     @given(hour=st.integers(0, 23))
     def test_process_hour_12(self, hour: int) -> None:
         time = dt.time(hour=hour)

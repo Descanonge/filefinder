@@ -311,14 +311,19 @@ class DateParser:
         return dt.datetime(**args)  # type: ignore[arg-type]
 
     def process_z(self) -> dict[str, dt.timezone]:
-        m = re.fullmatch(r"([+-])(\d\d)(\d\d)(\d\d(?:\.\d{6})?)?", self.elements["z"])
+        m = re.fullmatch(
+            r"([+-])(\d\d)(\d\d)(?:(\d\d)(?:\.(\d{6}))?)?", self.elements["z"]
+        )
         if m is None:
-            raise ValueError
+            raise ValueError(
+                f"Could not parse timezone information '{self.elements['z']}' "
+                "with pattern ±HHMM[SS[.ffffff]]."
+            )
 
         sign = m.group(1)
         elements = dict(
             zip(
-                ["hours", "minutes", "seconds"],
+                ["hours", "minutes", "seconds", "microseconds"],
                 [float(x) for x in m.groups()[1:] if x is not None],
                 strict=False,
             )

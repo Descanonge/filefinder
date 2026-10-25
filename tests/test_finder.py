@@ -731,8 +731,8 @@ class TestMatches:
         assert filematch["date2__Y"] == 2087
         assert filematch["date2__j"] == 93
 
-        assert filematch["date"] == dt.datetime(2086, 3, 2, tzinfo=dt.UTC)
-        assert filematch["date2"] == dt.datetime(2087, 4, 3, tzinfo=dt.UTC)
+        assert filematch["date"] == dt.datetime(2086, 3, 2)
+        assert filematch["date2"] == dt.datetime(2087, 4, 3)
 
     def test_all_date_formats(self) -> None:
         date = dt.datetime(
@@ -783,14 +783,14 @@ class TestMatches:
         finder = Finder("%(m)_%(d)_%(M)")
         filematch = finder.find_matches(Path("04_28_17"))
         assert filematch is not None
-        assert filematch["date"] == dt.datetime(1970, 4, 28, 0, 17, tzinfo=dt.UTC)
+        assert filematch["date"] == dt.datetime(1970, 4, 28, 0, 17)
 
         # Use same as default
         assert filematch.get_value(
             "date", default_date=dt.datetime(1970, 1, 1)
         ) == dt.datetime(1970, 4, 28, 0, 17)
         assert filematch.get_value("date", default_date={}) == dt.datetime(
-            1970, 4, 28, 0, 17, tzinfo=dt.UTC
+            1970, 4, 28, 0, 17
         )
 
         # Change default time
@@ -800,7 +800,7 @@ class TestMatches:
         assert filematch.get_value(
             "date",
             default_date={"hour": 8, "minute": 35, "second": 55},
-        ) == dt.datetime(1970, 4, 28, 8, 17, 55, tzinfo=dt.UTC)
+        ) == dt.datetime(1970, 4, 28, 8, 17, 55)
 
         # Change default date
         assert filematch.get_value(
@@ -808,7 +808,7 @@ class TestMatches:
         ) == dt.datetime(2012, 4, 28, 0, 17)
         assert filematch.get_value(
             "date", default_date={"year": 2012, "month": 5, "day": 6}
-        ) == dt.datetime(2012, 4, 28, 0, 17, tzinfo=dt.UTC)
+        ) == dt.datetime(2012, 4, 28, 0, 17)
 
     def test_month(self) -> None:
         finder = Finder("%(Y)_%(B)")
@@ -823,7 +823,7 @@ class TestMatches:
             filematch = finder.find_matches(Path(f"2012_{name}"))
             assert filematch is not None
             assert filematch["B"] == name
-            assert filematch["date"] == dt.datetime(2012, 2, 1, tzinfo=dt.UTC)
+            assert filematch["date"] == dt.datetime(2012, 2, 1)
 
     def test_datetime(self) -> None:
         finder = Finder(pattern_datetime.pattern)
@@ -838,8 +838,8 @@ class TestMatches:
         assert filematch["date2__x"] == "20870403"
         assert filematch["date2__T"] == "181920"
 
-        assert filematch["date"] == dt.datetime(2086, 3, 2, 15, 16, 17, tzinfo=dt.UTC)
-        assert filematch["date2"] == dt.datetime(2087, 4, 3, 18, 19, 20, tzinfo=dt.UTC)
+        assert filematch["date"] == dt.datetime(2086, 3, 2, 15, 16, 17)
+        assert filematch["date2"] == dt.datetime(2087, 4, 3, 18, 19, 20)
 
     def test_date_wrong(self) -> None:
         """Two groups gives different date elements."""
@@ -1051,20 +1051,20 @@ class TestFileScan:
 
     def test_filter_parameter(self, tmp_path: Path) -> None:
         self.setup(tmp_path)
-        self.finder.add_group_filter("param", lambda x: abs(x) > 0)  # type: ignore[arg-type]
+        self.finder.add_group_filter("param", lambda x: abs(x) > 0)
         self.assert_files(self.tmp_dir.make_filenames(params=[-1.5, 1.5]))
 
     def test_fix_and_filter_parameter(self, tmp_path: Path) -> None:
         self.setup(tmp_path)
         self.finder.fix(param=[0, 1.5])
-        self.finder.add_group_filter("param", lambda x: abs(x) > 0)  # type: ignore[arg-type]
+        self.finder.add_group_filter("param", lambda x: abs(x) > 0)
         self.assert_files(self.tmp_dir.make_filenames(params=[1.5]))
 
     def test_filter_date(self, tmp_path: Path) -> None:
         self.setup(tmp_path)
         self.finder.add_group_filter(
             "date",
-            lambda d: dt.date(2000, 6, 1) <= d.date() <= dt.date(2001, 6, 1),  # type: ignore[arg-type]
+            lambda d: dt.datetime(2000, 6, 1) <= d <= dt.datetime(2001, 6, 1),
         )
         fixed_dates = date_range((2000, 6, 14), 15, 24)
         self.assert_files(self.tmp_dir.make_filenames(dates=fixed_dates))
@@ -1074,7 +1074,7 @@ class TestFileScan:
         self.finder.fix(Y=2000)
         self.finder.add_group_filter(
             "date",
-            lambda d: dt.date(2000, 6, 1) <= d.date() <= dt.date(2001, 6, 1),  # type: ignore[arg-type]
+            lambda d: dt.datetime(2000, 6, 1) <= d <= dt.datetime(2001, 6, 1),
         )
         fixed_dates = date_range((2000, 6, 14), 15, 14)
         self.assert_files(self.tmp_dir.make_filenames(dates=fixed_dates))

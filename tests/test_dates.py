@@ -5,8 +5,9 @@ import datetime as dt
 from zoneinfo import ZoneInfo
 
 import pytest
-from hypothesis import given
+from hypothesis import example, given
 from hypothesis import strategies as st
+from lib import Drawer
 
 from filefinder.dates import (
     DATETIME_ELEMENTS,
@@ -14,13 +15,33 @@ from filefinder.dates import (
     TIME_ELEMENTS,
     DateParser,
     _datetime_to_dict,
-    _find_month_number,
     datetime_to_str,
     datetime_to_value,
     make_date_groups,
 )
 from filefinder.group import Group
 from filefinder.matches import GroupMatch
+
+
+def st_tzinfo() -> st.SearchStrategy[dt.timezone]:
+    @st.composite
+    def strat(draw: Drawer) -> dt.timezone:
+        neg = draw(st.booleans())
+
+        args = {
+            "hours": draw(st.integers(0, 23)),
+            "minutes": draw(st.integers(0, 59)),
+            "seconds": draw(st.one_of(st.none(), st.integers(0, 59))),
+            "microseconds": draw(st.one_of(st.none(), st.integers(0, 999999))),
+        }
+        args = {k: v for k, v in args.items() if v is not None}
+        delta = dt.timedelta(**args)  # type: ignore[arg-type]
+        if neg:
+            delta = -delta
+
+        return dt.timezone(delta)
+
+    return strat()
 
 
 def test_make_date_groups() -> None:
@@ -65,6 +86,17 @@ class TestDatetimeToStr:
         for name in TIME_ELEMENTS:
             with pytest.raises(TypeError):
                 datetime_to_str(dt.date(2000, 1, 1), name)
+
+    def test_naive(self) -> None:
+        date = dt.datetime(2026, 2, 3, 14, 34, 6)
+        assert datetime_to_str(date, "F") == "2026-02-03"
+        assert datetime_to_str(date, "H") == "14"
+        assert datetime_to_str(date, "I") == "02"
+        assert datetime_to_str(date, "p") == "PM"
+        assert datetime_to_str(date, "P") == "pm"
+        assert datetime_to_str(date, "s") == "1770129246.000000"
+        assert datetime_to_str(date, "T") == "143406"
+        assert datetime_to_str(date, "z") == "+0000"
 
 
 class TestDatetimeToValue:
@@ -122,11 +154,27 @@ class TestDatetimeToValue:
         for element in STRING_ELEMENTS:
             assert datetime_to_value(date, element) == datetime_to_str(date, element)
 
+    def test_naive(self) -> None:
+        date = dt.datetime(2026, 2, 3, 14, 34, 6)
+        assert datetime_to_value(date, "d") == 3
+        assert datetime_to_value(date, "F") == "2026-02-03"
+        assert datetime_to_value(date, "H") == 14
+        assert datetime_to_value(date, "I") == 2
+        assert datetime_to_value(date, "j") == 34
+        assert datetime_to_value(date, "m") == 2
+        assert datetime_to_value(date, "M") == 34
+        assert datetime_to_value(date, "p") == "PM"
+        assert datetime_to_value(date, "P") == "pm"
+        assert datetime_to_value(date, "s") == 1770129246.000000
+        assert datetime_to_value(date, "S") == 6
+        assert datetime_to_value(date, "T") == "143406"
+        assert datetime_to_value(date, "z") == "+0000"
 
-@given(month=st.integers(1, 12))
-def test_find_month_number(month: int) -> None:
-    name = calendar.month_name[month]
-    assert _find_month_number(name) == month
+        with pytest.raises(KeyError):
+            datetime_to_str(date, "NOT_A_KEY")
+        for name in TIME_ELEMENTS:
+            with pytest.raises(TypeError):
+                datetime_to_str(dt.date(2000, 1, 1), name)
 
 
 class TestDateParser:
@@ -205,37 +253,23 @@ class TestDateParser:
         date=st.datetimes(
             min_value=dt.datetime(1800, 1, 1), max_value=dt.datetime(2200, 1, 1)
         ),
-        offset_hr=st.integers(0, 23),
-        offset_min=st.integers(0, 59),
-        neg=st.booleans(),
+        tz=st.one_of(st.none(), st_tzinfo()),
     )
-    def test_process_s(
-        self, date: dt.datetime, offset_hr: int, offset_min: int, neg: bool
-    ) -> None:
-        delta = dt.timedelta(hours=offset_hr, minutes=offset_min)
-        if neg:
-            delta = -delta
-        tz_ref = dt.timezone(delta)
-        tz_str = f"{'-' if neg else '+'}{offset_hr:02d}{offset_min:02d}"
+    def test_process_s(self, date: dt.datetime, tz: dt.timezone | None) -> None:
+        if tz is None:
+            tz = dt.UTC
+        date = date.replace(tzinfo=tz)
 
-        # without tzinfo it is taken as local time
-        date = date.replace(tzinfo=tz_ref)
+        matches = [GroupMatch(Group("s", 0), str(date.timestamp()), 0, 0)]
+        if tz is not None:
+            matches.append(GroupMatch(Group("z", 0), date.strftime("%z"), 0, 0))
 
-        matches = [
-            GroupMatch(Group("z", 0), tz_str, 0, 0),
-            GroupMatch(Group("s", 0), str(date.timestamp()), 0, 0),
-        ]
         parser = DateParser(matches)
-        parser.process("z", parser.process_z)
-        assert parser.process_s() == {
-            "year": date.year,
-            "month": date.month,
-            "day": date.day,
-            "hour": date.hour,
-            "minute": date.minute,
-            "second": date.second,
-            "microsecond": date.microsecond,
-        }
+
+        if tz is not None:
+            parser.process("z", parser.process_z)
+
+        assert parser.process_s() == _datetime_to_dict(date)
 
     @given(time=st.times())
     def test_process_T(self, time: dt.time) -> None:  # noqa: N802
@@ -279,30 +313,8 @@ class TestDateParser:
             tz_delta = dt.timedelta()
         assert parser.process_z() == {"tzinfo": dt.timezone(tz_delta)}
 
-    @given(
-        neg=st.booleans(),
-        hours=st.integers(0, 23),
-        minutes=st.integers(0, 59),
-        seconds=st.one_of(st.none(), st.integers(0, 59)),
-        microseconds=st.one_of(st.none(), st.integers(0, 999999)),
-    )
-    def test_process_z_elements(
-        self, neg: bool, hours: int, minutes: int, seconds: int, microseconds: int
-    ) -> None:
-        args = {
-            "hours": hours,
-            "minutes": minutes,
-            "seconds": seconds,
-            "microseconds": microseconds,
-        }
-        args = {k: v for k, v in args.items() if v is not None}
-        # timedelta does not accept None as input
-        delta = dt.timedelta(**args)
-        if neg:
-            delta = -delta
-
-        tz = dt.timezone(delta)
-
+    @given(tz=st_tzinfo())
+    def test_process_z_elements(self, tz: dt.timezone) -> None:
         date = dt.datetime(2000, 1, 1, tzinfo=tz)
         gm = GroupMatch(Group("z", 0), date.strftime("%z"), 0, 0)
         parser = DateParser([gm])
@@ -346,8 +358,11 @@ class TestDateParser:
     @given(date=st.datetimes(timezones=st.timezones()))
     def test_parse(self, date: dt.datetime) -> None:
         """Test parsing a date from all elements."""
-        # remove microsecond
-        date = date.replace(microsecond=0)
+
+        if not 1800 < date.year < 2200:
+            # timestamp breaks at the microsecond level
+            date = date.replace(microsecond=0)
+
         matches = [
             GroupMatch(Group(name, 0), datetime_to_str(date, name), 0, 0)
             for name in DATETIME_ELEMENTS
@@ -364,8 +379,13 @@ class TestDateParser:
             max_value=dt.datetime(2200, 1, 1),
             timezones=st.timezones(),
         ),
-        default_date=st.datetimes(timezones=st.timezones()),
+        default_date=st.datetimes(timezones=st.one_of(st.none(), st.timezones())),
         elements=st.lists(st.sampled_from(DATETIME_ELEMENTS), min_size=1),
+    )
+    @example(
+        date=dt.datetime(2000, 1, 1, tzinfo=dt.UTC),
+        default_date=dt.datetime(2000, 1, 1),
+        elements=["s"],
     )
     def test_parse_with_default(
         self, date: dt.datetime, default_date: dt.datetime, elements: list[str]
@@ -397,9 +417,6 @@ class TestDateParser:
             "Y": ["year"],
             "z": ["tzinfo"],
         }
-
-        if "z" not in elements:
-            date = date.replace(tzinfo=dt.UTC)
 
         date_ref_elements = _datetime_to_dict(default_date)
 
@@ -446,7 +463,7 @@ class TestDateParser:
         parsed = parser.retrieve_date()
         assert parsed == date_ref
 
-    def test_not_date_group(self):
+    def test_not_date_group(self) -> None:
         matches = [
             GroupMatch(Group("Y", 0), "2000", 0, 0),
             GroupMatch(Group("not_a_date_group:fmt=d", 1), "5", 0, 0),
@@ -456,7 +473,7 @@ class TestDateParser:
         ):
             DateParser.parse(matches)
 
-    def test_duplicate_groups(self):
+    def test_duplicate_groups(self) -> None:
         """Different groups for the same element have different values."""
 
         matches = [

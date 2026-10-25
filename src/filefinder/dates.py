@@ -89,11 +89,14 @@ def datetime_to_str(date: dt.datetime | dt.date, element: str) -> str:
             )
         if element == "z":
             return date.strftime("%z") if date.tzinfo is not None else "+0000"
-        if element == "s":
-            return str(date.timestamp())
 
-        # strftime will format to UTC, we want to stay local
-        date = date.replace(tzinfo=dt.UTC)
+        # Assume naive is UTC. timestamp/strftime will otherwise take it as local time
+        if date.tzinfo is None:
+            date = date.replace(tzinfo=dt.UTC)
+
+        if element == "s":
+            return f"{date.timestamp():.6f}"
+
         if element == "T":
             return date.strftime("%H%M%S")
 
@@ -116,6 +119,9 @@ def datetime_to_value(date: dt.datetime | dt.date, element: str) -> int | float 
                 "object, not datetime.date."
             )
         if element == "s":
+            # Assume naive is UTC. timestamp/strftime will otherwise take it as local time
+            if date.tzinfo is None:
+                date = date.replace(tzinfo=dt.UTC)
             return date.timestamp()
 
     attributes = {
@@ -172,8 +178,9 @@ class DateParser:
         "minute": 0,
         "second": 0,
         "microsecond": 0,
-        "tzinfo": dt.UTC,
+        "tzinfo": None,
     }
+    """Default values for the default_date. Note it is offset-naive."""
 
     PROCESS_ORDER: ClassVar[dict[str, str]] = {
         "z": "z",
@@ -336,13 +343,17 @@ class DateParser:
         return {"tzinfo": tz}
 
     def process_s(self) -> dict[str, int | float]:
-        date = dt.datetime.fromtimestamp(
-            float(self.elements["s"]),
-            tz=self.get("tzinfo"),  # type: ignore[arg-type]
-        )
-        date_args = _datetime_to_dict(date)
-        date_args.pop("tzinfo")
-        return date_args
+        tz = self.get("tzinfo")
+        is_naive = tz is None
+        if is_naive:
+            tz = dt.UTC  # otherwise fromtimestamp assumes local time
+
+        date = dt.datetime.fromtimestamp(float(self.elements["s"]), tz=tz)  # type: ignore[arg-type]
+
+        args = _datetime_to_dict(date)
+        if is_naive:
+            args.pop("tzinfo")
+        return args
 
     def process_basic(self) -> dict[str, int]:
         attributes = {
@@ -475,21 +486,3 @@ class DateParser:
 
         date = dt.datetime.strptime(date_string, fmt)
         return {"month": date.month, "day": date.day}
-
-
-def _find_month_number(name: str) -> int:
-    """Find a month number from its name.
-
-    Name can be the full name (January) or its three letter abbreviation (jan).
-    The casing does not matter.
-    """
-    names = [m.lower() for m in calendar.month_name]
-    names_abbr = [c[:3] for c in names]
-
-    name = name.lower()
-    if name in names:
-        return names.index(name)
-    if name in names_abbr:
-        return names_abbr.index(name)
-
-    raise ValueError(f"Could not interpret month name '{name}'")

@@ -74,8 +74,18 @@ specify the year, we can use 2000 as a default::
     filematch.get_value("date", default_date={"year": 2000})
 
 The default date can be a datetime object, or a mapping containing any elements
-among: year, month, day, hour, minute, second. They will replace the default of
-1970-01-01 00:00:00 UTC.
+among: year, month, day, hour, minute, second, tzinfo, weekday, weeknumber. They
+will replace the default of 1970-01-01 00:00:00 (naive). For details on
+the parsing, see the documentation of :class:`.DateParser`.
+
+.. important::
+
+   Filefinder considers :ref:`naive <datetime-naive-aware>` datetime objects
+   (that do not have timezone information specified) as UTC.
+
+   Unless timezone information is present via the group ``%(z)`` or specified in
+   the default date, parsed dates will be returned as naive
+   :class:`datetime.datetime` objects.
 
 Restrict values
 ===============

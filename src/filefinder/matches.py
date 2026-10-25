@@ -198,7 +198,7 @@ class FileMatch:
         default_date:
             If key correspond to a date pseudo-group, use this as the default date
             elements. Datetime, or a mapping with keys in: year, month, day, hour,
-            minute, and second. Defaults to 1970-01-01 00:00:00 UTC.
+            minute, and second. Defaults to 1970-01-01 00:00:00 (naive).
         """
         matches = self.get_matches(key)
 
@@ -230,7 +230,7 @@ class FileMatch:
         default_date:
             If key correspond to a date pseudo-group, use this as the default date
             elements. Datetime, or a mapping with keys in: year, month, day, hour,
-            minute, and second. Defaults to 1970-01-01 00:00:00 UTC.
+            minute, and second. Defaults to 1970-01-01 00:00:00 (naive).
 
         Raises
         ------

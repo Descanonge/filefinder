@@ -76,7 +76,10 @@ def make_date_groups(date_format: str, name: str = "") -> str:
 
 
 def datetime_to_str(date: dt.datetime | dt.date, element: str) -> str:
-    """Format a date element (Y, m, F, ...) from a datetime object."""
+    """Format a date element (Y, m, F, ...) from a datetime object.
+
+    Naive datetimes are considered UTC.
+    """
     if element not in DATETIME_ELEMENTS:
         raise KeyError(
             f"Group name '{element}' not registered in dates.DATETIME_ELEMENTS"
@@ -107,7 +110,10 @@ def datetime_to_str(date: dt.datetime | dt.date, element: str) -> str:
 
 
 def datetime_to_value(date: dt.datetime | dt.date, element: str) -> int | float | str:
-    """Extract value of date element (Y, m, F, ...) from a datetime object."""
+    """Extract value of date element (Y, m, F, ...) from a datetime object.
+
+    Naive datetimes are considered UTC.
+    """
     if element not in DATETIME_ELEMENTS:
         raise KeyError(
             f"Group name '{element}' not registered in dates.DATETIME_ELEMENTS"
@@ -146,15 +152,50 @@ def datetime_to_value(date: dt.datetime | dt.date, element: str) -> int | float 
 class DateParser:
     """Parse date from matches.
 
-    Matches that can be used are in ``YBmdjHMSFxX``. If different matchers give
-    different values for the same element (for instance the group Y and F give a
-    different year), an exception will be raised.
+    Matches that can be used are in :attr:`DATETIME_ELEMENTS`. They are used to find the
+    arguments to pass to :class:`datetime.datetime`. If the matches do not permit to
+    recover all arguments, missing arguments will be taken from the `default_date`.
+    Missing elements will also been taken from the default date when necessary to parse,
+    for instance, to account for leap years ``%(j)`` will need the year to find the
+    month and day: it will use the parsed year if present in the matches, or the year of
+    the default date otherwise.
 
-    info about timestamp min/max
+    If multiple matches yield different values for the same argument (for instance if
+    the group Y and F give a different year), an exception will be raised.
 
-    platform dependent
+    Unless a match contains timezone information (``%(z)``) or the `default_date` has
+    been given `tzinfo`, the returned date will be naive. Filefinder considers naive
+    objects as UTC, so if no timezone information is available it will parse everything
+    as if UTC.
 
-    Use with either ``DateParser.parse(matches, default_date)`` or::
+    To parse a date from the week day and week number, the parser needs both information
+    on the day of the week (elements ``a, A, u`` or ``w``) and the week number (elements
+    ``U`` or ``W``). If only one part of the information is present:
+
+    - If other groups contain information about the month and day, the week part will
+      simply be ignored. For instance the pattern ``"%(Y)%(m)%(d)_%(a)"``
+      ("20261025_Sun") will ignore the information about the week day, and it will not
+      check the day of week is coherent the rest of the date.
+    - Otherwise, the parser will raise an exception. You may use the default date to
+      supply the missing information with keys ``weekday`` (equivalent to ``%w``) or
+      ``weeknumber`` (equivalent to ``%W``).
+
+    Similarly, when parsing the hour from a 12-hour clock, the parser will need element
+    ``I`` and either ``p`` or ``P``, otherwise an exception will be raised.
+
+    Some of the parsing (especially week number/day) is relying on
+    :meth:`~datetime.datetime.strptime`, whose availability may be platform dependent
+    (see :ref:`strftime-strptime-behavior`). Parsing the timestamp is also subject to
+    some limitations, computation may not be accurate to the microsecond when years are
+    too far from the epoch (see :meth:`~datetime.datetime.fromtimestamp`).
+
+    The names of months and week days are those of the current locale.
+
+    Use with either::
+
+        date = DateParser.parse(matches, default_date)
+
+        # or
 
         parser = DateParser(matches, default_date)
         date = parser.retrieve_date()
@@ -166,8 +207,10 @@ class DateParser:
     default_date:
         If an element is not found in the filename, use the element from this default
         date. It can be a :mod:`datetime` object or a mapping with keys among: year,
-        month, day, hour, minute, and second. Missing elements will default to
-        1970-01-01 00:00:00 UTC.
+        month, day, hour, minute, second, microsecond, tzinfo. Missing elements will
+        default to 1970-01-01 00:00:00 (naive). One can also supply ``weekday``
+        (equivalent to ``%w``) or ``weeknumber`` (equivalent to ``%W``) to give missing
+        week day/number information.
     """
 
     DEFAULT_DATE_DEFAULT: ClassVar[dict] = {
@@ -196,6 +239,11 @@ class DateParser:
         "HMSf": "basic",
         "IpP": "hour_12",
     }
+    """Processing methods for various elements, in order they are to be processed.
+
+    If the matches contain any of the elements in the key, the value will indicate the
+    method to use.
+    """
 
     def __init__(
         self, matches: Sequence[GroupMatch], default_date: DefaultDate | None = None
@@ -214,7 +262,9 @@ class DateParser:
         self.default_args = self.DEFAULT_DATE_DEFAULT | dict(default_date)
         """Default datetime arguments.
 
-        Used if an element is missing from the matches.
+        Used if an element is missing from the matches. Contains elements:
+        year, month, day, hour, minute, second, microsecond, tzinfo, and eventually
+        weeknumber or weekday.
         """
 
         self.elements: dict[str, str] = self.matches_to_elements()
@@ -237,7 +287,7 @@ class DateParser:
 
     @property
     def date_args(self) -> dict[str, int | float | dt.timezone]:
-        """Arguments to pass to `datetime.datetime`."""
+        """Arguments to pass to :class:`datetime.datetime`."""
         date_args = {}
         for arg_name, from_names in self.date_args_all.items():
             names = list(from_names.keys())
@@ -247,7 +297,8 @@ class DateParser:
     def matches_to_elements(self) -> dict[str, str]:
         """Create dictionary of elements name to matched strings.
 
-        Will check that multiple groups of the same element have the same value.
+        Will check that multiple groups of the same element have the same value, and
+        that all matches correspond to date groups.
         """
         elements_all: dict[str, list[GroupMatch]] = {}
         for m in self.matches:
@@ -271,7 +322,10 @@ class DateParser:
         }
 
     def retrieve_date(self) -> dt.datetime:
-        """Retrieve a date from matches."""
+        """Retrieve a date from matches.
+
+        The main parsing function.
+        """
         self.elements = self.matches_to_elements()
         self.date_args_all = {}
 
@@ -282,6 +336,17 @@ class DateParser:
         return self.create_date()
 
     def process(self, names: str, callback: Callable[..., dict]) -> None:
+        """Process elements using a given method.
+
+        If matches have any elements from `names`, launch the callback. The callback
+        must be a bound method that takes no arguments (other than `self`). It should
+        process the elements and return a dictionary of arguments for
+        :class:`datetime.datetime`.
+
+        The result of the callback is added to :attr:`.date_args_all` and if some
+        argument is different from what a previous callback processed, an exception is
+        raised.
+        """
         if _has_any_keys(self.elements, names):
             date_args = callback()
             for k, v in date_args.items():
@@ -297,14 +362,22 @@ class DateParser:
                     )
 
     def get(self, arg: str) -> int | float | dt.timezone | None:
+        """Return the corresponding parsed argument.
+
+        If the argument has been parsed, return that value. If not, return its value
+        from the `default_date`. If not present, raise an exception.
+        """
         if arg in self.date_args_all:
             return self.date_args[arg]
         if arg in self.default_args:
             return self.default_args[arg]
-        raise KeyError
+        raise KeyError(
+            f"Argument '{arg}' is neither in current parsed arguments nor in "
+            "default arguments."
+        )
 
     def create_date(self) -> dt.datetime:
-        """Create a datetime object from found elements."""
+        """Create a datetime object from parsed arguments."""
         args = dict(self.default_args)
         args.pop("weeknumber", None)
         args.pop("weekday", None)
@@ -318,6 +391,17 @@ class DateParser:
         return dt.datetime(**args)  # type: ignore[arg-type]
 
     def process_z(self) -> dict[str, dt.timezone]:
+        """Process timezone information.
+
+        **Elements:** ``z``
+
+        ``z`` should be of the form ±HHMM[SS.[ffffff]].
+
+        Returns
+        -------
+        arguments:
+            The `tzinfo` key.
+        """
         m = re.fullmatch(
             r"([+-])(\d\d)(\d\d)(?:(\d\d)(?:\.(\d{6}))?)?", self.elements["z"]
         )
@@ -343,6 +427,18 @@ class DateParser:
         return {"tzinfo": tz}
 
     def process_s(self) -> dict[str, int | float]:
+        """Process timestamp.
+
+        **Elements:** ``s``.
+
+        Timezone information should have been parsed already.
+
+        Returns
+        -------
+        arguments:
+            All arguments. `tzinfo` only present if timezone information was available
+            in matches or default date.
+        """
         tz = self.get("tzinfo")
         is_naive = tz is None
         if is_naive:
@@ -356,6 +452,15 @@ class DateParser:
         return args
 
     def process_basic(self) -> dict[str, int]:
+        """Process simple elements.
+
+        **Elements:** ``Y, m, d, H, M, S, f``
+
+        Returns
+        -------
+        arguments:
+            Any and all corresponding arguments.
+        """
         attributes = {
             "Y": "year",
             "m": "month",
@@ -372,14 +477,51 @@ class DateParser:
         return result
 
     def process_B(self) -> dict[str, int]:  # noqa: N802
+        """Process month name.
+
+        **Elements:** ``B``
+
+        Uses :attr:`calendar.month_name` (current locale). Could be changed so that a
+        specific locale could be used. This is not casing dependent.
+
+        Returns
+        -------
+        arguments:
+            The `month` key.
+
+        Raises
+        ------
+        KeyError
+            Unrecognised month name.
+        """
         name = self.elements.pop("B").lower()
         names = [m.lower() for m in calendar.month_name]
         if name in names:
             return {"month": names.index(name)}
 
-        raise KeyError
+        raise KeyError(
+            f"Month name '{name}' unrecognised. Must be a name from the "
+            f"current locale, among {names[1:]} (not case dependent)."
+        )
 
     def process_b(self) -> dict[str, int]:
+        """Process abbreviated month name.
+
+        **Elements:** ``b``
+
+        Uses :attr:`calendar.month_abbr` (current locale). Could be changed so that a
+        specific locale could be used. This is not casing dependent.
+
+        Returns
+        -------
+        arguments:
+            The `month` key.
+
+        Raises
+        ------
+        KeyError
+            Unrecognised month abbreviation.
+        """
         name = self.elements.pop("b").lower()
         names = [m.lower() for m in calendar.month_abbr]
         if name in names:
@@ -391,7 +533,15 @@ class DateParser:
         )
 
     def process_F(self) -> dict[str, int]:  # noqa: N802
-        """Process match for full date (YYYY-mm-dd)."""
+        """Process match for full date (YYYY-mm-dd).
+
+        **Elements**: ``F``
+
+        Returns
+        -------
+        arguments:
+            Keys `year`, `month`, and `day`.
+        """
         s = self.elements["F"]
         splits = s.split("-")
         if len(splits) != 3:
@@ -406,7 +556,17 @@ class DateParser:
         )
 
     def process_x(self) -> dict[str, int]:
-        """Process match for full date (YYYYmmdd)."""
+        """Process match for full date (YYYYmmdd).
+
+        **Elements:** ``x``
+
+        This departs from ISO as the year does not have to be padded with 0.
+
+        Returns
+        -------
+        arguments:
+            Keys `year`, `month`, and `day`.
+        """
         s = self.elements["x"]
         if len(s) < 5:
             raise ValueError(f"Could not parse date '{s}' (expected YYYYmmdd).")
@@ -414,7 +574,15 @@ class DateParser:
         return {elt: int(val) for elt, val in out.items()}
 
     def process_T(self) -> dict[str, int]:  # noqa: N802
-        """Process match for time (HHMMSS)."""
+        """Process match for time (HHMMSS).
+
+        **Elements:** ``T``
+
+        Returns
+        -------
+        arguments:
+            Keys `hour`, `minute`, and `second`.
+        """
         s = self.elements["T"]
         if len(s) != 6:
             raise ValueError(f"Could not parse time '{s}' (expected HHMMSS).")
@@ -422,11 +590,34 @@ class DateParser:
         return {elt: int(val) for elt, val in out.items()}
 
     def process_j(self) -> dict[str, int]:
+        """Process day of the year (j).
+
+        **Elements:** ``j``
+
+        Needs the year to have been parsed.
+
+        Returns
+        -------
+        arguments:
+            Keys `month` and `day`.
+        """
         s = self.elements["j"]
         date = dt.date(self.get("year"), 1, 1) + dt.timedelta(days=int(s) - 1)  # type: ignore[arg-type]
         return {"month": date.month, "day": date.day}
 
     def process_hour_12(self) -> dict[str, int]:
+        """Process hour as a 12-hour clock (IpP).
+
+        **Elements:** ``IpP``
+
+        If not both ``I`` and either ``p`` or ``P`` elements are present, an exception
+        will be raised.
+
+        Result
+        ------
+        arguments:
+            The key `hour`.
+        """
         present = {c for c in self.elements if c in "IpP"}
         has_p = "p" in present or "P" in present
         has_i = "I" in present
@@ -444,7 +635,25 @@ class DateParser:
         return {"hour": hour}
 
     def process_week_day(self) -> dict[str, int]:
-        values = {c: self.elements[c] for c in "aAuwUVW" if c in self.elements}
+        """Process the week day and week number. (aAuwUW).
+
+        **Elements:** ``aAuwUW``
+
+        Needs the year to be parsed. Needs both information about day of week and week
+        number. If one of them is missing:
+
+        - If month/day information has already been parsed, return an empty dict.
+        - If missing information is not present in default date, raise.
+
+        This relies on :meth:`datetime.datetime.strptime`, availability of element ``u``
+        may be platform dependent.
+
+        Returns
+        -------
+        arguments:
+            Keys `month` and `day`, or empty dict.
+        """
+        values = {c: self.elements[c] for c in "aAuwUW" if c in self.elements}
 
         def can_process(
             elements_missing: str, default_equivalent: str, present: str, missing: str
@@ -476,7 +685,7 @@ class DateParser:
         ):
             return {}
         if not can_process(
-            elements_missing="UVW",
+            elements_missing="UW",
             default_equivalent="W",
             present="weekday",
             missing="weeknumber",

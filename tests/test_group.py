@@ -109,27 +109,27 @@ class TestGroupDefinition:
             # no name
             ":fmt=08d",
             # argument given to flags
-            "a:opt=stuff",
-            "a:discard=stuff",
+            "bad:opt=stuff",
+            "bad:discard=stuff",
             # no argument given
-            "a:fmt=",
-            "a:pre=:opt",
+            "bad:fmt=",
+            "bad:pre=:opt",
             # missing properties
-            "a",
-            "a:pre=_",
+            "bad",
+            "bad:pre=_",
             # properties specified twice
-            "a:opt:fmt=02d:opt",
-            "a:rgx=foo:rgx=bar",
-            "a:opt:rgx=bar:opt:opt",
+            "bad:opt:fmt=02d:opt",
+            "bad:rgx=foo:rgx=bar",
+            "bad:opt:rgx=bar:opt:opt",
             # bad property
-            "a:optional",
-            "a:format=02d",
+            "bad:optional",
+            "bad:format=02d",
             # bad date group
             "__Y",  # empty date name
             "date__",  # empty date element
             "date__Y__m",  # multiple splits
             "date__Ym",  # not a date element
-            "date__u",  # note a date element
+            "date__O",  # not a date element
         ],
     )
     def test_bad_definition(self, spec: str) -> None:
@@ -142,8 +142,7 @@ class TestGroupDefinition:
         [
             ("Y", r"(\d{4})", "04d"),
             ("m", r"(\d\d)", "02d"),
-            ("x", r"(\d{8})", "08d"),
-            ("X", r"(\d{6})", "06d"),
+            ("x", r"(\d{8})", "s"),
             ("F", r"(\d{4}-\d\d-\d\d)", "s"),
         ],
     )

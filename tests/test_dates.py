@@ -48,7 +48,10 @@ def st_tzinfo() -> st.SearchStrategy[dt.timezone]:
 def fix_year_windows(date: dt.datetime) -> dt.datetime:
     """Windows does not support timestamps outside of 1970-2038."""
     if sys.platform.startswith("win"):
-        date = date.replace(min(max(date.year, 1970), 2038))
+        year, month, day = date.year, date.month, date.day
+        year = min(max(year, 1970), 2038)
+        day = min(day, calendar.monthrange(year, month)[1])
+        date = date.replace(year=year, day=day)
 
     return date
 

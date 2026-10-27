@@ -269,6 +269,8 @@ class TestDateParser:
             tz = dt.UTC
         date = date.replace(tzinfo=tz)
 
+        date = fix_year_windows(date)
+
         matches = [GroupMatch(Group("s", 0), str(date.timestamp()), 0, 0)]
         if tz is not None:
             matches.append(GroupMatch(Group("z", 0), date.strftime("%z"), 0, 0))

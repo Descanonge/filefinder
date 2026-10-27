@@ -90,6 +90,13 @@ def datetime_to_str(date: dt.datetime | dt.date, element: str) -> str:
                 f"Element '{element}' needs time information, ie a datetime.datetime "
                 "object, not datetime.date."
             )
+        # P is not platform independant
+        if element in "pP":
+            ampm = "am" if date.hour < 12 else "pm"
+            if element == "p":
+                ampm = ampm.upper()
+            return ampm
+
         if element == "z":
             return date.strftime("%z") if date.tzinfo is not None else "+0000"
 

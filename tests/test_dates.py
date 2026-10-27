@@ -355,13 +355,18 @@ class TestDateParser:
         parser.process("Y", parser.process_basic)
         assert parser.process_week_day() == {"month": date.month, "day": date.day}
 
-    @given(date=st.datetimes(timezones=st.timezones()))
-    def test_parse(self, date: dt.datetime) -> None:
+    @given(date=st.datetimes(), tzinfo=st.one_of(st.timezones(), st_tzinfo()))
+    def test_parse(self, date: dt.datetime, tzinfo: dt.timezone) -> None:
         """Test parsing a date from all elements."""
+        # convert to timedelta based, otherwise comparison will fail
+        tzdelta = tzinfo.utcoffset(date)
 
         if not 1800 < date.year < 2200:
             # timestamp breaks at the microsecond level
             date = date.replace(microsecond=0)
+            tzdelta -= dt.timedelta(microseconds=tzdelta.microseconds)
+
+        date = date.replace(tzinfo=dt.timezone(tzdelta))
 
         matches = [
             GroupMatch(Group(name, 0), datetime_to_str(date, name), 0, 0)
@@ -377,15 +382,10 @@ class TestDateParser:
         date=st.datetimes(
             min_value=dt.datetime(1800, 1, 1),
             max_value=dt.datetime(2200, 1, 1),
-            timezones=st.timezones(),
+            timezones=st.one_of(st.timezones(), st_tzinfo()),
         ),
         default_date=st.datetimes(timezones=st.one_of(st.none(), st.timezones())),
         elements=st.lists(st.sampled_from(DATETIME_ELEMENTS), min_size=1),
-    )
-    @example(
-        date=dt.datetime(2000, 1, 1, tzinfo=dt.UTC),
-        default_date=dt.datetime(2000, 1, 1),
-        elements=["s"],
     )
     def test_parse_with_default(
         self, date: dt.datetime, default_date: dt.datetime, elements: list[str]

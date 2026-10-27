@@ -52,6 +52,7 @@ tests = [
     'hypothesis',
     'coverage',
     'pytest-cov',
+    'tzdata',  # for windows
 ]
 
 [project.urls]

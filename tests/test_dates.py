@@ -440,9 +440,9 @@ class TestDateParser:
                 date_ref_elements[attr] = getattr(date, attr)
 
         # Combination of date and default_date could result in `day` being outside of
-        # the valid range of the month. This is difficult to predict, so we cap at 29
-        date_ref_elements["day"] = min(29, date_ref_elements["day"])
-        default_date = default_date.replace(day=min(29, default_date.day))
+        # the valid range of the month. This is difficult to predict, so we cap at 28
+        date_ref_elements["day"] = min(28, date_ref_elements["day"])
+        default_date = default_date.replace(day=min(28, default_date.day))
 
         date_ref = dt.datetime(**date_ref_elements)
 

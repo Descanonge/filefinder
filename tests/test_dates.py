@@ -2,6 +2,7 @@
 
 import calendar
 import datetime as dt
+import sys
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -42,6 +43,14 @@ def st_tzinfo() -> st.SearchStrategy[dt.timezone]:
         return dt.timezone(delta)
 
     return strat()
+
+
+def fix_year_windows(date: dt.datetime) -> dt.datetime:
+    """Windows does not support timestamps outside of 1970-2038."""
+    if sys.platform.startswith("win"):
+        date = date.replace(min(max(date.year, 1970), 2038))
+
+    return date
 
 
 def test_make_date_groups() -> None:
@@ -361,6 +370,8 @@ class TestDateParser:
         # convert to timedelta based, otherwise comparison will fail
         tzdelta = tzinfo.utcoffset(date)
 
+        date = fix_year_windows(date)
+
         if not 1800 < date.year < 2200:
             # timestamp breaks at the microsecond level
             date = date.replace(microsecond=0)
@@ -418,11 +429,21 @@ class TestDateParser:
             "z": ["tzinfo"],
         }
 
+        if "s" in elements:
+            date = fix_year_windows(date)
+            default_date = fix_year_windows(default_date)
+
         date_ref_elements = _datetime_to_dict(default_date)
 
         for element in elements:
             for attr in elements_attributes[element]:
                 date_ref_elements[attr] = getattr(date, attr)
+
+        # Combination of date and default_date could result in `day` being outside of
+        # the valid range of the month. This is difficult to predict, so we cap at 29
+        date_ref_elements["day"] = min(29, date_ref_elements["day"])
+        default_date = default_date.replace(day=min(29, default_date.day))
+
         date_ref = dt.datetime(**date_ref_elements)
 
         matches = [

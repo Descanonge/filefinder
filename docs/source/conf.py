@@ -112,7 +112,7 @@ def remove_none_return_type(
     app: Sphinx,
     obj_type: str,
     name: str,
-    obj: Any,
+    obj,
     options,
     signature: str,
     return_annotation: str,

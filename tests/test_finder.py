@@ -18,7 +18,7 @@ from lib import assert_fixed, assert_unfixed
 from lib.tmp_dir import TmpDirectory, TmpDirectoryExample, date_range
 
 from filefinder import Finder
-from filefinder.dates import DATETIME_ELEMENTS, make_date_groups
+from filefinder.dates import DATETIME_ELEMENTS
 from filefinder.group import Group, get_date_names, get_groups_indices
 from filefinder.matches import FileMatch, ParseStatus
 
@@ -388,7 +388,7 @@ class TestClearCache:
 
 
 class TestFixing:
-    def test_fix(self) -> None:
+    def test_fix(self) -> None:  # noqa: PLR0912
         finder = Finder(pattern_general.pattern)
         groups = {g.name: g for g in finder.groups}
 

@@ -14,7 +14,7 @@ settings.load_profile(os.getenv("HYPOTHESIS_PROFILE", "dev").lower())
 
 
 def pytest_collection_modifyitems(
-    session: Session, config: Config, items: list[Item]
+    session: Session, config: Config, items: list[Item]  # noqa: ARG001
 ) -> None:
     """Pytest hook.
 
@@ -24,7 +24,7 @@ def pytest_collection_modifyitems(
     """
     # test modules in order to be tested, relative to the root config (normally here)
     module_order = [
-        path.join("tests", f"test_{s}.py")
+        path.join("tests", f"test_{s}.py")  # noqa: PTH118
         for s in ["format", "dates", "group", "filters", "finder"]
     ]
 

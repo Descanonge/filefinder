@@ -410,20 +410,223 @@ class DateParser:
                     "default date mapping."
                 )
 
-        present = set("IpP") & set(elements.keys())
-        has_hour12 = "I" in elements
-        has_ampm = _has_any_keys(elements, "pP")
-        if has_hour12 != has_ampm:
-            if "H" in self.elements:
-                # We have other groups that can find the hour
-                for elt in present:
-                    elements.pop(elt)
-            else:
-                to_str = {True: "hour", False: "AM/PM"}
-                has = to_str[has_weekday]
-                missing = to_str[not has_weekday]
-                raise ValueError(
-                    f"Cannot correctly parse 12-hour with only the {has} and "
-                    f"not the {missing}. You can add the missing element to the "
-                    "default date mapping."
-                )
+    def process_B(self) -> dict[str, int]:  # noqa: N802
+        """Process month name.
+
+        **Elements:** ``B``
+
+        Uses :attr:`calendar.month_name` (current locale). Could be changed so that a
+        specific locale could be used. This is not casing dependent.
+
+        Returns
+        -------
+        arguments:
+            The `month` key.
+
+        Raises
+        ------
+        KeyError
+            Unrecognised month name.
+        """
+        name = self.elements.pop("B").lower()
+        names = [m.lower() for m in calendar.month_name]
+        if name in names:
+            return {"month": names.index(name)}
+
+        raise KeyError(
+            f"Month name '{name}' unrecognised. Must be a name from the "
+            f"current locale, among {names[1:]} (not case dependent)."
+        )
+
+    def process_b(self) -> dict[str, int]:
+        """Process abbreviated month name.
+
+        **Elements:** ``b``
+
+        Uses :attr:`calendar.month_abbr` (current locale). Could be changed so that a
+        specific locale could be used. This is not casing dependent.
+
+        Returns
+        -------
+        arguments:
+            The `month` key.
+
+        Raises
+        ------
+        KeyError
+            Unrecognised month abbreviation.
+        """
+        name = self.elements.pop("b").lower()
+        names = [m.lower() for m in calendar.month_abbr]
+        if name in names:
+            return {"month": names.index(name)}
+
+        raise KeyError(
+            f"Abbreviated month name '{name}' unrecognised. Must be a name from the "
+            f"current locale, among {names[1:]} (not case dependent)."
+        )
+
+    def process_F(self) -> dict[str, int]:  # noqa: N802
+        """Process match for full date (YYYY-mm-dd).
+
+        **Elements**: ``F``
+
+        Returns
+        -------
+        arguments:
+            Keys `year`, `month`, and `day`.
+        """
+        s = self.elements["F"]
+        splits = s.split("-")
+        if len(splits) != 3:
+            raise ValueError(f"Could not parse date '{s}' (expected YYYY-mm-dd).")
+
+        return dict(
+            zip(
+                ["year", "month", "day"],
+                [int(x) for x in splits],
+                strict=True,
+            )
+        )
+
+    def process_x(self) -> dict[str, int]:
+        """Process match for full date (YYYYmmdd).
+
+        **Elements:** ``x``
+
+        This departs from ISO as the year does not have to be padded with 0.
+
+        Returns
+        -------
+        arguments:
+            Keys `year`, `month`, and `day`.
+        """
+        s = self.elements["x"]
+        if len(s) < 5:
+            raise ValueError(f"Could not parse date '{s}' (expected YYYYmmdd).")
+        out = {"year": s[:-4], "month": s[-4:-2], "day": s[-2:]}
+        return {elt: int(val) for elt, val in out.items()}
+
+    def process_T(self) -> dict[str, int]:  # noqa: N802
+        """Process match for time (HHMMSS).
+
+        **Elements:** ``T``
+
+        Returns
+        -------
+        arguments:
+            Keys `hour`, `minute`, and `second`.
+        """
+        s = self.elements["T"]
+        if len(s) != 6:
+            raise ValueError(f"Could not parse time '{s}' (expected HHMMSS).")
+        out = {"hour": s[:2], "minute": s[2:4], "second": s[4:6]}
+        return {elt: int(val) for elt, val in out.items()}
+
+    def process_j(self) -> dict[str, int]:
+        """Process day of the year (j).
+
+        **Elements:** ``j``
+
+        Needs the year to have been parsed.
+
+        Returns
+        -------
+        arguments:
+            Keys `month` and `day`.
+        """
+        s = self.elements["j"]
+        date = dt.date(self.get("year"), 1, 1) + dt.timedelta(days=int(s) - 1)  # type: ignore[arg-type]
+        return {"month": date.month, "day": date.day}
+
+    def process_hour_12(self) -> dict[str, int]:
+        """Process hour as a 12-hour clock (IpP).
+
+        **Elements:** ``IpP``
+
+        If not both ``I`` and either ``p`` or ``P`` elements are present, an exception
+        will be raised.
+
+        Result
+        ------
+        arguments:
+            The key `hour`.
+        """
+        present = {c for c in self.elements if c in "IpP"}
+        has_p = "p" in present or "P" in present
+        has_i = "I" in present
+        if has_p != has_i:
+            raise ValueError(
+                "Need both %I (12-hour clock) and %p/%P (am/pm) to retrieve hour"
+                f"received {present}."
+            )
+
+        ampm = self.elements.get("p") or self.elements["P"]
+
+        hour = int(self.elements["I"]) % 12
+        if ampm.lower() == "pm":
+            hour += 12
+        return {"hour": hour}
+
+    def process_week_day(self) -> dict[str, int]:
+        """Process the week day and week number. (aAuwUW).
+
+        **Elements:** ``aAuwUW``
+
+        Needs the year to be parsed. Needs both information about day of week and week
+        number. If one of them is missing:
+
+        - If month/day information has already been parsed, return an empty dict.
+        - If missing information is not present in default date, raise.
+
+        This relies on :meth:`datetime.datetime.strptime`, availability of element ``u``
+        may be platform dependent.
+
+        Returns
+        -------
+        arguments:
+            Keys `month` and `day`, or empty dict.
+        """
+        values = {c: self.elements[c] for c in "aAuwUW" if c in self.elements}
+
+        def can_process(
+            elements_missing: str, default_equivalent: str, present: str, missing: str
+        ) -> bool:
+            if not _has_any_keys(values, elements_missing):
+                # we are missing weekday or weeknumber
+                if _has_all_keys(self.date_args_all, ["month", "day"]):
+                    # we have other group that found the date
+                    # we can ignore week day/number
+                    return False
+                if missing not in self.default_args:
+                    raise ValueError(
+                        f"Cannot determine date with only {present} and not {missing} "
+                        f"(only received elements {list(values.keys())}). Other groups "
+                        "do not have month/day information: parsing will fallback to "
+                        f"the default date. You may indicate the default {missing} with "
+                        f"``default_date={{'{missing}': ...}}``, "
+                        f"equivalent to %{default_equivalent}."
+                    )
+                values[default_equivalent] = str(self.default_args[missing])
+            return True
+
+        if not can_process(
+            elements_missing="aAuw",
+            default_equivalent="w",
+            present="weeknumber",
+            missing="weekday",
+        ):
+            return {}
+        if not can_process(
+            elements_missing="UW",
+            default_equivalent="W",
+            present="weekday",
+            missing="weeknumber",
+        ):
+            return {}
+
+        fmt = "%Y_" + "_".join(f"%{c}" for c in values)
+        date_string = f"{self.get('year'):04d}" + "_" + "_".join(values.values())
+
+        date = dt.datetime.strptime(date_string, fmt)
+        return {"month": date.month, "day": date.day}

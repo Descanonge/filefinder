@@ -8,7 +8,7 @@ import re
 import warnings
 from collections.abc import Callable, Generator, Sequence
 from pathlib import Path
-from typing import Any, Literal, cast, overload
+from typing import Any, Literal, overload
 
 from .filters import FilterByDate, FilterByGroup, FilterList
 from .group import Group, GroupKey, get_date_names, get_groups_indices
@@ -206,7 +206,7 @@ class Finder:
                 "Group delimiters must be a tuple of (prefix, start characters, "
                 f"end characters), received '{group_delimiters}'."
             )
-        group_delimiters = cast(tuple[str, str, str], tuple(group_delimiters))
+        group_delimiters = tuple(group_delimiters)
         if self._group_delimiters != group_delimiters:
             self._group_delimiters = group_delimiters
             self.set_pattern(self._pattern)
@@ -292,7 +292,7 @@ class Finder:
         return get_date_names(self.groups)
 
     @overload
-    def get_files(self, *, relative: bool = ...) -> list[Path]: ...
+    def get_files(self, *, relative: bool = ..., nested: None = ...) -> list[Path]: ...
 
     @overload
     def get_files(
@@ -719,6 +719,7 @@ class Finder:
             end = None
             level = 1
             start_spec = start + len(grp_prefix) + len(grp_start)
+            end_spec = 0
             for m in find_next.finditer(pattern, pos=start_spec):
                 if m.group() == grp_start:
                     level += 1

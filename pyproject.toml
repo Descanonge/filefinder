@@ -38,38 +38,34 @@ classifiers = [
 dependencies = [
 ]
 
-[project.optional-dependencies]
-dev = [
-    'ruff',
-    'mypy>=1.5',
-]
-docs = [
-    'sphinx==9.1.*',
-    'pydata-sphinx-theme==0.20.*',
-]
-tests = [
-    'pytest>=7.4',
-    'hypothesis',
-    'coverage',
-    'pytest-cov',
-    'tzdata',  # for windows
-]
-
 [project.urls]
 'Source' = 'https://github.com/Descanonge/filefinder'
 'Documentation' = 'https://filefinder.readthedocs.io'
 
-[tool.mypy]
-disable_error_code = ['annotation-unchecked']
-# allow_untyped_defs = true
-ignore_missing_imports = true
+[dependency-groups]
+dev = [
+    "pyrefly>=1.4.0",
+    "ruff>=0.17.3",
+]
+docs = [
+    "pydata-sphinx-theme>=0.23.0",
+    "sphinx>=9.0.4",
+    "sphinx-autobuild>=2025.8.25",
+]
+test = [
+    "coverage>=7.17.0",
+    "hypothesis>=6.170.13",
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "tzdata>=2026.6",
+]
 
 [tool.ruff]
 line-length = 88
 target-version = 'py311'
 
 [tool.ruff.lint]
-extend-select = [
+select = [
     'ANN',  # flake8-annotations
     'FBT',  # flake8-boolean-trap
     'B',    # flake8-bugbear
@@ -88,7 +84,6 @@ extend-select = [
     'N',    # pep8-naming
     'E',    # pycodestyle Error
     'W',    # pycodestyle Warning
-    'DOC',  # pydoclint
     'D',    # pydocstyle
     'F',    # Pyflakes
     'PL',   # Pylint
@@ -105,11 +100,14 @@ ignore = [
        'D213', # multiline docstring start at 2nd line
        'D417', # not all parameters need doc
        'PLR2004',  # magic values
+       'PLR6301',  # no self use
        'SIM108', # ternary if operator
        'RET504', # assignement before return
        'BLE', # blind exceptions
 ]
 unfixable = ["F401"]
+
+exclude = ['docs/source/conf.py']
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D"]
@@ -126,3 +124,11 @@ max-args = 9
 
 [tool.ruff.format]
 quote-style = 'double'
+
+[tool.pyrefly]
+preset = "default"
+search-path = ["src", "tests"]
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
+]

@@ -2,7 +2,7 @@
 
 import calendar
 import datetime as dt
-import sys
+import platform
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -46,7 +46,7 @@ def st_tzinfo() -> st.SearchStrategy[dt.timezone]:
 
 def fix_year_windows(date: dt.datetime) -> dt.datetime:
     """Windows does not support timestamps outside of 1970-2038."""
-    if sys.platform.startswith("win"):
+    if platform.system() == "Windows":
         year, month, day = date.year, date.month, date.day
         year = min(max(year, 1970), 2038)
         day = min(day, calendar.monthrange(year, month)[1])

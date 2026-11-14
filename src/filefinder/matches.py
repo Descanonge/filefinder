@@ -203,7 +203,7 @@ class FileMatch:
         matches = self.get_matches(key)
 
         if key in get_date_names(self.groups):
-            return [DateParser.parse(matches, default_date)]
+            return [DateParser(matches, default_date).parse()]
 
         return [m.get_match(parse=parse) for m in matches]
 

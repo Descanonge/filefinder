@@ -6,7 +6,7 @@ import sys
 from zoneinfo import ZoneInfo
 
 import pytest
-from hypothesis import example, given
+from hypothesis import given
 from hypothesis import strategies as st
 from lib import Drawer
 
@@ -15,7 +15,6 @@ from filefinder.dates import (
     STRING_ELEMENTS,
     TIME_ELEMENTS,
     DateParser,
-    _datetime_to_dict,
     datetime_to_str,
     datetime_to_value,
     make_date_groups,
@@ -190,76 +189,80 @@ class TestDatetimeToValue:
 
 
 class TestDateParser:
-    @given(month=st.integers(1, 12))
-    def test_process_B(self, month: int) -> None:  # noqa: N802
-        gm = GroupMatch(Group("B", 0), dt.date(1970, month, 1).strftime("%B"), 0, 0)
-        parser = DateParser([gm])
-        assert parser.process_B() == {"month": month}
-
-    @given(month=st.integers(1, 12))
-    def test_process_b(self, month: int) -> None:
-        gm = GroupMatch(Group("b", 0), dt.date(1970, month, 1).strftime("%b"), 0, 0)
-        parser = DateParser([gm])
-        assert parser.process_b() == {"month": month}
-
-    @given(day=st.integers(0, 31))
-    def test_process_d(self, day: int) -> None:
-        gm = GroupMatch(Group("d", 0), f"{day:02d}", 0, 0)
-        parser = DateParser([gm])
-        assert parser.process_basic() == {"day": day}
-
-    @given(microsecond=st.integers(0, 1000000))
-    def test_process_f(self, microsecond: int) -> None:
-        gm = GroupMatch(Group("f", 0), f"{microsecond:06d}", 0, 0)
-        parser = DateParser([gm])
-        assert parser.process_basic() == {"microsecond": microsecond}
-
     @given(date=st.dates())
-    def test_process_F(self, date: dt.date) -> None:  # noqa: N802
-        gm = GroupMatch(Group("F", 0), date.strftime("%F"), 0, 0)
+    def test_prepare_F(self, date: dt.date) -> None:  # noqa: N802
+        s = datetime_to_str(date, "F")
+        gm = GroupMatch(Group("F", 0), s, 0, 0)
         parser = DateParser([gm])
-        assert parser.process_F() == {
-            "year": date.year,
-            "month": date.month,
-            "day": date.day,
+
+        elements = {
+            "Y": f"{date.year:04d}",
+            "m": f"{date.month:02d}",
+            "d": f"{date.day:02d}",
         }
 
-    @given(hour=st.integers(0, 24))
-    def test_process_H(self, hour: int) -> None:  # noqa: N802
-        gm = GroupMatch(Group("H", 0), f"{hour:02d}", 0, 0)
-        parser = DateParser([gm])
-        assert parser.process_basic() == {"hour": hour}
+        assert parser.prepare_F(s) == elements
+        assert parser.elements == elements
 
     @given(date=st.dates())
-    def test_process_j(self, date: dt.date) -> None:
-        # Year from other group
-        gm = GroupMatch(Group("j", 0), date.strftime("%j"), 0, 0)
-        gm_year = GroupMatch(Group("Y", 0), str(date.year), 0, 0)
-        parser = DateParser([gm_year, gm])
-        parser.process("Y", parser.process_basic)
-        assert parser.process_j() == {"month": date.month, "day": date.day}
-
-        # Year from default date
-        parser = DateParser([gm], default_date={"year": date.year})
-        assert parser.process_j() == {"month": date.month, "day": date.day}
-
-    @given(month=st.integers(0, 12))
-    def test_process_m(self, month: int) -> None:
-        gm = GroupMatch(Group("m", 0), f"{month:02d}", 0, 0)
+    def test_process_x(self, date: dt.date) -> None:
+        s = datetime_to_str(date, "x")
+        gm = GroupMatch(Group("x", 0), s, 0, 0)
         parser = DateParser([gm])
-        assert parser.process_basic() == {"month": month}
 
-    @given(minute=st.integers(0, 24))
-    def test_process_M(self, minute: int) -> None:  # noqa: N802
-        gm = GroupMatch(Group("M", 0), f"{minute:02d}", 0, 0)
-        parser = DateParser([gm])
-        assert parser.process_basic() == {"minute": minute}
+        elements = {
+            "Y": f"{date.year:04d}",
+            "m": f"{date.month:02d}",
+            "d": f"{date.day:02d}",
+        }
 
-    @given(second=st.integers(0, 24))
-    def test_process_S(self, second: int) -> None:  # noqa: N802
-        gm = GroupMatch(Group("S", 0), f"{second:02d}", 0, 0)
+        assert parser.prepare_x(s) == elements
+        assert parser.elements == elements
+
+    @given(time=st.times())
+    def test_process_T(self, time: dt.time) -> None:  # noqa: N802
+        s = f"{time.hour:02d}{time.minute:02d}{time.second:02d}"
+        gm = GroupMatch(Group("T", 0), s, 0, 0)
         parser = DateParser([gm])
-        assert parser.process_basic() == {"second": second}
+
+        elements = {
+            "H": f"{time.hour:02d}",
+            "M": f"{time.minute:02d}",
+            "S": f"{time.second:02d}",
+        }
+
+        assert parser.prepare_T(s) == elements
+        assert parser.elements == elements
+
+    @given(s=st.sampled_from(["am", "pm"]))
+    def test_process_P(self, s: str) -> None:  # noqa: N802
+        gm = GroupMatch(Group("P", 0), s, 0, 0)
+        parser = DateParser([gm])
+
+        elements = {"p": s.upper()}
+
+        assert parser.prepare_P(s) == elements
+        assert parser.elements == elements
+
+    @given(tz=st.timezones())
+    def test_parse_z(self, tz: dt.timezone) -> None:
+        date = dt.datetime(2000, 1, 1, tzinfo=tz)
+        tz_str = datetime_to_str(date, "z")
+
+        # Need this to convert from zoneinfo.ZoneInfo to datetime.timezone
+        tz_delta = tz.utcoffset(date)
+        if tz_delta is None:
+            tz_delta = dt.timedelta()
+
+        parser = DateParser([])
+        assert parser.parse_z(tz_str) == dt.timezone(tz_delta)
+
+    @given(tz=st_tzinfo())
+    def test_process_z_elements(self, tz: dt.timezone) -> None:
+        tz_str = datetime_to_str(dt.datetime(2000, 1, 1, tzinfo=tz), "z")
+        parser = DateParser([])
+
+        assert parser.parse_z(tz_str) == tz
 
     @given(
         date=st.datetimes(
@@ -268,109 +271,16 @@ class TestDateParser:
         tz=st.one_of(st.none(), st_tzinfo()),
     )
     def test_process_s(self, date: dt.datetime, tz: dt.timezone | None) -> None:
-        if tz is None:
-            tz = dt.UTC
         date = date.replace(tzinfo=tz)
-
         date = fix_year_windows(date)
 
-        matches = [GroupMatch(Group("s", 0), str(date.timestamp()), 0, 0)]
-        if tz is not None:
-            matches.append(GroupMatch(Group("z", 0), date.strftime("%z"), 0, 0))
+        ts_str = datetime_to_str(date, "s")
+        parser = DateParser([])
 
-        parser = DateParser(matches)
-
-        if tz is not None:
-            parser.process("z", parser.process_z)
-
-        assert parser.process_s() == _datetime_to_dict(date)
-
-    @given(time=st.times())
-    def test_process_T(self, time: dt.time) -> None:  # noqa: N802
-        gm = GroupMatch(
-            Group("T", 0), f"{time.hour:02d}{time.minute:02d}{time.second:02d}", 0, 0
-        )
-        parser = DateParser([gm])
-        assert parser.process_T() == {
-            "hour": time.hour,
-            "minute": time.minute,
-            "second": time.second,
-        }
-
-    @given(date=st.dates())
-    def test_process_x(self, date: dt.date) -> None:
-        gm = GroupMatch(
-            Group("x", 0), f"{date.year}{date.month:02d}{date.day:02d}", 0, 0
-        )
-        parser = DateParser([gm])
-        assert parser.process_x() == {
-            "year": date.year,
-            "month": date.month,
-            "day": date.day,
-        }
-
-    @given(year=st.integers(0, 9999))
-    def test_process_Y(self, year: int) -> None:  # noqa: N802
-        gm = GroupMatch(Group("Y", 0), str(year), 0, 0)
-        parser = DateParser([gm])
-        assert parser.process_basic() == {"year": year}
-
-    @given(tz=st.timezones())
-    def test_process_z(self, tz: dt.timezone) -> None:
-        date = dt.datetime(2000, 1, 1, tzinfo=tz)
-        gm = GroupMatch(Group("z", 0), date.strftime("%z"), 0, 0)
-        parser = DateParser([gm])
-
-        # Need this to convert from zoneinfo.ZoneInfo to datetime.timezone
-        tz_delta = tz.utcoffset(date)
-        if tz_delta is None:
-            tz_delta = dt.timedelta()
-        assert parser.process_z() == {"tzinfo": dt.timezone(tz_delta)}
-
-    @given(tz=st_tzinfo())
-    def test_process_z_elements(self, tz: dt.timezone) -> None:
-        date = dt.datetime(2000, 1, 1, tzinfo=tz)
-        gm = GroupMatch(Group("z", 0), date.strftime("%z"), 0, 0)
-        parser = DateParser([gm])
-
-        assert parser.process_z() == {"tzinfo": tz}
-
-    @given(hour=st.integers(0, 23))
-    def test_process_hour_12(self, hour: int) -> None:
-        time = dt.time(hour=hour)
-        matches = [
-            GroupMatch(Group("I", 0), time.strftime("%I"), 0, 0),
-            GroupMatch(Group("p", 0), time.strftime("%p"), 0, 0),
-        ]
-        parser = DateParser(matches)
-        assert parser.process_hour_12() == {"hour": hour}
-
-        with pytest.raises(ValueError):
-            DateParser(matches[:1]).process_hour_12()
-        with pytest.raises(ValueError):
-            DateParser(matches[1:]).process_hour_12()
-
-    @given(
-        date=st.dates(),
-        weekday_fmt=st.sampled_from("aAuw"),
-        weeknumber_fmt=st.sampled_from("UW"),
-    )
-    def test_process_week_day(
-        self, date: dt.date, weekday_fmt: str, weeknumber_fmt: str
-    ) -> None:
-        matches = [
-            GroupMatch(Group("Y", 0), date.strftime("%Y"), 0, 0),
-            GroupMatch(Group(weekday_fmt, 0), date.strftime(f"%{weekday_fmt}"), 0, 0),
-            GroupMatch(
-                Group(weeknumber_fmt, 0), date.strftime(f"%{weeknumber_fmt}"), 0, 0
-            ),
-        ]
-        parser = DateParser(matches)
-        parser.process("Y", parser.process_basic)
-        assert parser.process_week_day() == {"month": date.month, "day": date.day}
+        assert parser.parse_s(ts_str, tz) == date
 
     @given(date=st.datetimes(), tzinfo=st.one_of(st.timezones(), st_tzinfo()))
-    def test_parse(self, date: dt.datetime, tzinfo: dt.timezone) -> None:
+    def test_parse_simple(self, date: dt.datetime, tzinfo: dt.timezone) -> None:
         """Test parsing a date from all elements."""
         # convert to timedelta based, otherwise comparison will fail
         tzdelta = tzinfo.utcoffset(date)
@@ -386,13 +296,86 @@ class TestDateParser:
 
         matches = [
             GroupMatch(Group(name, 0), datetime_to_str(date, name), 0, 0)
-            for name in DATETIME_ELEMENTS
+            for name in "YmdHMSfz"
         ]
-        assert DateParser.parse(matches) == date
+        assert DateParser(matches).parse() == date
 
-        # alternative way
+    @given(
+        date=st.dates(),
+        weekday_elt=st.sampled_from("aAuw"),
+        weeknum_elt=st.sampled_from("UW"),
+    )
+    def test_parse_weekdaynumber(
+        self, date: dt.date, weekday_elt: str, weeknum_elt: str
+    ) -> None:
+        gm_year = GroupMatch(Group("Y", 0), datetime_to_str(date, "Y"), 0, 0)
+        gm_weekday = GroupMatch(
+            Group(weekday_elt, 0), datetime_to_str(date, weekday_elt), 0, 0
+        )
+        gm_weeknum = GroupMatch(
+            Group(weeknum_elt, 0), datetime_to_str(date, weeknum_elt), 0, 0
+        )
+
+        # Full
+        assert DateParser([gm_year, gm_weekday, gm_weeknum]).parse().date() == date
+
+        # Missing one
+        with pytest.raises(ValueError):
+            DateParser([gm_year, gm_weekday]).parse()
+        with pytest.raises(ValueError):
+            DateParser([gm_year, gm_weeknum]).parse()
+
+        # Missing one - with default
+        parser = DateParser(
+            [gm_year, gm_weekday],
+            default_date={weeknum_elt: datetime_to_value(date, weeknum_elt)},
+        )
+        assert parser.parse().date() == date
+
+        parser = DateParser(
+            [gm_year, gm_weeknum],
+            default_date={weekday_elt: datetime_to_value(date, weekday_elt)},
+        )
+        assert parser.parse().date() == date
+
+        # Missing one - other match is used
+        matches = [
+            gm_year,
+            GroupMatch(Group(weeknum_elt, 0), "42", 0, 0),  # should be ignored
+            GroupMatch(Group("j", 0), datetime_to_str(date, "j"), 0, 0),
+        ]
         parser = DateParser(matches)
-        assert parser.retrieve_date() == date
+        assert parser.parse().date() == date
+
+    @given(hour=st.integers(0, 23))
+    def test_parse_hour12(self, hour: int) -> None:
+        date = dt.datetime(1970, 1, 1, hour, 0, 0)
+        gm_hour = GroupMatch(Group("I", 0), datetime_to_str(date, "I"), 0, 0)
+        gm_ampm = GroupMatch(Group("p", 0), datetime_to_str(date, "p"), 0, 0)
+
+        # Full
+        assert DateParser([gm_hour, gm_ampm]).parse() == date
+
+        # Missing one
+        with pytest.raises(ValueError):
+            DateParser([gm_hour]).parse()
+        with pytest.raises(ValueError):
+            DateParser([gm_ampm]).parse()
+
+        # Missing one - with default
+        parser = DateParser(
+            [gm_hour],
+            default_date={"p": datetime_to_value(date, "p")},
+        )
+        assert parser.parse() == date
+
+        # Missing one - other match is used
+        matches = [
+            GroupMatch(Group("I", 0), "05", 0, 0),  # should be ignored
+            GroupMatch(Group("H", 0), datetime_to_str(date, "H"), 0, 0),
+        ]
+        parser = DateParser(matches)
+        assert parser.parse() == date
 
     @given(
         date=st.datetimes(
@@ -400,7 +383,7 @@ class TestDateParser:
             max_value=dt.datetime(2200, 1, 1),
             timezones=st.one_of(st.timezones(), st_tzinfo()),
         ),
-        default_date=st.datetimes(timezones=st.one_of(st.none(), st.timezones())),
+        default_date=st.datetimes(timezones=st.one_of(st.none(), st_tzinfo())),
         elements=st.lists(st.sampled_from(DATETIME_ELEMENTS), min_size=1),
     )
     def test_parse_with_default(
@@ -434,11 +417,43 @@ class TestDateParser:
             "z": ["tzinfo"],
         }
 
+        has_ampm = len(set("pP") & set(elements)) > 0
+        has_hour12 = "I" in elements
+        has_weekday = len(set("aAuw") & set(elements)) > 0
+        has_weeknum = len(set("UW") & set(elements)) > 0
+        has_month = len(set("bBmjFxs") & set(elements)) > 0
+        has_day = len(set("djFxs") & set(elements)) > 0
+        has_hour = "H" in elements
+
+        if has_weekday != has_weeknum and (not has_month or not has_day):
+            if not has_weekday:
+                elements.append("u")
+            if not has_weeknum:
+                elements.append("U")
+
+        if has_hour12 != has_ampm and not has_hour:
+            if not has_hour12:
+                elements.append("I")
+            if not has_ampm:
+                elements.append("p")
+
         if "s" in elements:
             date = fix_year_windows(date)
             default_date = fix_year_windows(default_date)
 
-        date_ref_elements = _datetime_to_dict(default_date)
+        date_ref_elements = {
+            attr: getattr(default_date, attr)
+            for attr in [
+                "year",
+                "month",
+                "day",
+                "hour",
+                "minute",
+                "second",
+                "microsecond",
+                "tzinfo",
+            ]
+        }
 
         for element in elements:
             for attr in elements_attributes[element]:
@@ -456,37 +471,8 @@ class TestDateParser:
             for element in elements
         ]
 
-        has_ampm = len(set("pP") & set(elements)) > 0
-        has_hour12 = "I" in elements
-        has_weekday = len(set("aAuw") & set(elements)) > 0
-        has_weeknum = len(set("UW") & set(elements)) > 0
-        has_month = len(set("bBmjFxs") & set(elements)) > 0
-        has_day = len(set("djFxs") & set(elements)) > 0
-
-        if has_ampm != has_hour12:
-            with pytest.raises(ValueError):
-                DateParser.parse(matches)
-            return
-
-        if has_weekday != has_weeknum:
-            # try specifying what is missing with default_date
-            default_date_with_missing = _datetime_to_dict(default_date)
-            if not has_weeknum:
-                default_date_with_missing["weeknumber"] = int(date_ref.strftime("%W"))
-            if not has_weekday:
-                default_date_with_missing["weekday"] = int(date_ref.strftime("%w"))
-
-            parser = DateParser(matches, default_date=default_date_with_missing)
-            parsed = parser.retrieve_date()
-            assert parsed == date_ref
-
-            if not has_month or not has_day:
-                with pytest.raises(ValueError):
-                    DateParser.parse(matches)
-                return
-
         parser = DateParser(matches, default_date=default_date)
-        parsed = parser.retrieve_date()
+        parsed = parser.parse()
         assert parsed == date_ref
 
     def test_not_date_group(self) -> None:
@@ -497,7 +483,7 @@ class TestDateParser:
         with pytest.raises(
             ValueError, match=r"'not_a_date_group:1' is not a date group."
         ):
-            DateParser.parse(matches)
+            DateParser(matches).parse()
 
     def test_duplicate_groups(self) -> None:
         """Different groups for the same element have different values."""
@@ -508,4 +494,4 @@ class TestDateParser:
             GroupMatch(Group("Y", 2), "2010", 0, 0),
         ]
         with pytest.raises(ValueError, match="Groups with the same element 'Y'"):
-            DateParser.parse(matches)
+            DateParser(matches).parse()

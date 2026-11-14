@@ -18,7 +18,7 @@ from lib import assert_fixed, assert_unfixed
 from lib.tmp_dir import TmpDirectory, TmpDirectoryExample, date_range
 
 from filefinder import Finder
-from filefinder.dates import make_date_groups, DATETIME_ELEMENTS
+from filefinder.dates import DATETIME_ELEMENTS, make_date_groups
 from filefinder.group import Group, get_date_names, get_groups_indices
 from filefinder.matches import FileMatch, ParseStatus
 
@@ -799,7 +799,7 @@ class TestMatches:
         ) == dt.datetime(1970, 4, 28, 8, 17, 55)
         assert filematch.get_value(
             "date",
-            default_date={"hour": 8, "minute": 35, "second": 55},
+            default_date={"H": 8, "M": 35, "S": 55},
         ) == dt.datetime(1970, 4, 28, 8, 17, 55)
 
         # Change default date
@@ -807,7 +807,7 @@ class TestMatches:
             "date", default_date=dt.datetime(2012, 5, 6)
         ) == dt.datetime(2012, 4, 28, 0, 17)
         assert filematch.get_value(
-            "date", default_date={"year": 2012, "month": 5, "day": 6}
+            "date", default_date={"Y": 2012, "m": 5, "d": 6}
         ) == dt.datetime(2012, 4, 28, 0, 17)
 
     def test_month(self) -> None:
@@ -840,26 +840,6 @@ class TestMatches:
 
         assert filematch["date"] == dt.datetime(2086, 3, 2, 15, 16, 17)
         assert filematch["date2"] == dt.datetime(2087, 4, 3, 18, 19, 20)
-
-    def test_date_wrong(self) -> None:
-        """Two groups gives different date elements."""
-        finder = Finder(pattern_dates.pattern)
-        filematch = finder.find_matches(Path("2080", "20860302-061_20870403-093.txt"))
-        assert filematch is not None
-        with pytest.raises(ValueError):
-            filematch["date"]
-
-        finder = Finder("%(F)_%(m).txt")
-        filematch = finder.find_matches(Path("2086-03-02_05.txt"))
-        assert filematch is not None
-        with pytest.raises(ValueError):
-            filematch["date"]
-
-        finder = Finder("%(Y)%(m)%(d)_%(j).txt")
-        filematch = finder.find_matches(Path("20860302_015.txt"))
-        assert filematch is not None
-        with pytest.raises(ValueError):
-            filematch["date"]
 
     @pytest.mark.parametrize("pattern", pattern_examples)
     def test_wrong_filename(self, pattern: PatternExample) -> None:

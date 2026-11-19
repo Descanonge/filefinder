@@ -382,33 +382,6 @@ class TestDateParser:
         self, date: dt.datetime, default_date: dt.datetime, elements: list[str]
     ) -> None:
 
-        elements_attributes = {
-            "a": ["month", "day"],
-            "A": ["month", "day"],
-            "b": ["month"],
-            "B": ["month"],
-            "d": ["day"],
-            "f": ["microsecond"],
-            "F": ["year", "month", "day"],
-            "H": ["hour"],
-            "I": ["hour"],
-            "j": ["month", "day"],
-            "m": ["month"],
-            "M": ["minute"],
-            "p": [],
-            "P": [],
-            "s": ["year", "month", "day", "hour", "minute", "second", "microsecond"],
-            "S": ["second"],
-            "T": ["hour", "minute", "second"],
-            "u": ["month", "day"],
-            "U": ["month", "day"],
-            "w": ["month", "day"],
-            "W": ["month", "day"],
-            "x": ["year", "month", "day"],
-            "Y": ["year"],
-            "z": ["tzinfo"],
-        }
-
         has_ampm = len(set("pP") & set(elements)) > 0
         has_hour12 = "I" in elements
         has_weekday = len(set("aAuw") & set(elements)) > 0
@@ -448,7 +421,7 @@ class TestDateParser:
         }
 
         for element in elements:
-            for attr in elements_attributes[element]:
+            for attr in DateElement.get(element).contains:
                 date_ref_elements[attr] = getattr(date, attr)
 
         # Combination of date and default_date could result in `day` being outside of

@@ -8,7 +8,7 @@ import re
 from collections.abc import Sequence
 from typing import Any, ClassVar, Self
 
-from .dates import datetime_to_value
+from .dates import DateElement
 from .format import Format, FormatAbstract
 
 logger = logging.getLogger(__name__)
@@ -51,6 +51,7 @@ class GroupSpecs:
         pre: str | None = None,
         post: str | None = None,
         opt: bool = False,
+        date_element: DateElement | None = None,
     ) -> None:
         self.name = name
         self.fmt = fmt
@@ -59,6 +60,7 @@ class GroupSpecs:
         self.pre = pre
         self.post = post
         self.opt = opt
+        self.date_element = date_element
 
         self.validate()
 
@@ -118,7 +120,16 @@ class GroupSpecs:
     def as_dict(self, *, include_none: bool = True) -> dict[str, Any]:
         """Return dictionary containing specs."""
         out = {}
-        for attr in ["name", "fmt", "bool", "rgx", "pre", "post", "opt"]:
+        for attr in [
+            "name",
+            "fmt",
+            "bool",
+            "rgx",
+            "pre",
+            "post",
+            "opt",
+            "date_element",
+        ]:
             value = getattr(self, attr)
             if include_none or value is not None:
                 out[attr] = value
@@ -134,37 +145,6 @@ class Group:
         Group definition.
     idx:
         Index of the group in the filename pattern.
-    """
-
-    DATE_GROUPS: ClassVar[dict[str, tuple[str, str]]] = {
-        "a": (r"\w+", "s"),  # weekday abbreviated
-        "A": (r"\w+", "s"),  # weekday
-        "b": (r"\w+", "s"),  # month name abbreviated
-        "B": (r"\w+", "s"),  # month name
-        "d": (r"\d\d", "02d"),  # day
-        "f": (r"\d{6}", "06d"),  # microsecond
-        "F": (r"\d{4}-\d\d-\d\d", "s"),  # formated date
-        "H": (r"\d\d", "02d"),  # hour (24 hour clock)
-        "I": (r"\d\d", "02d"),  # hour (12 hour clock, 01-12)
-        "j": (r"\d{3}", "03d"),  # dayofyear
-        "m": (r"\d\d", "02d"),  # month
-        "M": (r"\d\d", "02d"),  # minute
-        "p": (r"AM|PM", "s"),  # AM/PM
-        "P": (r"am|pm", "s"),  # am/pm
-        "s": (r"[+-]?\d+(?:\.\d{6})?", ".6f"),  # timestamp (seconds since epoch)
-        "S": (r"\d\d", "02d"),  # second
-        "T": (r"\d{6}", "s"),  # time (HHMMSS)
-        "u": (r"\d", "d"),  # weekday (1-7, Monday=1)
-        "U": (r"\d\d", "02d"),  # weeknumber, starting from first Sunday
-        "w": (r"\d", "d"),  # weekday (0-6, Sunday=0)
-        "W": (r"\d\d", "02d"),  # weeknumber, starting from first Monday
-        "x": (r"\d{8}", "s"),  # date (YYYYmmdd)
-        "Y": (r"\d{4}", "04d"),  # year
-        "z": (r"[+-]\d{4}(?:\d\d(?:\.\d{6})?)?", "s"),  # timezone (-HHMM[SS[.ffffff]])
-    }
-    """Regex and format strings for various default groups.
-
-    See :ref:`name` for details.
     """
 
     def __init__(self, definition: str, idx: int) -> None:
@@ -191,7 +171,7 @@ class Group:
 
         self.date_name: str | None = None
         """Name of the parent date pseudo-group. None if not a date group."""
-        self.date_element: str | None = None
+        self.date_element: DateElement | None = None
         """Name of the date element (Y, m, d, ...). None if not a date group."""
 
         self._fixed = False
@@ -215,19 +195,24 @@ class Group:
                     "Use format '<date name>__<date element>'.",
                     self,
                 )
-            self.date_name, self.date_element = parts
-            if self.date_element not in self.DATE_GROUPS:
+            self.date_name, date_element = parts
+            if date_element not in DateElement.registered():
                 raise GroupParseError(
                     f"'{self.date_element}' is not a registered date element.", self
                 )
-        elif specs.name in self.DATE_GROUPS:
+            self.date_element = DateElement.get(date_element)
+        elif specs.name in DateElement.registered():
             self.date_name = "date"
-            self.date_element = specs.name
+            self.date_element = DateElement.get(specs.name)
+
+        if specs.date_element is not None:
+            self.date_element = specs.date_element
 
         self.name = specs.name
 
         if self.date_element is not None:
-            self.rgx, fmt_def = self.DATE_GROUPS[self.date_element]
+            self.rgx = self.date_element.regex
+            fmt_def = self.date_element.fmt
             self.fmt = Format(fmt_def)
 
         if specs.pre is not None:
@@ -325,7 +310,7 @@ class Group:
                     "Cannot fix a date object to a group not corresponding to a "
                     f"date element ({self})."
                 )
-            fixed_value = datetime_to_value(fix, self.date_element)
+            fixed_value = self.date_element.datetime_to_value(fix)
             fixed_string = self.prefix + self.fmt.format(fixed_value) + self.suffix
             return fixed_value, fixed_string, re.escape(fixed_string)
 

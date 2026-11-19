@@ -18,7 +18,7 @@ from lib import assert_fixed, assert_unfixed
 from lib.tmp_dir import TmpDirectory, TmpDirectoryExample, date_range
 
 from filefinder import Finder
-from filefinder.dates import DATETIME_ELEMENTS
+from filefinder.dates import DateElement
 from filefinder.group import Group, get_date_names, get_groups_indices
 from filefinder.matches import FileMatch, ParseStatus
 
@@ -564,7 +564,7 @@ class TestFixing:
 
     def test_fix_date_all(self) -> None:
         """Test all date elements."""
-        finder = Finder("_".join(f"%({elt})" for elt in DATETIME_ELEMENTS))
+        finder = Finder("_".join(f"%({elt})" for elt in DateElement.registered()))
         groups = {grp.name: grp for grp in finder.groups}
 
         date = dt.datetime(
@@ -771,9 +771,8 @@ class TestMatches:
             "z": ("+0121", "+0121"),
         }
         finder = Finder("_".join(f"%({elt})" for elt in values_and_string))
-        filematch = finder.find_matches(
-            Path("_".join(x[1] for x in values_and_string.values()))
-        )
+        filename = "_".join(x[1] for x in values_and_string.values())
+        filematch = finder.find_matches(filename)
         assert filematch is not None
         for elt, (value, _) in values_and_string.items():
             assert filematch[elt] == value

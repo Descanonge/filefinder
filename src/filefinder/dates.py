@@ -30,8 +30,6 @@ class DateElement:
     fmt: ClassVar[str] = "s"
     contains: ClassVar[tuple[str, ...]] = ()
     is_time: ClassVar[bool]
-    parsable: ClassVar[bool] = False
-    need_to_parse: ClassVar[list[str]] = []
 
     ELEMENTS: ClassVar[dict[str, DateElement]] = {}
 
@@ -604,10 +602,7 @@ class DateParser:
         self.check_hour12(elements)
 
         if "s" in elements:
-            if "z" in elements:
-                tz = self.parse_z(elements["z"])
-            else:
-                tz = None
+            tz = self.parse_z(elements)
             return self.parse_s(elements["s"], tz)
 
         date_fmt = "_".join([f"%{elt}" for elt in elements])
@@ -615,30 +610,23 @@ class DateParser:
 
         return dt.datetime.strptime(date_str, date_fmt)
 
-    def parse_z(self, z: str) -> dt.timezone:
-        """Process timezone information."""
-        m = re.fullmatch(r"([+-])(\d\d)(\d\d)(?:(\d\d)(?:\.(\d{6}))?)?", z)
-        if m is None:
-            raise ValueError(
-                f"Could not parse timezone information '{z}' "
-                "with pattern ±HHMM[SS[.ffffff]]."
-            )
+    def parse_z(self, elements: Mapping[str, str]) -> dt.tzinfo | None:
+        """Parse timezone."""
+        date_str = []
+        date_fmt = []
+        for elt, value in elements.items():
+            if "tzinfo" in DateElement.get(elt).contains:
+                date_str.append(value)
+                date_fmt.append(f"%{elt}")
 
-        sign = m.group(1)
-        elements = dict(
-            zip(
-                ["hours", "minutes", "seconds", "microseconds"],
-                [float(x) for x in m.groups()[1:] if x is not None],
-                strict=False,
-            )
-        )
-        delta = dt.timedelta(**elements)
-        if sign == "-":
-            delta = -delta
+        if not date_str:
+            # no element with timezone info
+            return dt.UTC
 
-        return dt.timezone(delta)
+        date = dt.datetime.strptime("_".join(date_str), "_".join(date_fmt))
+        return date.tzinfo
 
-    def parse_s(self, s: str, tz: dt.timezone | None) -> dt.datetime:
+    def parse_s(self, s: str, tz: dt.tzinfo | None) -> dt.datetime:
         """Process timestamp."""
         is_naive = tz is None
         if is_naive:

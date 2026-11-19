@@ -249,15 +249,19 @@ class TestDateParser:
             tz_delta = dt.timedelta()
 
         parser = DateParser([])
-        assert parser.parse_z(tz_str) == dt.timezone(tz_delta)
+        assert parser.parse_z({"z": tz_str}) == dt.timezone(tz_delta)
 
     @given(
         date=st.datetimes(
             min_value=dt.datetime(1800, 1, 1), max_value=dt.datetime(2200, 1, 1)
         ),
-        tz=st.one_of(st.none(), st_tzinfo(), st_tzinfo()),
+        tz=st.one_of(st.none(), st_tzinfo()),
     )
     def test_parse_s(self, date: dt.datetime, tz: dt.timezone | None) -> None:
+        # convert to timedelta based, otherwise comparison will fail
+        if tz is not None:
+            tz = dt.timezone(tz.utcoffset(date))
+
         date = date.replace(tzinfo=tz)
         date = fix_year_windows(date)
 
@@ -454,6 +458,13 @@ class TestDateParser:
         default_date = default_date.replace(day=min(28, default_date.day))
 
         date_ref = dt.datetime(**date_ref_elements)
+
+        # convert to timedelta based, otherwise comparison will fail
+        tzinfo = date_ref.tzinfo
+        if tzinfo is not None:
+            tzdelta = tzinfo.utcoffset(date_ref)
+            assert tzdelta is not None
+            date_ref = date_ref.replace(tzinfo=dt.timezone(tzdelta))
 
         matches = [
             GroupMatch(Group(element, 0), datetime_to_str(date_ref, element), 0, 0)

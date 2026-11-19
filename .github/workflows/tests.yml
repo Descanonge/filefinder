@@ -19,7 +19,7 @@ jobs:
 
       - name: Install package
         run: |
-          uv sync --group dev
+          uv sync --dev
 
       - name: Ruff
         run: |
@@ -52,7 +52,7 @@ jobs:
 
       - name: Install package
         run: |
-          uv sync --group test
+          uv sync --dev
 
       - name: Cache Hypothesis database
         uses: actions/cache@v6

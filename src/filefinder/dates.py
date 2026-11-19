@@ -79,7 +79,7 @@ class DateElement:
         """Extract element from a datetime object."""
         raise NotImplementedError
 
-    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:
+    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: ARG002
         """Prepare element for strptime.
 
         Some date elements need some preprocessing before being sent to strptime.
@@ -323,7 +323,7 @@ class DateElementP(DateElement):
             raise TypeError
         return "am" if date.hour < 12 else "pm"
 
-    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: D102
+    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: D102, ARG002
         return {"p": s.upper()}
 
 
@@ -368,7 +368,7 @@ class DateElementF(DateElement):
     def datetime_to_value(self, date: dt.datetime | dt.date) -> str:  # noqa: D102
         return f"{date.year:04d}-{date.month:02d}-{date.day:02d}"
 
-    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: D102
+    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: D102, ARG002
         splits = s.split("-")
         if len(splits) != 3:
             raise ValueError(f"Could not parse date '{s}' (expected YYYY-mm-dd).")
@@ -386,7 +386,7 @@ class DateElementx(DateElement):
     def datetime_to_value(self, date: dt.datetime | dt.date) -> str:  # noqa: D102
         return f"{date.year:04d}{date.month:02d}{date.day:02d}"
 
-    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: D102
+    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: D102, ARG002
         if len(s) < 5:
             raise ValueError(f"Could not parse date '{s}' (expected YYYYmmdd).")
         return {"Y": s[:-4], "m": s[-4:-2], "d": s[-2:]}
@@ -397,24 +397,26 @@ class DateElementT(DateElement):
 
     key = "T"
     regex = r"\d{6}"
-    contains = ("hour", "minute", "seconde")
+    contains = ("hour", "minute", "second")
 
     def datetime_to_value(self, date: dt.datetime | dt.date) -> str:  # noqa: D102
         if not isinstance(date, dt.datetime):
             raise TypeError
         return f"{date.hour:02d}{date.minute:02d}{date.second:02d}"
 
-    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: D102
+    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: D102, ARG002
         if len(s) != 6:
             raise ValueError(f"Could not parse time '{s}' (expected HHMMSS).")
         return {"H": s[:2], "M": s[2:4], "S": s[4:]}
 
 
 def datetime_to_str(date: dt.datetime | dt.date, element: str) -> str:
+    """Extract element from a datetime object and format it."""
     return DateElement.get(element).datetime_to_str(date)
 
 
 def datetime_to_value(date: dt.datetime | dt.date, element: str) -> int | float | str:
+    """Extract element from a datetime object."""
     return DateElement.get(element).datetime_to_value(date)
 
 
@@ -553,11 +555,10 @@ class DateParser:
 
         default_date = self.DEFAULT_DATE_DEFAULT | dict(default_date)
 
-        default_date_str = {}
-        for k, v in default_date.items():
-            if not isinstance(v, str):
-                v = DateElement.ELEMENTS[k].format(v)
-            default_date_str[k] = v
+        default_date_str = {
+            k: v if isinstance(v, str) else DateElement.ELEMENTS[k].format(v)
+            for k, v in default_date.items()
+        }
         return default_date_str
 
     def matches_to_elements(self) -> dict[str, str]:
@@ -575,7 +576,6 @@ class DateParser:
                 elements_all[element.key] = []
             elements_all[element.key].append(m)
 
-        print(elements_all)
         for element, matches in elements_all.items():
             values = [m.match_str for m in matches]
             if any(v != values[0] for v in values[1:]):

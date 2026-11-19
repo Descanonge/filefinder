@@ -2,7 +2,6 @@
 
 import calendar
 import datetime as dt
-import locale
 import platform
 from zoneinfo import ZoneInfo
 
@@ -95,7 +94,7 @@ class TestDatetimeToStr:
         assert self.datetime_to_str(date, "Y") == "2026"
         assert self.datetime_to_str(date, "z") == "-0100"
 
-    def test_bad(self):
+    def test_bad(self) -> None:
         with pytest.raises(KeyError):
             self.datetime_to_str(dt.datetime(2000, 1, 1), "NOT_A_KEY")
 
@@ -147,7 +146,7 @@ class TestDatetimeToValue:
         assert self.datetime_to_value(date, "Y") == 2026
         assert self.datetime_to_value(date, "z") == "-0100"
 
-    def test_bad(self):
+    def test_bad(self) -> None:
         with pytest.raises(KeyError):
             self.datetime_to_value(dt.datetime(2000, 1, 1), "NOT_A_KEY")
 

@@ -621,7 +621,7 @@ class DateParser:
 
         if not date_str:
             # no element with timezone info
-            return dt.UTC
+            return None
 
         date = dt.datetime.strptime("_".join(date_str), "_".join(date_fmt))
         return date.tzinfo

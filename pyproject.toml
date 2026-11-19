@@ -44,18 +44,19 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    # lint
     "pyrefly>=1.4.0",
     "ruff>=0.17.3",
+    # tests
     "coverage>=7.17.0",
     "hypothesis>=6.170.13",
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
     "tzdata>=2026.6",
-]
-docs = [
-    "pydata-sphinx-theme>=0.23.0",
+    # docs
     "sphinx>=9.0.4",
     "sphinx-autobuild>=2025.8.25",
+    "pydata-sphinx-theme>=0.23.0",
 ]
 
 [tool.ruff]

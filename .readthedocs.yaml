@@ -11,7 +11,7 @@ python:
     - method: uv
       command: sync
       groups:
-        - docs
+        - dev
 
 sphinx:
   builder: html

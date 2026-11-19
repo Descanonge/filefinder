@@ -51,7 +51,6 @@ class GroupSpecs:
         pre: str | None = None,
         post: str | None = None,
         opt: bool = False,
-        date_element: DateElement | None = None,
     ) -> None:
         self.name = name
         self.fmt = fmt
@@ -60,7 +59,10 @@ class GroupSpecs:
         self.pre = pre
         self.post = post
         self.opt = opt
-        self.date_element = date_element
+
+        self.date_name: str | None = None
+        self.date_element: DateElement | None = None
+        self.name_to_date_element()
 
         self.validate()
 
@@ -100,6 +102,30 @@ class GroupSpecs:
             }
 
         return cls(**specs)  # type: ignore[arg-type]
+
+    def name_to_date_element(self) -> None:
+        """Find date name and date element from group name.
+
+        Set attributes from either a name of the form `<date_name>__<date_element>` or
+        if the name is a registered date element.
+        """
+        if "__" in self.name:
+            parts = self.name.split("__")
+            if len(parts) != 2 or not parts[0]:
+                raise GroupParseError(
+                    f"Invalid group name '{self.name}'. "
+                    "Use format '<date name>__<date element>'.",
+                    self,
+                )
+            self.date_name, date_element = parts
+            if date_element not in DateElement.registered():
+                raise GroupParseError(
+                    f"'{self.date_element}' is not a registered date element.", self
+                )
+            self.date_element = DateElement.get(date_element)
+        elif self.name in DateElement.registered():
+            self.date_name = "date"
+            self.date_element = DateElement.get(self.name)
 
     def validate(self) -> None:
         """Validate specs."""
@@ -187,28 +213,9 @@ class Group:
         self._apply_specs(specs)
 
     def _apply_specs(self, specs: GroupSpecs) -> None:
-        if "__" in specs.name:
-            parts = specs.name.split("__")
-            if len(parts) != 2 or not parts[0]:
-                raise GroupParseError(
-                    f"Invalid group name '{specs.name}'. "
-                    "Use format '<date name>__<date element>'.",
-                    self,
-                )
-            self.date_name, date_element = parts
-            if date_element not in DateElement.registered():
-                raise GroupParseError(
-                    f"'{self.date_element}' is not a registered date element.", self
-                )
-            self.date_element = DateElement.get(date_element)
-        elif specs.name in DateElement.registered():
-            self.date_name = "date"
-            self.date_element = DateElement.get(specs.name)
-
-        if specs.date_element is not None:
-            self.date_element = specs.date_element
-
         self.name = specs.name
+        self.date_name = specs.date_name
+        self.date_element = specs.date_element
 
         if self.date_element is not None:
             self.rgx = self.date_element.regex

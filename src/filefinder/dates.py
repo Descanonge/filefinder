@@ -22,25 +22,61 @@ def _has_all_keys(d: Mapping, keys: Sequence) -> bool:
     return len(set(keys) & d.keys()) == len(keys)
 
 
+__all__ = [
+    "DateElement",
+    "DateParser",
+    "DefaultDate",
+    "datetime_to_str",
+    "datetime_to_value",
+    "make_date_groups",
+]
+
+
 class DateElement:
-    """Date element."""
+    """Date element base class and registry.
+
+    A class representing a date element that can be used in a date group, and parsed
+    into a datetime object.
+
+    Existing date elements objects can be modified. For instance to change the regex
+    of an element: ``DateElement.get("Y").regex = ...``.
+
+    More date elements can be added by users. Any subclass that defines a :attr:`key`
+    attribute will be registered in :attr:`ELEMENTS` and automatically be available for
+    groups or parsing. This can replace existing elements.
+    """
 
     key: ClassVar[str]
+    """Name of the element."""
     regex: ClassVar[str]
+    """Default regular-expression."""
     fmt: ClassVar[str] = "s"
+    """Default format string."""
     contains: ClassVar[tuple[str, ...]] = ()
+    """What :class:`datetime.datetime` arguments can be inferred from this element."""
     parsable: ClassVar[bool] = True
-    """If this element should be used for date parsing."""
+    """If this element should be used for date parsing. If False, matches will be
+    ignored by the parser."""
 
     ELEMENTS: ClassVar[dict[str, DateElement]] = {}
+    """Dictionary of instances of registered element classes."""
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         if hasattr(cls, "key"):
             cls.ELEMENTS[cls.key] = cls()
 
+    # Technically, all methods could be class methods (DateElement has no instance
+    # attributes). I reserve class methods for registry-related stuff.
+
     @classmethod
     def get(cls, key: str) -> DateElement:
-        """Obtain a DateElement instance for the corresponding element key."""
+        """Obtain a DateElement instance for the corresponding element key.
+
+        Raises
+        ------
+        KeyError
+            If not a registered element.
+        """
         if key not in cls.ELEMENTS:
             raise KeyError(
                 f"'{key}' is not a registered date element. "
@@ -76,7 +112,7 @@ class DateElement:
         }
         return len(any_time) > 0
 
-    def format(self, value: int | float | str) -> str:
+    def format(self, value: Any) -> str:
         """Format a value according to the date element format."""
         return f"{{:{self.fmt}}}".format(value)
 
@@ -91,12 +127,22 @@ class DateElement:
     def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: ARG002
         """Prepare element for strptime.
 
-        Some date elements need some preprocessing before being sent to strptime.
+        Some date elements need some preprocessing before being sent to
+        :meth:`datetime.datetime.strptime`. This takes the matching string of that
+        element and return a dictionary of any other element(s).
+
+        For instance, ``T`` is slightly different from what strptime expects, so it is
+        prepared into ``{"H": "HH", "M": "MM", "S": "SS"}``.
+
+        By default, this returns the same element with no change.
 
         Parameters
         ----------
         s:
             String match of date element.
+        kwargs:
+            Currently empty. In the future, could be additional information passed by
+            the parser.
 
         Returns
         -------
@@ -112,7 +158,7 @@ class DateElementDateAttr(DateElement):
 
     date_attr: ClassVar[Literal["year", "month", "day"]]
 
-    def datetime_to_value(self, date: dt.datetime | dt.date) -> int:  # noqa: D102
+    def datetime_to_value(self, date: dt.datetime | dt.date) -> int:
         return getattr(date, self.date_attr)
 
 
@@ -152,7 +198,7 @@ class DateElementTimeAttr(DateElement):
 
     time_attr: ClassVar[Literal["hour", "minute", "second", "microsecond"]]
 
-    def datetime_to_value(self, date: dt.datetime | dt.date) -> int:  # noqa: D102
+    def datetime_to_value(self, date: dt.datetime | dt.date) -> int:
         if not isinstance(date, dt.datetime):
             raise TypeError
         return getattr(date, self.time_attr)
@@ -202,7 +248,7 @@ class DateElementf(DateElementTimeAttr):
 class DateElementStr(DateElement):
     """Element is a string that can directly be obtained with strftime."""
 
-    def datetime_to_value(self, date: dt.datetime | dt.date) -> str:  # noqa: D102
+    def datetime_to_value(self, date: dt.datetime | dt.date) -> str:
         return date.strftime(f"%{self.key}")
 
 
@@ -243,7 +289,7 @@ class DateElementB(DateElementStr):
 class DateElementStrInt(DateElement):
     """Element is an integer that can be obtained from strftime."""
 
-    def datetime_to_value(self, date: dt.datetime | dt.date) -> int:  # noqa: D102
+    def datetime_to_value(self, date: dt.datetime | dt.date) -> int:
         return int(date.strftime(f"%{self.key}"))
 
 
@@ -255,7 +301,7 @@ class DateElementI(DateElementStrInt):
     fmt = "02d"
     contains = ("hour",)
 
-    def datetime_to_value(self, date: dt.datetime | dt.date) -> int:  # noqa: D102
+    def datetime_to_value(self, date: dt.datetime | dt.date) -> int:
         if not isinstance(date, dt.datetime):
             raise TypeError
         return super().datetime_to_value(date)
@@ -314,7 +360,7 @@ class DateElementp(DateElement):
     regex = r"AM|PM"
     contains = ("hour",)
 
-    def datetime_to_value(self, date: dt.datetime | dt.date) -> str:  # noqa: D102
+    def datetime_to_value(self, date: dt.datetime | dt.date) -> str:
         if not isinstance(date, dt.datetime):
             raise TypeError
         return "AM" if date.hour < 12 else "PM"
@@ -327,12 +373,12 @@ class DateElementP(DateElement):
     regex = r"am|pm"
     contains = ("hour",)
 
-    def datetime_to_value(self, date: dt.datetime | dt.date) -> str:  # noqa: D102
+    def datetime_to_value(self, date: dt.datetime | dt.date) -> str:
         if not isinstance(date, dt.datetime):
             raise TypeError
         return "am" if date.hour < 12 else "pm"
 
-    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: D102, ARG002
+    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: ARG002
         return {"p": s.upper()}
 
 
@@ -344,7 +390,7 @@ class DateElements(DateElement):
     fmt = ".6f"
     contains = ("year", "month", "day", "hour", "minute", "second", "microsecond")
 
-    def datetime_to_value(self, date: dt.datetime | dt.date) -> float:  # noqa: D102
+    def datetime_to_value(self, date: dt.datetime | dt.date) -> float:
         if not isinstance(date, dt.datetime):
             raise TypeError
         if date.tzinfo is None:
@@ -360,13 +406,13 @@ class DateElementz(DateElement):
     regex = r"[+-]\d{4}(?:\d\d(?:\.\d{6})?)?"
     contains = ("tzinfo",)
 
-    def datetime_to_value(self, date: dt.datetime | dt.date) -> str:  # noqa: D102
     def format(self, value: str | dt.tzinfo) -> str:
         if isinstance(value, dt.tzinfo):
             # this allows for passing a timezone object in the default date
             return self.datetime_to_value(dt.datetime(1970, 0, 0, tzinfo=value))
         return super().format(value)
 
+    def datetime_to_value(self, date: dt.datetime | dt.date) -> str:
         if not isinstance(date, dt.datetime):
             raise TypeError
         return date.strftime("%z") if date.tzinfo is not None else "+0000"
@@ -380,10 +426,10 @@ class DateElementF(DateElement):
     regex = r"\d{4}-\d\d-\d\d"
     contains = ("year", "month", "day")
 
-    def datetime_to_value(self, date: dt.datetime | dt.date) -> str:  # noqa: D102
+    def datetime_to_value(self, date: dt.datetime | dt.date) -> str:
         return f"{date.year:04d}-{date.month:02d}-{date.day:02d}"
 
-    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: D102, ARG002
+    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: ARG002
         splits = s.split("-")
         if len(splits) != 3:
             raise ValueError(f"Could not parse date '{s}' (expected YYYY-mm-dd).")
@@ -398,10 +444,10 @@ class DateElementx(DateElement):
     regex = r"\d{8}"
     contains = ("year", "month", "day")
 
-    def datetime_to_value(self, date: dt.datetime | dt.date) -> str:  # noqa: D102
+    def datetime_to_value(self, date: dt.datetime | dt.date) -> str:
         return f"{date.year:04d}{date.month:02d}{date.day:02d}"
 
-    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: D102, ARG002
+    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: ARG002
         if len(s) < 5:
             raise ValueError(f"Could not parse date '{s}' (expected YYYYmmdd).")
         return {"Y": s[:-4], "m": s[-4:-2], "d": s[-2:]}
@@ -414,12 +460,12 @@ class DateElementT(DateElement):
     regex = r"\d{6}"
     contains = ("hour", "minute", "second")
 
-    def datetime_to_value(self, date: dt.datetime | dt.date) -> str:  # noqa: D102
+    def datetime_to_value(self, date: dt.datetime | dt.date) -> str:
         if not isinstance(date, dt.datetime):
             raise TypeError
         return f"{date.hour:02d}{date.minute:02d}{date.second:02d}"
 
-    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: D102, ARG002
+    def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: ARG002
         if len(s) != 6:
             raise ValueError(f"Could not parse time '{s}' (expected HHMMSS).")
         return {"H": s[:2], "M": s[2:4], "S": s[4:]}
@@ -470,12 +516,13 @@ def make_date_groups(date_format: str, name: str = "") -> str:
 class DateParser:
     """Parse date from matches.
 
-    Matches are prepared before being passed to :func:`datetime.datetime.strptime.`.
+    Matches are prepared before being passed to :meth:`datetime.datetime.strptime`.
     Some elements may not be available on all platforms, see
     :ref:`strftime-strptime-behavior`
 
     The `default_date` argument provides default values for any elements (by default,
-    ``YmdHMSf``).
+    ``YmdHMSf``). For instance: ``default_date=dt.datetime(1950, 1, 1)``, or to get
+    timezone-aware dates ``default_date={"tzinfo": dt.UTC}``.
 
     If multiple **groups** have different values for the same element, an exception will
     be raised. However, strptime does not check for the coherence of multiple elements.
@@ -495,28 +542,32 @@ class DateParser:
     - If other groups contain information about the month and day, the week part will
       simply be ignored. For instance the pattern ``"%(Y)%(m)%(d)_%(a)"``
       ("20261025_Sun") will ignore the information about the week day, and it will not
-      check the day of week is coherent the rest of the date.
+      check the day of week is coherent with the rest of the date.
     - Otherwise, the parser will raise an exception. You may use the default date to
       supply the missing elements.
 
     Similarly, when parsing the hour from a 12-hour clock, the parser will need element
-    ``I`` and either ``p`` or ``P``, otherwise an exception will be raised.
+    ``I`` and either ``p`` or ``P``, and unless the hour can be inferred from another
+    element an exception will be raised.
 
     If a timestamp element ``s`` is present, the timezone ``z`` will be parsed
     separately and the parser will use :meth:`~datetime.datetime.fromtimestamp` and
     ignore all other elements. Parsing may not be accurate to the microsecond when years
     are too far from the epoch.
 
-    The names of months and week days are those of the current locale.
+    The names of months and week days are those of the current locale. By using
+    :meth:`DateElement.prepare` any locale could be passed as argument, open an issue if
+    that is of interest to you.
 
-    Use with either::
+    Use with::
 
         date = DateParser(matches, default_date).parse()
 
     Parameters
     ----------
     matches:
-        Matches obtained from a filename.
+        Matches obtained from a filename, corresponding to date elements. The
+        :attr:`.Group.date_element` attribute must be defined.
     default_date:
         Default value for elements if not found in the filename. It can be a mapping of
         elements or a :mod:`datetime` object (in which case the elements ``YmdHMSfz``
@@ -644,7 +695,7 @@ class DateParser:
         return date.tzinfo
 
     def parse_s(self, s: str, tz: dt.tzinfo | None) -> dt.datetime:
-        """Process timestamp."""
+        """Parse timestamp."""
         is_naive = tz is None
         if is_naive:
             tz = dt.UTC  # otherwise fromtimestamp assumes local time
@@ -693,11 +744,11 @@ class DateParser:
                 for elt in present:
                     elements.pop(elt)
             else:
-                to_str = {True: "hour", False: "AM/PM"}
+                to_str = {True: "the hour (%I)", False: "AM/PM"}
                 has = to_str[has_hour12]
                 missing = to_str[not has_hour12]
                 raise ValueError(
-                    f"Cannot correctly parse 12-hour with only the {has} and "
-                    f"not the {missing}. You can add the missing element to the "
+                    f"Cannot correctly parse 12-hour with only {has} and "
+                    f"not {missing}. You can add the missing element to the "
                     "default date mapping."
                 )

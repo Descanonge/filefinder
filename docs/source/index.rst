@@ -17,6 +17,34 @@ groups, similarly to a regular expression. Once setup, it can:
 - Select only filenames with specific values
 - Generate filenames
 
+.. grid:: 1 2 4 4
+
+    .. grid-item-card:: Usage
+        :link: usage
+        :link-type: doc
+
+        How to use FileFinder
+
+    .. grid-item-card:: Pattern
+        :link: pattern
+        :link-type: doc
+
+        How to write a FileFinder pattern
+
+    .. grid-item-card:: Handling dates
+        :link: handling_dates
+        :link-type: doc
+
+        Details on how to handle dates
+
+    .. grid-item-card:: API reference
+        :link: api
+        :link-type: doc
+
+
+Quickstart
+----------
+
 The following example will find all files with the structure ``Data/depth_[depth]/[year]/Temperature_[date].nc``::
 
     finder = Finder(
@@ -62,22 +90,14 @@ or from source with::
   pip install -e .
 
 
-Contents
---------
-
 .. toctree::
-   :maxdepth: 2
+   :hidden:
 
    usage
    pattern
-
-.. toctree::
-   :maxdepth: 1
-
+   handling_dates
    api
 
-
-Source code: `<https://github.com/Descanonge/filefinder>`__
 
 Indices and tables
 ------------------

@@ -495,8 +495,10 @@ class Finder:
             * "fail": fail the filter for this value (as if returning False).
             * "pass": pass the filter for this value (as if returning True).
         default_date
-            Default date elements to use when retrieving date. See :ref:`dates` and
-            :class:`.DateParser`.
+            Default value for elements if not found in the filename. It can be a mapping
+            of elements or a :mod:`datetime` object (in which case the elements
+            ``YmdHMSfz`` are used). Defaults to 1970-01-01 00:00:00 (naive). See
+            :ref:`default_date` for details.
         kwargs
             Will be passed to the function.
         """

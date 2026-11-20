@@ -118,7 +118,9 @@ class GroupMatch:
 
 
 class FileMatch:
-    """Scan an input file and store the results.
+    """Store matches found for a filename.
+
+    Matches can be directly accessed by indexing: ``filematch[group_name]``.
 
     Parameters
     ----------
@@ -228,9 +230,10 @@ class FileMatch:
             If True (default), return the parsed value. If False return the
             matched string.
         default_date:
-            If key correspond to a date pseudo-group, use this as the default date
-            elements. Datetime, or a mapping with keys in: year, month, day, hour,
-            minute, and second. Defaults to 1970-01-01 00:00:00 (naive).
+            Default value for elements if not found in the filename. It can be a mapping
+            of elements or a :mod:`datetime` object (in which case the elements
+            ``YmdHMSfz`` are used). Defaults to 1970-01-01 00:00:00 (naive). See
+            :ref:`default_date` for details.
 
         Raises
         ------

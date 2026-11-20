@@ -13,17 +13,6 @@
    {% endif %}
    {% endblock %}
 
-   {% block functions %}
-   {% if functions %}
-   .. rubric:: {{ _('Functions') }}
-
-   .. autosummary::
-   {% for item in functions %}
-   .. autofunction:: {{ item }}
-   {%- endfor %}
-   {% endif %}
-   {% endblock %}
-
    {% block classes %}
    {% if classes %}
    .. rubric:: {{ _('Classes') }}
@@ -32,6 +21,17 @@
       :toctree:
    {% for item in classes %}
       {{ item }}
+   {%- endfor %}
+   {% endif %}
+   {% endblock %}
+
+   {% block functions %}
+   {% if functions %}
+   .. rubric:: {{ _('Functions') }}
+
+   .. autosummary::
+   {% for item in functions %}
+   .. autofunction:: {{ item }}
    {%- endfor %}
    {% endif %}
    {% endblock %}

@@ -37,13 +37,6 @@ class DateElement:
 
     A class representing a date element that can be used in a date group, and parsed
     into a datetime object.
-
-    Existing date elements objects can be modified. For instance to change the regex
-    of an element: ``DateElement.get("Y").regex = ...``.
-
-    More date elements can be added by users. Any subclass that defines a :attr:`key`
-    attribute will be registered in :attr:`ELEMENTS` and automatically be available for
-    groups or parsing. This can replace existing elements.
     """
 
     key: ClassVar[str]
@@ -57,6 +50,8 @@ class DateElement:
     parsable: ClassVar[bool] = True
     """If this element should be used for date parsing. If False, matches will be
     ignored by the parser."""
+    description: ClassVar[str] = "placeholder"
+    """Description used in the documentation."""
 
     ELEMENTS: ClassVar[dict[str, DateElement]] = {}
     """Dictionary of instances of registered element classes."""
@@ -113,7 +108,12 @@ class DateElement:
         return len(any_time) > 0
 
     def format(self, value: Any) -> str:
-        """Format a value according to the date element format."""
+        """Format a value according to the date element format.
+
+        This should only be used for formatting default date elements that may be passed
+        by the user as unformatted values. Groups will use their own format string (that
+        can be changed by the user in the group specifications).
+        """
         return f"{{:{self.fmt}}}".format(value)
 
     def datetime_to_str(self, date: dt.datetime | dt.date) -> str:
@@ -126,13 +126,6 @@ class DateElement:
 
     def prepare(self, s: str, **kwargs: Any) -> dict[str, str]:  # noqa: ARG002
         """Prepare element for strptime.
-
-        Some date elements need some preprocessing before being sent to
-        :meth:`datetime.datetime.strptime`. This takes the matching string of that
-        element and return a dictionary of any other element(s).
-
-        For instance, ``T`` is slightly different from what strptime expects, so it is
-        prepared into ``{"H": "HH", "M": "MM", "S": "SS"}``.
 
         By default, this returns the same element with no change.
 
@@ -170,6 +163,7 @@ class DateElementY(DateElementDateAttr):
     fmt = "04d"
     date_attr = "year"
     contains = ("year",)
+    description = "Year (YYYY)"
 
 
 class DateElementm(DateElementDateAttr):
@@ -180,6 +174,7 @@ class DateElementm(DateElementDateAttr):
     fmt = "02d"
     date_attr = "month"
     contains = ("month",)
+    description = "Month (mm)"
 
 
 class DateElementd(DateElementDateAttr):
@@ -190,6 +185,7 @@ class DateElementd(DateElementDateAttr):
     fmt = "02d"
     date_attr = "day"
     contains = ("day",)
+    description = "Day (dd)"
 
 
 ## Time attributes
@@ -212,6 +208,7 @@ class DateElementH(DateElementTimeAttr):
     fmt = "02d"
     time_attr = "hour"
     contains = ("hour",)
+    description = "Hour, 24-hour clock (HH)"
 
 
 class DateElementM(DateElementTimeAttr):
@@ -222,6 +219,7 @@ class DateElementM(DateElementTimeAttr):
     fmt = "02d"
     time_attr = "minute"
     contains = ("minute",)
+    description = "Minute (MM)"
 
 
 class DateElementS(DateElementTimeAttr):
@@ -232,6 +230,7 @@ class DateElementS(DateElementTimeAttr):
     fmt = "02d"
     time_attr = "second"
     contains = ("second",)
+    description = "Second (SS)"
 
 
 class DateElementf(DateElementTimeAttr):
@@ -242,6 +241,7 @@ class DateElementf(DateElementTimeAttr):
     fmt = "06d"
     time_attr = "microsecond"
     contains = ("microsecond",)
+    description = "Microsecond (ffffff)"
 
 
 ## Strings obtained from strftime
@@ -258,6 +258,7 @@ class DateElementa(DateElementStr):
     key = "a"
     regex = r"\w+"
     contains = ("month", "day")
+    description = "Week day name, in current locale, abbreviated"
 
 
 class DateElementA(DateElementStr):
@@ -266,15 +267,16 @@ class DateElementA(DateElementStr):
     key = "A"
     regex = r"\w+"
     contains = ("month", "day")
+    description = "Week day name, in current locale"
 
 
 class DateElementb(DateElementStr):
     """Month name, abbreviated. Current locale."""
 
     key = "b"
-    description = "Month name abbreviated"
     regex = r"\w+"
     contains = ("month",)
+    description = "Month name, in current locale, abbreviated"
 
 
 class DateElementB(DateElementStr):
@@ -283,6 +285,7 @@ class DateElementB(DateElementStr):
     key = "B"
     regex = r"\w+"
     contains = ("month",)
+    description = "Month name, in current locale"
 
 
 ## Integers obtained from strftime
@@ -300,6 +303,7 @@ class DateElementI(DateElementStrInt):
     regex = r"\d\d"
     fmt = "02d"
     contains = ("hour",)
+    description = "Hour, 12-hour clock (01-12)"
 
     def datetime_to_value(self, date: dt.datetime | dt.date) -> int:
         if not isinstance(date, dt.datetime):
@@ -314,6 +318,7 @@ class DateElementj(DateElementStrInt):
     regex = r"\d{3}"
     fmt = "03d"
     contains = ("month", "day")
+    description = "Day of year (jjj)"
 
 
 class DateElementu(DateElementStrInt):
@@ -323,6 +328,7 @@ class DateElementu(DateElementStrInt):
     regex = r"\d"
     fmt = "01d"
     contains = ("month", "day")
+    description = "Week day (1-7, Monday=1)"
 
 
 class DateElementU(DateElementStrInt):
@@ -332,6 +338,7 @@ class DateElementU(DateElementStrInt):
     regex = r"\d\d"
     fmt = "02d"
     contains = ("month", "day")
+    description = "Week number (00-53, week 1 starts at first Sunday)"
 
 
 class DateElementw(DateElementStrInt):
@@ -341,6 +348,7 @@ class DateElementw(DateElementStrInt):
     regex = r"\d"
     fmt = "01d"
     contains = ("month", "day")
+    description = "Week day (1-7, Sunday=0)"
 
 
 class DateElementW(DateElementStrInt):
@@ -350,6 +358,7 @@ class DateElementW(DateElementStrInt):
     regex = r"\d\d"
     fmt = "02d"
     contains = ("month", "day")
+    description = "Week number (00-53, week 1 starts at first Monday)"
 
 
 ## Others
@@ -359,6 +368,7 @@ class DateElementp(DateElement):
     key = "p"
     regex = r"AM|PM"
     contains = ("hour",)
+    description = "AM/PM"
 
     def datetime_to_value(self, date: dt.datetime | dt.date) -> str:
         if not isinstance(date, dt.datetime):
@@ -372,6 +382,7 @@ class DateElementP(DateElement):
     key = "P"
     regex = r"am|pm"
     contains = ("hour",)
+    description = "am/pm"
 
     def datetime_to_value(self, date: dt.datetime | dt.date) -> str:
         if not isinstance(date, dt.datetime):
@@ -389,6 +400,7 @@ class DateElements(DateElement):
     regex = r"[+-]?\d+(?:\.\d{6})?"
     fmt = ".6f"
     contains = ("year", "month", "day", "hour", "minute", "second", "microsecond")
+    description = "Timestamp, seconds since epoch (1970-01-01 00:00:00 UTC)"
 
     def datetime_to_value(self, date: dt.datetime | dt.date) -> float:
         if not isinstance(date, dt.datetime):
@@ -405,6 +417,7 @@ class DateElementz(DateElement):
     key = "z"
     regex = r"[+-]\d{4}(?:\d\d(?:\.\d{6})?)?"
     contains = ("tzinfo",)
+    description = "UTC offset (±HHMM[SS[.ffffff]])"
 
     def format(self, value: str | dt.tzinfo) -> str:
         if isinstance(value, dt.tzinfo):
@@ -425,6 +438,7 @@ class DateElementF(DateElement):
     key = "F"
     regex = r"\d{4}-\d\d-\d\d"
     contains = ("year", "month", "day")
+    description = "Date (YYYY-mm-dd)"
 
     def datetime_to_value(self, date: dt.datetime | dt.date) -> str:
         return f"{date.year:04d}-{date.month:02d}-{date.day:02d}"
@@ -443,6 +457,7 @@ class DateElementx(DateElement):
     key = "x"
     regex = r"\d{8}"
     contains = ("year", "month", "day")
+    description = "Date (YYYYmmdd)"
 
     def datetime_to_value(self, date: dt.datetime | dt.date) -> str:
         return f"{date.year:04d}{date.month:02d}{date.day:02d}"
@@ -459,6 +474,7 @@ class DateElementT(DateElement):
     key = "T"
     regex = r"\d{6}"
     contains = ("hour", "minute", "second")
+    description = "Time (HHMMSS)"
 
     def datetime_to_value(self, date: dt.datetime | dt.date) -> str:
         if not isinstance(date, dt.datetime):
@@ -516,49 +532,6 @@ def make_date_groups(date_format: str, name: str = "") -> str:
 class DateParser:
     """Parse date from matches.
 
-    Matches are prepared before being passed to :meth:`datetime.datetime.strptime`.
-    Some elements may not be available on all platforms, see
-    :ref:`strftime-strptime-behavior`
-
-    The `default_date` argument provides default values for any elements (by default,
-    ``YmdHMSf``). For instance: ``default_date=dt.datetime(1950, 1, 1)``, or to get
-    timezone-aware dates ``default_date={"tzinfo": dt.UTC}``.
-
-    If multiple **groups** have different values for the same element, an exception will
-    be raised. However, strptime does not check for the coherence of multiple elements.
-    For instance, if elements ``Ymd`` and ``j`` correspond to different dates, one of
-    them will be chosen and the other ignored (as far as I know, this is undefined
-    behavior).
-
-    Unless a match contains timezone information (``%(z)``) or the `default_date` has
-    been given `tzinfo`, the returned date will be naive. Filefinder considers naive
-    objects as UTC, so if no timezone information is available it will parse everything
-    as if UTC.
-
-    To parse a date from the week day and week number, the parser needs both information
-    on the day of the week (elements ``a, A, u`` or ``w``) and the week number (elements
-    ``U`` or ``W``). If only one part of the information is present:
-
-    - If other groups contain information about the month and day, the week part will
-      simply be ignored. For instance the pattern ``"%(Y)%(m)%(d)_%(a)"``
-      ("20261025_Sun") will ignore the information about the week day, and it will not
-      check the day of week is coherent with the rest of the date.
-    - Otherwise, the parser will raise an exception. You may use the default date to
-      supply the missing elements.
-
-    Similarly, when parsing the hour from a 12-hour clock, the parser will need element
-    ``I`` and either ``p`` or ``P``, and unless the hour can be inferred from another
-    element an exception will be raised.
-
-    If a timestamp element ``s`` is present, the timezone ``z`` will be parsed
-    separately and the parser will use :meth:`~datetime.datetime.fromtimestamp` and
-    ignore all other elements. Parsing may not be accurate to the microsecond when years
-    are too far from the epoch.
-
-    The names of months and week days are those of the current locale. By using
-    :meth:`DateElement.prepare` any locale could be passed as argument, open an issue if
-    that is of interest to you.
-
     Use with::
 
         date = DateParser(matches, default_date).parse()
@@ -571,7 +544,8 @@ class DateParser:
     default_date:
         Default value for elements if not found in the filename. It can be a mapping of
         elements or a :mod:`datetime` object (in which case the elements ``YmdHMSfz``
-        are used). Defaults to 1970-01-01 00:00:00 (naive).
+        are used). Defaults to 1970-01-01 00:00:00 (naive). See :ref:`default_date` for
+        details.
     """
 
     DEFAULT_DATE_DEFAULT: ClassVar[dict[str, str | int | float]] = {

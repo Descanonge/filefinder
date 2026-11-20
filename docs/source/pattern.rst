@@ -56,8 +56,23 @@ valid: ``"parameter_{param:fmt=04}_{Y}-{m}-{d}.txt"``.
 Name
 ====
 
-The name can be anything (excluding colons ':'). It will be used to refer to
+The name can be anything (excluding colons ``:``). It will be used to refer to
 that group when fixing groups or retrieving matches.
+
+To simplify working with dates, FileFinder may consider some groups as
+corresponding to date elements (year, month, hour, etc.) depending on their
+name, namely if:
+
+- the name is of the form ``<date name>__<date element>`` (double underscore)
+- the name is a registered date element (then date name is "date")
+
+See :doc:`handling_dates` for details.
+
+.. tip::
+
+    As all default date elements have names with a single letter (``Y``, ``m``,
+    ``d``, etc.), use multi-character group names to avoid being considered as
+    a date group.
 
 .. note::
 
@@ -66,94 +81,6 @@ that group when fixing groups or retrieving matches.
    functions may return more than one result if they are multiple groups with
    that name.
 
-Filefinder tries to simplify working with dates (see :ref:`dates`). To create a
-group that corresponds to a date element you can use the following name
-structure ``<date name>__<date element>`` (with a double underscore): for
-instance ``start__Y``. The date element must be contained in the table below.
-It will dictate the regex and format string used for that group (unless
-overridden by the :ref:`fmt<fmt>` and :ref:`rgx<rgx>` properties). By having
-multiple groups with the same date name they can be managed as a single
-pseudo-group.
-
-The date name can be omitted, in that case it will default to 'date', but the
-group name will remain unchanged (*ie* "%(Y)" will be not be available as
-"date__Y").
-
-+------+------------------------------+--------------------------------+--------+
-| Name |                              | Regex                          | Format |
-+======+==============================+================================+========+
-| a    | Week day in current locale,  | \w+                            |    s   |
-|      | abbreviated                  |                                |        |
-+------+------------------------------+--------------------------------+--------+
-| A    | Week day in current locale   | \w+                            |    s   |
-+------+------------------------------+--------------------------------+--------+
-| b    | Month name in current locale,| \w                             |    s   |
-|      | abbreviated                  |                                |        |
-+------+------------------------------+--------------------------------+--------+
-| B    | Month name in current locale | \w                             |    s   |
-+------+------------------------------+--------------------------------+--------+
-| d    | Day of month (dd)            | \\d\\d                         |    02d |
-+------+------------------------------+--------------------------------+--------+
-| f    | Microsecond (ffffff)         | \\d{6}                         |    06d |
-|      |                              |                                |        |
-+------+------------------------------+--------------------------------+--------+
-| F    | Date (YYYY-mm-dd)            | \\d{4}-\\d\\d-\\d\\d           |      s |
-+------+------------------------------+--------------------------------+--------+
-| H    | Hour, 24-hour clock (HH)     | \\d\\d                         |    02d |
-+------+------------------------------+--------------------------------+--------+
-| I    | Hour, 12-hour clock (HH,     | \\d\\d                         |    02d |
-|      | 01-12)                       |                                |        |
-+------+------------------------------+--------------------------------+--------+
-| j    | Day of year (jjj)            | \\d{3}                         |    03d |
-+------+------------------------------+--------------------------------+--------+
-| m    | Month (mm)                   | \\d\\d                         |    02d |
-+------+------------------------------+--------------------------------+--------+
-| M    | Minute (MM)                  | \\d\\d                         |    02d |
-+------+------------------------------+--------------------------------+--------+
-| p    | AM/PM                        | (AM|PM)                        |      s |
-+------+------------------------------+--------------------------------+--------+
-| P    | am/pm                        | (am|pm)                        |      s |
-+------+------------------------------+--------------------------------+--------+
-| s    | Timestamp, seconds since     | [+-]?\\d+(\\.\\d{6})?          |    .6f |
-|      | epoch                        |                                |        |
-|      | (1970-01-01 00:00:00 UTC).   |                                |        |
-+------+------------------------------+--------------------------------+--------+
-| S    | Seconds (SS)                 | \\d\\d                         |    02d |
-+------+------------------------------+--------------------------------+--------+
-| T    | Time (HHMMSS)                | \\d{6}                         |    02d |
-+------+------------------------------+--------------------------------+--------+
-| u    | Weekday (1-7, Monday=1)      | \\d                            |      d |
-+------+------------------------------+--------------------------------+--------+
-| U    | Week number (00-53, week 1   | \\d\\d                         |    02d |
-|      | starts at first Sunday       |                                |        |
-+------+------------------------------+--------------------------------+--------+
-| w    | Weekday (0-6, Sunday=0)      | \\d                            |      d |
-+------+------------------------------+--------------------------------+--------+
-| W    | Week number (00-53, week 1   | \\d\\d                         |    02d |
-|      | starts at first Monday)      |                                |        |
-+------+------------------------------+--------------------------------+--------+
-| x    | Date (YYYYmmdd)              | \\d{8}                         |      s |
-+------+------------------------------+--------------------------------+--------+
-| Y    | Year (YYYY)                  | \\d{4}                         |    04d |
-+------+------------------------------+--------------------------------+--------+
-| z    | UTC offset                   | [+-]\\d{4}(\\d\\d(\\.\\d{6})?)?|      s |
-|      | (±HHMM[SS[.ffffff]])         |                                |        |
-+------+------------------------------+--------------------------------+--------+
-
-This follow the specification of :ref:`strftime-strptime-behavior` and `strftime
-<https://linux.die.net/man/3/strftime>`__.
-
-Default format can be overriden, but at your own risk.
-
-.. note::
-
-   Creating many date groups can be a bit verbose, so the function
-   :func:`.make_date_groups` helps mitigate this problem::
-
-        >>> make_date_groups("%Y%m%d", name="start")
-        "%(start__Y)%(start__m)%(start__d)"
-        >>> make_date_groups("%Y-%m-%d %H:%M:%S")
-        "%(Y)%(m)%(d) %(H):%(M):%(S)"
 
 .. _fmt:
 
@@ -187,7 +114,7 @@ If the format is never specified, it defaults to a ``s`` format.
    Only s, d, f, e, and E format types are supported.
 
    Parsing of numbers will fail in some ambiguous (and quite unrealistic) cases
-   that involve alignment padding with numbers or the minus signs. Creating a
+   that involve alignment padding with numbers or the minus sign. Creating a
    format object where we can't unambiguously remove the padding character is
    not allowed and will raise a :class:`~format.DangerousFormatError`.
 
@@ -232,7 +159,7 @@ If the group is not present, the parsed value will be `None`. When fixed to
 the value `None`, this will only match files without the group (*ie* "A.txt")
 
 An optional group does not have to be fixed when :ref:`generating a
-filename<create-filenames>`.
+filename<generate-filenames>`.
 
 .. _pre-post:
 
@@ -240,8 +167,7 @@ Prefix and suffix
 =================
 
 The prefix and suffix will be added to formatted values, as well as to the group
-regex. They will not be added when fixing to a string (strings are fixed as-is).
-They are removed before parsing values.
+regex (correctly escaped). They are removed before parsing values.
 
 It can be useful when a group is optional, for instance
 ``A%(idx:fmt=d:pre=_:opt).txt`` would match "A.txt" and "A_0.txt", and correctly

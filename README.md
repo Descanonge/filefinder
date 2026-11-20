@@ -9,7 +9,7 @@
 [![GitHub release](https://img.shields.io/github/v/release/Descanonge/filefinder)](https://github.com/Descanonge/filefinder/releases)
 [![codecov](https://codecov.io/github/Descanonge/filefinder/branch/master/graph/badge.svg?token=D5OBXX61HM)](https://codecov.io/github/Descanonge/filefinder)
 ![test status](https://github.com/Descanonge/filefinder/actions/workflows/tests.yml/badge.svg)
-[![Documentation Status](https://readthedocs.org/projects/filefinder/badge/?version=latest)](https://filefinder.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/filefinder/badge/?version=latest)](https://app.readthedocs.org/projects/filefinder/badge/?version=latest)
 
 </div>
 
@@ -62,11 +62,9 @@ finder.make_filename(depth=0.5, Y=2000, m=1, d=1)
 
 Documentation is available at [filefinder.readthedocs.io](https://filefinder.readthedocs.io).
 
-## Requirements
-
-Python >= 3.11
-
 ## Installation
+
+**Requires** Python >= 3.11
 
 From pip:
 ``` sh

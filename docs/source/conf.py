@@ -3,7 +3,8 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-from sphinx.application import Sphinx
+import subprocess
+from pathlib import Path
 
 import filefinder
 
@@ -16,6 +17,18 @@ author = "Clément Haëck"
 release = filefinder.__version__
 version = filefinder.__version__
 print(f"filefinder: {version}")
+
+## Generate date element table
+docs_root = Path(__file__).parent
+subprocess.run(
+    [
+        "python",
+        str(docs_root / "generate_date_elements_table.py"),
+        str(docs_root / "_date_elements_table.rst"),
+    ],
+    check=True,
+)
+
 
 ## General configuration
 
@@ -59,6 +72,7 @@ autodoc_default_options = {
 }
 ## Autosummary config
 autosummary_generate = ["api.rst"]
+autosummary_ignore_module_all = False
 
 ## Napoleon config
 napoleon_google_docstring = False
@@ -106,27 +120,3 @@ html_theme_options = dict(
 html_last_updated_fmt = "%Y-%m-%d"
 
 html_sidebars = {"**": ["sidebar-nav.html"]}
-
-
-def remove_none_return_type(
-    app: Sphinx,
-    obj_type: str,
-    name: str,
-    obj,
-    options,
-    signature: str,
-    return_annotation: str,
-) -> tuple[str, str]:
-    print(name, signature, return_annotation)
-    if return_annotation == "None":
-        return_annotation = ""
-    return signature, return_annotation
-
-
-def setup(app: Sphinx) -> dict:
-    app.connect("autodoc-process-signature", remove_none_return_type)
-
-    return {
-        "parallel_read_safe": True,
-        "parallel_write_safe": True,
-    }

@@ -1,3 +1,4 @@
 
-docs/build
+docs/_build
 docs/source/_api
+docs/source/_date_elements_table.rst

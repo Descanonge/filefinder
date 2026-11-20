@@ -16,20 +16,24 @@ parentheses, preceded by a percent sign. Within the parentheses are
 specifications for a :class:`~.Group` that will handle creating
 the regular expression to find files and formatting values appropriately.
 
-For instance, to find files contained in the ``/data`` directory and that follow
-the structure ``depth_[depth]/[year]/variable_[year]-[month]-[day].nc``::
+Behind the scenes, the Finder object will transform the pattern into a regular
+expression to match against filenames.
+
+As an example, to find files contained in the ``/data`` directory and that
+follow the structure ``depth_[depth]/[year]/variable_[year]-[month]-[day].nc``::
 
     finder = Finder(
         "depth_%(depth:fmt=.1f)/%(Y)/variable_%(Y)-%(m)-%(d).nc",
         root="/data"
     )
 
-.. important::
+.. seealso::
 
     Details on how to write the pattern are available at: :doc:`pattern`.
 
-Behind the scenes, the Finder object will transform the pattern into a regular
-expression to match against filenames.
+.. seealso::
+
+    Details on how to deal with dates are available at: :doc:`handling_dates`.
 
 .. _cache:
 
@@ -51,47 +55,12 @@ Changing some options may clear the cache:
   a filter will only remove files from the cache that do not pass that new
   filter.
 
-.. _dates:
-
-Handling dates
-++++++++++++++
-
-When working with dates, it is necessary to deal with multiple individual
-elements: year, month, day, etc. The package tries to make this easier by
-allowing to refer to multiple elements as a single pseudo-group.
-
-Group names that have the form ``<date name>__<date element>`` (with a double
-underscore) will be considered date elements (if omitted, date name defaults to
-'date', see :ref:`name` for details). All groups with the same date name can be
-managed as a single pseudo-group.
-
-Some methods (:meth:`.FileMatch.get_value` and :meth:`.Finder.add_group_filter`)
-accept a ``default_date`` argument that specifies the default elements to use
-when constructing datetime objects. For instance, if the filename does not
-specify the year, we can use 2000 as a default::
-
-    finder = Finder("%(m)-%(d).txt")
-    filematch.get_value("date", default_date={"year": 2000})
-
-The default date can be a datetime object, or a mapping containing any elements
-among: year, month, day, hour, minute, second, tzinfo, weekday, weeknumber. They
-will replace the default of 1970-01-01 00:00:00 (naive). For details on
-the parsing, see the documentation of :class:`.DateParser`.
-
-.. important::
-
-   Filefinder considers :ref:`naive <datetime-naive-aware>` datetime objects
-   (that do not have timezone information specified) as UTC.
-
-   Unless timezone information is present via the group ``%(z)`` or specified in
-   the default date, parsed dates will be returned as naive
-   :class:`datetime.datetime` objects.
 
 Restrict values
 ===============
 
-The filenames to keep when scanning can be restricted using two main ways:
-fixing groups to specific values, and/or run arbitrary filters on those
+When scanning for files, which files to keep can be restricted using two main
+ways: fixing groups to specific values, and/or run arbitrary filters on those
 filenames.
 
 .. _fixing:
@@ -99,7 +68,7 @@ filenames.
 Fixing
 ++++++
 
-Each group can be fixed to one value or to a set of possible values. This will
+Each group can be fixed to a value or to a set of possible values. This will
 adapt the regular expression used and thus restrict the filenames kept when
 scanning.
 
@@ -116,16 +85,16 @@ The given value can be:
 * a **boolean**: if the group has two options (specified with the
   :ref:`bool<bool>` keyword), one of the options is selected and used as a
   string.
-* a :mod:`datetime` object when fixing a date pseudo-group. Each group will
-  be fixed to the appropriate date element (year, month, ...).
-* **None** if the group is marked as :ref:`optional<opt>`: the group will *not*
-  appear in the filename.
 * a **string**: the value is directly interpreted as a regular expression and
   used as-is when scanning files or creating filenames, without further escaping
   or formatting.
+* a :mod:`datetime` object: date groups will extract the appropriate element
+  from the object
+* **None**: for groups marked as :ref:`optional<opt>`, the group will *not*
+  appear in the filename.
 * a **list** of any of the above: each element will be formatted to a string if
   not already. When scanning files, all elements are considered by joining them
-  with *OR* (``(value1|value2|...)``), and when creating files only the
+  with *OR* (``(value1|value2|...)``), and when generating filenames only the
   **first** element of the list is used.
 
 So with the pattern ``%(depth:fmt=.1f)/%(Y)/Temperature_%(Y)-%(m)-%(d).nc``::
@@ -159,9 +128,9 @@ groups will be fixed with the corresponding element::
 .. important::
 
    Fixing to a list of dates is not equivalent to selecting those exact dates
-   because each element is fixed independently of the other.
-   For instance, fixing to ``[date(2000, 1, 10), date(2000, 2, 15)]`` will
-   select four dates: 2000-01-10, 2000-01-15, 2000-02-10, 2000-02-15.
+   because each element is fixed independently of the other. For instance,
+   fixing to ``[datetime(2000, 1, 10), datetime(2000, 2, 15)]`` will select four
+   dates: 2000-01-10, 2000-01-15, 2000-02-10, 2000-02-15.
 
    To select exactly multiple dates, use a filter::
 
@@ -242,9 +211,9 @@ Group filters can be removed with :meth:`.Finder.remove_group_filters`.
 
 .. note::
 
-   If the parsing of a group fails, the filter behavior is dictated by the
+   If a group fails to parse its match, the filter behavior is dictated by the
    *on_parse_failure* option: it can raise an error, pass the unparsed string
-   to the filter function, and pass or fail that value (and continue as normal).
+   to the filter function, pass or fail that value (and continue as normal).
    See :meth:`.Finder.add_group_filter`.
 
 .. _find-files:
@@ -257,9 +226,9 @@ Find files
 Retrieve files
 ++++++++++++++
 
-Found files can be accessed with:
+Files found on disk can be accessed with:
 
-* :attr:`.Finder.files`: a list of absolute filenames as :mod:`pathlib` Paths
+* :attr:`.Finder.files`: a list of absolute filenames as :class:`pathlib.Path`
   objects.
 * :attr:`.Finder.matches`: a list of :class:`.FileMatch` objects each containing
   a filename and group values parsed from it.
@@ -343,7 +312,7 @@ one nesting level::
 .. note::
 
    In the example above, it would be equivalent to use ``nested=["depth",
-   "date"]``, see :ref:`dates`.
+   "date"]``, see :doc:`handling_dates`.
 
 .. note::
 
@@ -394,7 +363,7 @@ FileMatch will only parse the value when requested, not at construction.
    ``matches.get_value(key, parse=True)``.
 
 Using the name of a date pseudo-group will return a datetime object constructed
-from relevant matches::
+from relevant matches, see :ref:`date-parsing` for details::
 
     >>> finder = Finder(
         "%(start:Y)%(start:m)%(start:d)_%(end:Y)%(end:m)%(end:d).txt"
@@ -404,10 +373,6 @@ from relevant matches::
     datetime.datetime(2012, 1, 1, 0, 0)
     >>> filematch["end"]
     datetime.datetime(2012, 1, 31, 0, 0)
-
-:meth:`~.FileMatch.get_values` and :meth:`~.FileMatch.get_value` can be given a
-*default_date* argument to specify the values of missing date elements: see the
-methods documentation and :ref:`dates` for details.
 
 .. _directories-in-pattern:
 
@@ -454,10 +419,10 @@ likely example could be that of an optional directory::
 In both cases, when a file is found, the whole regular expression is applied and
 if it is successful the filters are applied next.
 
-.. _create-filenames:
+.. _generate-filenames:
 
-Create filenames
-================
+Generate filenames
+==================
 
 Using the information contained in the filename pattern we can also generate
 arbitrary filenames. This is done with :meth:`.Finder.make_filename`. Any group
@@ -488,7 +453,7 @@ overridden without affecting it::
   "/data/depth_2.0/2015-06-01.txt"  # Y is still fixed to 2014
 
 As for fixing, a value will be appropriately formatted but a string will be left
-untouched (note the prefix is not added when using a string)::
+untouched::
 
-  >>> finder.make_filename(depth="this-feels-wrong", m=6, d=1, id="_a")
+  >>> finder.make_filename(depth="this-feels-wrong", m=6, d=1, id="a")
   "/data/depth_this-feels-wrong/2014-06-01_a.txt"

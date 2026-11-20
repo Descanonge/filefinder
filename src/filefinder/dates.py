@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Literal
 if TYPE_CHECKING:
     from .matches import GroupMatch
 
-DefaultDate = dt.datetime | dt.date | Mapping[str, int | str | float]
+DefaultDate = dt.datetime | dt.date | Mapping[str, int | str | float | dt.tzinfo]
 """Type for default_date argument."""
 
 
@@ -352,6 +352,12 @@ class DateElementz(DateElement):
     contains = ("tzinfo",)
 
     def datetime_to_value(self, date: dt.datetime | dt.date) -> str:  # noqa: D102
+    def format(self, value: str | dt.tzinfo) -> str:
+        if isinstance(value, dt.tzinfo):
+            # this allows for passing a timezone object in the default date
+            return self.datetime_to_value(dt.datetime(1970, 0, 0, tzinfo=value))
+        return super().format(value)
+
         if not isinstance(date, dt.datetime):
             raise TypeError
         return date.strftime("%z") if date.tzinfo is not None else "+0000"

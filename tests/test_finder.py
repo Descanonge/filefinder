@@ -34,7 +34,7 @@ class PatternExample:
 pattern_general = PatternExample(
     pattern=(
         "A_%(fmt_int:fmt=02d)_%(fmt_str:fmt=s)_%(custom_rgx:rgx=.*)_"
-        "%(bool:bool=true.:false.)%(optional:fmt=.1f:pre=_:opt).txt"
+        "%(bool:bool=true.:false.)%(optional:fmt=.1f:pre=&:opt).txt"
     ),
     names=["fmt_int", "fmt_str", "custom_rgx", "bool", "optional"],
 )
@@ -157,7 +157,7 @@ class TestCreation:
             ("fmt_str:fmt=s", 21, 36),
             ("custom_rgx:rgx=.*", 38, 57),
             ("bool:bool=true.:false.", 59, 83),
-            ("optional:fmt=.1f:pre=_:opt", 84, 112),
+            ("optional:fmt=.1f:pre=&:opt", 84, 112),
         ]
 
         with pytest.raises(ValueError):
@@ -259,7 +259,7 @@ class TestCreation:
         f = Finder(pattern_general.pattern)
         assert f.get_regex() == (
             r"A_(-?0*\d+)_(.*?\ *)_(.*)_"
-            r"(true\.|false\.)((?:_-?\d+\.\d{1})?)\.txt"
+            r"(true\.|false\.)((?:\&-?\d+\.\d{1})?)\.txt"
         )
 
         f = Finder(pattern_dates.pattern)
@@ -273,7 +273,7 @@ class AssertClear:
         self.clear = clear
 
     def __enter__(self) -> None:
-        filematch = self.finder.find_matches("A_01_a_b_true._0.5.txt")
+        filematch = self.finder.find_matches("A_01_a_b_true.&0.5.txt")
         assert filematch is not None
         self.finder._matches = [filematch]
         self.finder.scanned = True
@@ -401,7 +401,7 @@ class TestFixing:
 
         # Fix another single group
         finder.fix(optional=0.5)
-        assert_fixed(groups["optional"], 0.5, "_0.5", r"_0\.5")
+        assert_fixed(groups["optional"], 0.5, "&0.5", r"\&0\.5")
         for group in finder.groups:
             if group.name not in ["fmt_int", "optional"]:
                 assert_unfixed(group)
@@ -445,12 +445,14 @@ class TestFixing:
 
         # Format with a number
         finder.fix(optional=0.5)
-        assert_fixed(groups["optional"], 0.5, "_0.5", r"_0\.5")
+        assert_fixed(groups["optional"], 0.5, "&0.5", r"\&0\.5")
         finder.unfix()
 
-        # Format with a string
+        # Format with a string (only prefix is escaped)
         finder.fix(optional="not+escaped")
-        assert_fixed(groups["optional"], "not+escaped", "not+escaped", "not+escaped")
+        assert_fixed(
+            groups["optional"], "not+escaped", r"&not+escaped", r"\&not+escaped"
+        )
 
         # Bool with a bool
         finder.fix(bool=False)
@@ -496,8 +498,8 @@ class TestFixing:
         assert_fixed(
             groups["optional"],
             [0.0, 0.5, 1.0],
-            ["_0.0", "_0.5", "_1.0"],
-            r"_0\.0|_0\.5|_1\.0",
+            ["&0.0", "&0.5", "&1.0"],
+            r"\&0\.0|\&0\.5|\&1\.0",
         )
 
         # Fix two groups
@@ -640,7 +642,7 @@ class TestFixing:
 class TestMatches:
     def get_filematch(self, filename: str | None = None) -> tuple[Finder, FileMatch]:
         if filename is None:
-            filename = "A_05_abc_def_true._-15.2.txt"
+            filename = "A_05_abc_def_true.&-15.2.txt"
 
         finder = Finder(pattern_general.pattern)
         filematch = finder.find_matches(filename)
@@ -658,7 +660,7 @@ class TestMatches:
         assert filematch.get_value("fmt_str", parse=False) == "abc"
         assert filematch.get_value("custom_rgx", parse=False) == "def"
         assert filematch.get_value("bool", parse=False) == "true."
-        assert filematch.get_value("optional", parse=False) == "_-15.2"
+        assert filematch.get_value("optional", parse=False) == "&-15.2"
 
         # Make sure we have not triggered any parsing
         for group_match in filematch.matches:
@@ -858,7 +860,7 @@ class TestMakeFilename:
             "bool": True,
             "optional": 0.1,
         }
-        filename = Path("base", "A_01_a+_b+_true._0.1.txt")
+        filename = Path("base", "A_01_a+_b+_true.&0.1.txt")
 
         assert finder.make_filename(fixes) == filename
         assert finder.make_filename(**fixes) == filename
@@ -877,7 +879,7 @@ class TestMakeFilename:
             "bool": "d+",
             "optional": "e+",
         }
-        filename = Path("base", "A_a+_b+_c+_d+e+.txt")
+        filename = Path("base", "A_a+_b+_c+_d+&e+.txt")
 
         assert finder.make_filename(fixes) == filename
         assert finder.make_filename(**fixes) == filename
@@ -907,11 +909,11 @@ class TestMakeFilename:
             bool=True,
         )
         assert finder.make_filename(custom_rgx="b+", optional=0.5) == Path(
-            "base", "A_01_a+_b+_true._0.5.txt"
+            "base", "A_01_a+_b+_true.&0.5.txt"
         )
 
         assert finder.make_filename(custom_rgx="b+", optional=0.5, fmt_int=5) == Path(
-            "base", "A_05_a+_b+_true._0.5.txt"
+            "base", "A_05_a+_b+_true.&0.5.txt"
         )
 
     def test_optional(self) -> None:
@@ -938,11 +940,11 @@ class TestMakeFilename:
         )
         assert finder.make_filename(
             custom_rgx=["b1", "b2"], optional=[0.5, 0.6, 0.7]
-        ) == Path("base", "A_01_a1_b1_true._0.5.txt")
+        ) == Path("base", "A_01_a1_b1_true.&0.5.txt")
 
         assert finder.make_filename(
             custom_rgx=["b1"], optional=[0.5, 0.6, 0.7], fmt_int=[2, 3]
-        ) == Path("base", "A_02_a1_b1_true._0.5.txt")
+        ) == Path("base", "A_02_a1_b1_true.&0.5.txt")
 
     def test_doubles(self) -> None:
         """Multiple groups with the same name are correctly handled."""

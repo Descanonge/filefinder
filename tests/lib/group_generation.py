@@ -79,7 +79,7 @@ class GroupSpecs:
             raise ValueError("Cannot create regex from specs.")
 
         if matching:
-            rgx = self.pre + rgx + self.post
+            rgx = re.escape(self.pre) + rgx + re.escape(self.post)
             if "opt" in self:
                 rgx = f"(?:{rgx})?"
             rgx = f"({rgx})"

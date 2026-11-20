@@ -63,40 +63,37 @@ def test_make_date_groups() -> None:
 
 
 class TestDatetimeToStr:
-    def datetime_to_str(self, date: dt.datetime, elt: str) -> str:
-        return DateElement.get(elt).datetime_to_str(date)
-
     def test_manual(self) -> None:
         date = dt.datetime(2026, 2, 3, 14, 34, 6, 654, tzinfo=ZoneInfo("Etc/GMT+1"))
 
-        assert self.datetime_to_str(date, "a") == calendar.day_abbr[1]
-        assert self.datetime_to_str(date, "A") == calendar.day_name[1]
-        assert self.datetime_to_str(date, "b") == calendar.month_abbr[2]
-        assert self.datetime_to_str(date, "B") == calendar.month_name[2]
-        assert self.datetime_to_str(date, "d") == "03"
-        assert self.datetime_to_str(date, "f") == "000654"
-        assert self.datetime_to_str(date, "F") == "2026-02-03"
-        assert self.datetime_to_str(date, "H") == "14"
-        assert self.datetime_to_str(date, "I") == "02"
-        assert self.datetime_to_str(date, "j") == "034"
-        assert self.datetime_to_str(date, "m") == "02"
-        assert self.datetime_to_str(date, "M") == "34"
-        assert self.datetime_to_str(date, "p") == "PM"
-        assert self.datetime_to_str(date, "P") == "pm"
-        assert self.datetime_to_str(date, "s") == "1770132846.000654"
-        assert self.datetime_to_str(date, "S") == "06"
-        assert self.datetime_to_str(date, "T") == "143406"
-        assert self.datetime_to_str(date, "u") == "2"
-        assert self.datetime_to_str(date, "U") == "05"
-        assert self.datetime_to_str(date, "w") == "2"
-        assert self.datetime_to_str(date, "W") == "05"
-        assert self.datetime_to_str(date, "x") == "20260203"
-        assert self.datetime_to_str(date, "Y") == "2026"
-        assert self.datetime_to_str(date, "z") == "-0100"
+        assert datetime_to_str(date, "a") == calendar.day_abbr[1]
+        assert datetime_to_str(date, "A") == calendar.day_name[1]
+        assert datetime_to_str(date, "b") == calendar.month_abbr[2]
+        assert datetime_to_str(date, "B") == calendar.month_name[2]
+        assert datetime_to_str(date, "d") == "03"
+        assert datetime_to_str(date, "f") == "000654"
+        assert datetime_to_str(date, "F") == "2026-02-03"
+        assert datetime_to_str(date, "H") == "14"
+        assert datetime_to_str(date, "I") == "02"
+        assert datetime_to_str(date, "j") == "034"
+        assert datetime_to_str(date, "m") == "02"
+        assert datetime_to_str(date, "M") == "34"
+        assert datetime_to_str(date, "p") == "PM"
+        assert datetime_to_str(date, "P") == "pm"
+        assert datetime_to_str(date, "s") == "1770132846.000654"
+        assert datetime_to_str(date, "S") == "06"
+        assert datetime_to_str(date, "T") == "143406"
+        assert datetime_to_str(date, "u") == "2"
+        assert datetime_to_str(date, "U") == "05"
+        assert datetime_to_str(date, "w") == "2"
+        assert datetime_to_str(date, "W") == "05"
+        assert datetime_to_str(date, "x") == "20260203"
+        assert datetime_to_str(date, "Y") == "2026"
+        assert datetime_to_str(date, "z") == "-0100"
 
     def test_bad(self) -> None:
         with pytest.raises(KeyError):
-            self.datetime_to_str(dt.datetime(2000, 1, 1), "NOT_A_KEY")
+            datetime_to_str(dt.datetime(2000, 1, 1), "NOT_A_KEY")
 
         for elt in DateElement.ELEMENTS.values():
             if elt.is_time:
@@ -105,50 +102,47 @@ class TestDatetimeToStr:
 
     def test_naive(self) -> None:
         date = dt.datetime(2026, 2, 3, 14, 34, 6)
-        assert self.datetime_to_str(date, "F") == "2026-02-03"
-        assert self.datetime_to_str(date, "H") == "14"
-        assert self.datetime_to_str(date, "I") == "02"
-        assert self.datetime_to_str(date, "p") == "PM"
-        assert self.datetime_to_str(date, "P") == "pm"
-        assert self.datetime_to_str(date, "s") == "1770129246.000000"
-        assert self.datetime_to_str(date, "T") == "143406"
-        assert self.datetime_to_str(date, "z") == "+0000"
+        assert datetime_to_str(date, "F") == "2026-02-03"
+        assert datetime_to_str(date, "H") == "14"
+        assert datetime_to_str(date, "I") == "02"
+        assert datetime_to_str(date, "p") == "PM"
+        assert datetime_to_str(date, "P") == "pm"
+        assert datetime_to_str(date, "s") == "1770129246.000000"
+        assert datetime_to_str(date, "T") == "143406"
+        assert datetime_to_str(date, "z") == "+0000"
 
 
 class TestDatetimeToValue:
-    def datetime_to_value(self, date: dt.datetime, elt: str) -> int | float | str:
-        return DateElement.get(elt).datetime_to_value(date)
-
     def test_manual(self) -> None:
         date = dt.datetime(2026, 2, 3, 14, 34, 6, 654, tzinfo=ZoneInfo("Etc/GMT+1"))
-        assert self.datetime_to_value(date, "a") == calendar.day_abbr[1]
-        assert self.datetime_to_value(date, "A") == calendar.day_name[1]
-        assert self.datetime_to_value(date, "b") == calendar.month_abbr[2]
-        assert self.datetime_to_value(date, "B") == calendar.month_name[2]
-        assert self.datetime_to_value(date, "d") == 3
-        assert self.datetime_to_value(date, "f") == 654
-        assert self.datetime_to_value(date, "F") == "2026-02-03"
-        assert self.datetime_to_value(date, "H") == 14
-        assert self.datetime_to_value(date, "I") == 2
-        assert self.datetime_to_value(date, "j") == 34
-        assert self.datetime_to_value(date, "m") == 2
-        assert self.datetime_to_value(date, "M") == 34
-        assert self.datetime_to_value(date, "p") == "PM"
-        assert self.datetime_to_value(date, "P") == "pm"
-        assert self.datetime_to_value(date, "s") == 1770132846.000654
-        assert self.datetime_to_value(date, "S") == 6
-        assert self.datetime_to_value(date, "T") == "143406"
-        assert self.datetime_to_value(date, "u") == 2
-        assert self.datetime_to_value(date, "U") == 5
-        assert self.datetime_to_value(date, "w") == 2
-        assert self.datetime_to_value(date, "W") == 5
-        assert self.datetime_to_value(date, "x") == "20260203"
-        assert self.datetime_to_value(date, "Y") == 2026
-        assert self.datetime_to_value(date, "z") == "-0100"
+        assert datetime_to_value(date, "a") == calendar.day_abbr[1]
+        assert datetime_to_value(date, "A") == calendar.day_name[1]
+        assert datetime_to_value(date, "b") == calendar.month_abbr[2]
+        assert datetime_to_value(date, "B") == calendar.month_name[2]
+        assert datetime_to_value(date, "d") == 3
+        assert datetime_to_value(date, "f") == 654
+        assert datetime_to_value(date, "F") == "2026-02-03"
+        assert datetime_to_value(date, "H") == 14
+        assert datetime_to_value(date, "I") == 2
+        assert datetime_to_value(date, "j") == 34
+        assert datetime_to_value(date, "m") == 2
+        assert datetime_to_value(date, "M") == 34
+        assert datetime_to_value(date, "p") == "PM"
+        assert datetime_to_value(date, "P") == "pm"
+        assert datetime_to_value(date, "s") == 1770132846.000654
+        assert datetime_to_value(date, "S") == 6
+        assert datetime_to_value(date, "T") == "143406"
+        assert datetime_to_value(date, "u") == 2
+        assert datetime_to_value(date, "U") == 5
+        assert datetime_to_value(date, "w") == 2
+        assert datetime_to_value(date, "W") == 5
+        assert datetime_to_value(date, "x") == "20260203"
+        assert datetime_to_value(date, "Y") == 2026
+        assert datetime_to_value(date, "z") == "-0100"
 
     def test_bad(self) -> None:
         with pytest.raises(KeyError):
-            self.datetime_to_value(dt.datetime(2000, 1, 1), "NOT_A_KEY")
+            datetime_to_value(dt.datetime(2000, 1, 1), "NOT_A_KEY")
 
         for elt in DateElement.ELEMENTS.values():
             if elt.is_time:
@@ -157,40 +151,40 @@ class TestDatetimeToValue:
 
     @given(date=st.datetimes(timezones=st.timezones()))
     def test_hypothesis(self, date: dt.datetime) -> None:
-        assert self.datetime_to_value(date, "Y") == date.year
-        assert self.datetime_to_value(date, "m") == date.month
-        assert self.datetime_to_value(date, "d") == date.day
-        assert self.datetime_to_value(date, "j") == int(date.strftime("%j"))
+        assert datetime_to_value(date, "Y") == date.year
+        assert datetime_to_value(date, "m") == date.month
+        assert datetime_to_value(date, "d") == date.day
+        assert datetime_to_value(date, "j") == int(date.strftime("%j"))
 
-        assert self.datetime_to_value(date, "H") == date.hour
-        assert self.datetime_to_value(date, "M") == date.minute
-        assert self.datetime_to_value(date, "S") == date.second
-        assert self.datetime_to_value(date, "f") == date.microsecond
-        assert self.datetime_to_value(date, "s") == date.timestamp()
+        assert datetime_to_value(date, "H") == date.hour
+        assert datetime_to_value(date, "M") == date.minute
+        assert datetime_to_value(date, "S") == date.second
+        assert datetime_to_value(date, "f") == date.microsecond
+        assert datetime_to_value(date, "s") == date.timestamp()
 
-        assert self.datetime_to_value(date, "u") == date.weekday() + 1
-        assert self.datetime_to_value(date, "U") == int(date.strftime("%U"))
-        assert self.datetime_to_value(date, "w") == int(date.strftime("%w"))
-        assert self.datetime_to_value(date, "W") == int(date.strftime("%W"))
+        assert datetime_to_value(date, "u") == date.weekday() + 1
+        assert datetime_to_value(date, "U") == int(date.strftime("%U"))
+        assert datetime_to_value(date, "w") == int(date.strftime("%w"))
+        assert datetime_to_value(date, "W") == int(date.strftime("%W"))
 
     def test_naive(self) -> None:
         date = dt.datetime(2026, 2, 3, 14, 34, 6)
-        assert self.datetime_to_value(date, "d") == 3
-        assert self.datetime_to_value(date, "F") == "2026-02-03"
-        assert self.datetime_to_value(date, "H") == 14
-        assert self.datetime_to_value(date, "I") == 2
-        assert self.datetime_to_value(date, "j") == 34
-        assert self.datetime_to_value(date, "m") == 2
-        assert self.datetime_to_value(date, "M") == 34
-        assert self.datetime_to_value(date, "p") == "PM"
-        assert self.datetime_to_value(date, "P") == "pm"
-        assert self.datetime_to_value(date, "s") == 1770129246.000000
-        assert self.datetime_to_value(date, "S") == 6
-        assert self.datetime_to_value(date, "T") == "143406"
-        assert self.datetime_to_value(date, "z") == "+0000"
+        assert datetime_to_value(date, "d") == 3
+        assert datetime_to_value(date, "F") == "2026-02-03"
+        assert datetime_to_value(date, "H") == 14
+        assert datetime_to_value(date, "I") == 2
+        assert datetime_to_value(date, "j") == 34
+        assert datetime_to_value(date, "m") == 2
+        assert datetime_to_value(date, "M") == 34
+        assert datetime_to_value(date, "p") == "PM"
+        assert datetime_to_value(date, "P") == "pm"
+        assert datetime_to_value(date, "s") == 1770129246.000000
+        assert datetime_to_value(date, "S") == 6
+        assert datetime_to_value(date, "T") == "143406"
+        assert datetime_to_value(date, "z") == "+0000"
 
         with pytest.raises(KeyError):
-            self.datetime_to_value(date, "NOT_A_KEY")
+            datetime_to_value(date, "NOT_A_KEY")
 
 
 class TestDateParser:

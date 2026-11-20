@@ -304,7 +304,11 @@ class Group:
         """
         # if a string, leave it as is
         if isinstance(fix, str):
-            return fix, fix, fix
+            return (
+                fix,
+                self.prefix + fix + self.suffix,
+                re.escape(self.prefix) + fix + re.escape(self.suffix),
+            )
 
         # None for optional group
         if fix is None and self.optional:
@@ -403,7 +407,7 @@ class Group:
             rgx = self.fixed_regex
         else:
             rgx = self.rgx
-            rgx = self.prefix + rgx + self.suffix
+            rgx = re.escape(self.prefix) + rgx + re.escape(self.suffix)
 
         if self.optional and not self.fixed:
             rgx = f"(?:{rgx})?"

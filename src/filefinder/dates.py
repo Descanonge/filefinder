@@ -30,6 +30,8 @@ class DateElement:
     fmt: ClassVar[str] = "s"
     contains: ClassVar[tuple[str, ...]] = ()
     is_time: ClassVar[bool]
+    parsable: ClassVar[bool] = True
+    """If this element should be used for date parsing."""
 
     ELEMENTS: ClassVar[dict[str, DateElement]] = {}
 
@@ -583,12 +585,14 @@ class DateParser:
         """
         elements_all: dict[str, list[GroupMatch]] = {}
         for m in self.matches:
-            element = m.group.date_element
-            if element is None:
+            elt_obj = m.group.date_element
+            if elt_obj is None:
                 raise ValueError(f"'{m.group}' is not a date group.")
-            if element.key not in elements_all:
-                elements_all[element.key] = []
-            elements_all[element.key].append(m)
+            if not elt_obj.parsable:
+                continue
+            if elt_obj.key not in elements_all:
+                elements_all[elt_obj.key] = []
+            elements_all[elt_obj.key].append(m)
 
         for element, matches in elements_all.items():
             values = [m.match_str for m in matches]

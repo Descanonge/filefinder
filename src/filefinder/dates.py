@@ -29,7 +29,6 @@ class DateElement:
     regex: ClassVar[str]
     fmt: ClassVar[str] = "s"
     contains: ClassVar[tuple[str, ...]] = ()
-    is_time: ClassVar[bool]
     parsable: ClassVar[bool] = True
     """If this element should be used for date parsing."""
 

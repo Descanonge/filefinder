@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 if TYPE_CHECKING:
@@ -51,6 +51,14 @@ class DateElement:
     def registered(cls) -> list[str]:
         """List of registered element names."""
         return list(cls.ELEMENTS.keys())
+
+    @classmethod
+    def all_contains(cls, keys: Iterable[str]) -> set[str]:
+        """Set of the datetime arguments that can be infered from multiple elements."""
+        contains = set()
+        for key in keys:
+            contains |= set(cls.get(key).contains)
+        return contains
 
     def __repr__(self) -> str:
         return f"DateElement[{self.key}]"
@@ -650,11 +658,7 @@ class DateParser:
         has_weekday = _has_any_keys(elements, "aAuw")
         has_weeknumber = _has_any_keys(elements, "UW")
 
-        contains = set()
-        for elt in self.elements:
-            if elt in present:
-                continue
-            contains |= set(DateElement.get(elt).contains)
+        contains = DateElement.all_contains(set(self.elements.keys()) - present)
 
         if has_weekday != has_weeknumber:
             if {"month", "day"} & contains:
@@ -678,11 +682,7 @@ class DateParser:
         has_hour12 = "I" in elements
         has_ampm = _has_any_keys(elements, "pP")
 
-        contains = set()
-        for elt in self.elements:
-            if elt in present:
-                continue
-            contains |= set(DateElement.get(elt).contains)
+        contains = DateElement.all_contains(set(self.elements.keys()) - present)
 
         if has_hour12 != has_ampm:
             if "hour" in contains:

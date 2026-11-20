@@ -420,9 +420,8 @@ class TestDateParser:
             ]
         }
 
-        for element in elements:
-            for attr in DateElement.get(element).contains:
-                date_ref_elements[attr] = getattr(date, attr)
+        for attr in DateElement.all_contains(elements):
+            date_ref_elements[attr] = getattr(date, attr)
 
         # Combination of date and default_date could result in `day` being outside of
         # the valid range of the month. This is difficult to predict, so we cap at 28

@@ -360,6 +360,7 @@ class TestClearCache:
             finder.scan_everything = True
         with self.assert_cleared(finder):
             finder.regex_outside_groups = True
+        finder.regex_outside_groups = False
         with self.assert_cleared(finder):
             finder.follow_symlinks = True
 
@@ -1127,8 +1128,9 @@ class TestFileScan:
         for f_ref in files:
             tmp_dir.create_file(Path(*f_ref))
 
+        sep = re.escape(os.sep)
         self.finder = Finder(
-            "%(folder:rgx=[a-z]/:opt)%(folder:rgx=[a-z]/:opt)%(param:fmt=d).txt",
+            f"%(folder:rgx=[a-z]{sep}:opt)%(folder:rgx=[a-z]{sep}:opt)%(param:fmt=d).txt",
             root=tmp_dir.base_dir,
             scan_everything=True,
         )
@@ -1187,7 +1189,7 @@ class TestFileScan:
         # Add a misdirect (the different depth should not allow matching)
         (tmp_dir.base_dir / "a1" / "a04").symlink_to(tmp_dir.base_dir / "a0")
         finder = Finder(
-            r"%(l1:rgx=a\d\d)/%(l2:rgx=a\d\d).file",
+            rf"%(l1:rgx=a\d\d){os.sep}%(l2:rgx=a\d\d).file",
             root=tmp_dir.base_dir / "a1",
             follow_symlinks=True,
         )

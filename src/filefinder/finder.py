@@ -769,7 +769,7 @@ class Finder:
     def get_regex(self) -> str:
         """Return regex."""
         rgx_subdirs = self.get_regex_subdirs()
-        return os.sep.join(rgx_subdirs)  # noqa: PTH118
+        return re.escape(os.sep).join(rgx_subdirs)
 
     def find_files(self) -> None:
         """Find files to scan and store them in cache.

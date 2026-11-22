@@ -747,35 +747,29 @@ class Finder:
 
         return output
 
-    def get_regex(self, *, replace_dir_sep: bool = True) -> str:
-        """Return regex.
-
-        Parameters
-        ----------
-        replace_dir_sep:
-            If True (default), replace "/" in the regex by the correct directory
-            separator for the current OS.
-        """
-        segments = self.segments.copy()
-        if not self.regex_outside_groups:
-            # escape regex outside groups
-            segments = [
-                s if (i % 2 == 1) else re.escape(s) for i, s in enumerate(segments)
-            ]
-
-        for idx, group in enumerate(self.groups):
-            segments[2 * idx + 1] = group.get_regex()
-
-        regex = "".join(segments)
-
-        if replace_dir_sep:
-            regex = regex.replace("/", re.escape(os.sep))
-
-        return regex
-
     def get_regex_subdirs(self) -> list[str]:
         """Return regexes for each sub-directory."""
-        return self.get_regex(replace_dir_sep=False).split("/")
+        rgx_subdirs = [""]
+
+        for i, segment in enumerate(self.segments):
+            if i % 2 == 0:
+                if not self.regex_outside_groups:
+                    seg_split = segment.split(os.sep)  # noqa: PTH206
+                    seg_split = [re.escape(s) for s in seg_split]
+                else:
+                    seg_split = segment.split(re.escape(os.sep))
+
+                rgx_subdirs[-1] += seg_split[0]
+                rgx_subdirs += seg_split[1:]
+            else:
+                rgx_subdirs[-1] += self.groups[(i - 1) // 2].get_regex()
+
+        return rgx_subdirs
+
+    def get_regex(self) -> str:
+        """Return regex."""
+        rgx_subdirs = self.get_regex_subdirs()
+        return os.sep.join(rgx_subdirs)  # noqa: PTH118
 
     def find_files(self) -> None:
         """Find files to scan and store them in cache.

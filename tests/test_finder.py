@@ -32,9 +32,11 @@ class PatternExample:
 
 
 pattern_general = PatternExample(
-    pattern=(
-        "A_%(fmt_int:fmt=02d)_%(fmt_str:fmt=s)_%(custom_rgx:rgx=.*)_"
-        "%(bool:bool=true.:false.)%(optional:fmt=.1f:pre=&:opt).txt"
+    pattern=os.sep.join(  # noqa: PTH118
+        [
+            "A_%(fmt_int:fmt=02d)_%(fmt_str:fmt=s)_%(custom_rgx:rgx=.*)",
+            "%(bool:bool=true.:false.)%(optional:fmt=.1f:pre=&:opt).txt",
+        ]
     ),
     names=["fmt_int", "fmt_str", "custom_rgx", "bool", "optional"],
 )
@@ -43,7 +45,9 @@ pattern_double = PatternExample(
     names=["fmt_int", "fmt_int", "other"],
 )
 pattern_dates = PatternExample(
-    pattern="%(Y)/%(Y)%(m)%(d)-%(j)_%(date2__Y)%(date2__m)%(date2__d)-%(date2__j).txt",
+    pattern=os.sep.join(  # noqa: PTH118
+        ["%(Y)", "%(Y)%(m)%(d)-%(j)_%(date2__Y)%(date2__m)%(date2__d)-%(date2__j).txt"]
+    ),
     names=["Y", "Y", "m", "d", "j", "date2__Y", "date2__m", "date2__d", "date2__j"],
 )
 pattern_datetime = PatternExample(
@@ -257,14 +261,48 @@ class TestCreation:
     def test_regex(self) -> None:
         """Test that the correct regex is generated."""
         f = Finder(pattern_general.pattern)
-        assert f.get_regex() == (
-            r"A_(-?0*\d+)_(.*?\ *)_(.*)_"
-            r"(true\.|false\.)((?:\&-?\d+\.\d{1})?)\.txt"
+        assert f.get_regex() == re.escape(os.sep).join(
+            [
+                r"A_(-?0*\d+)_(.*?\ *)_(.*)",
+                r"(true\.|false\.)((?:\&-?\d+\.\d{1})?)\.txt",
+            ]
         )
 
         f = Finder(pattern_dates.pattern)
         rgx = r"(\d{4})(\d\d)(\d\d)\-(\d{3})"
         assert f.get_regex() == rf"(\d{{4}}){re.escape(os.sep)}{rgx}_{rgx}\.txt"
+
+    def test_regex_subdirs(self) -> None:
+        """Test regex is correctly split in subdirs."""
+        f = Finder(pattern_general.pattern)
+        assert f.get_regex_subdirs() == [
+            r"A_(-?0*\d+)_(.*?\ *)_(.*)",
+            r"(true\.|false\.)((?:\&-?\d+\.\d{1})?)\.txt",
+        ]
+
+        f = Finder(pattern_dates.pattern)
+        rgx = r"(\d{4})(\d\d)(\d\d)\-(\d{3})"
+        assert f.get_regex_subdirs() == [r"(\d{4})", rf"{rgx}_{rgx}\.txt"]
+
+    def test_regex_outside_groups(self) -> None:
+        """Test regex is correct when allow regex outside groups."""
+        pattern = re.escape(os.sep).join(
+            [
+                "A_.*",
+                "B_[012]_%(fmt_int:fmt=02d)_%(fmt_str:fmt=s)_%(custom_rgx:rgx=.*)",
+                r"%(bool:bool=true.:false.)%(optional:fmt=.1f:pre=&:opt)\.txt",
+            ]
+        )
+        finder = Finder(pattern, regex_outside_groups=True)
+        assert finder.get_regex_subdirs() == [
+            r"A_.*",
+            r"B_[012]_(-?0*\d+)_(.*?\ *)_(.*)",
+            r"(true\.|false\.)((?:\&-?\d+\.\d{1})?)\.txt",
+        ]
+
+        filename = Path("A_anything", "B_1_05_sfmt_anything", "true..txt")
+        filematch = finder.find_matches(filename)
+        assert filematch is not None
 
 
 class AssertClear:
@@ -273,7 +311,7 @@ class AssertClear:
         self.clear = clear
 
     def __enter__(self) -> None:
-        filematch = self.finder.find_matches("A_01_a_b_true.&0.5.txt")
+        filematch = self.finder.find_matches(Path("A_01_a_b", "true.&0.5.txt"))
         assert filematch is not None
         self.finder._matches = [filematch]
         self.finder.scanned = True
@@ -640,9 +678,11 @@ class TestFixing:
 
 
 class TestMatches:
-    def get_filematch(self, filename: str | None = None) -> tuple[Finder, FileMatch]:
+    def get_filematch(
+        self, filename: str | Path | None = None
+    ) -> tuple[Finder, FileMatch]:
         if filename is None:
-            filename = "A_05_abc_def_true.&-15.2.txt"
+            filename = Path("A_05_abc_def", "true.&-15.2.txt")
 
         finder = Finder(pattern_general.pattern)
         filematch = finder.find_matches(filename)
@@ -688,7 +728,7 @@ class TestMatches:
 
     def test_optional(self) -> None:
         """Test optional group has empty match."""
-        _, filematch = self.get_filematch("A_05_abc_def_true..txt")
+        _, filematch = self.get_filematch(Path("A_05_abc_def", "true..txt"))
         assert filematch is not None
 
         assert filematch.get_value("optional", parse=False) == ""
@@ -860,7 +900,7 @@ class TestMakeFilename:
             "bool": True,
             "optional": 0.1,
         }
-        filename = Path("base", "A_01_a+_b+_true.&0.1.txt")
+        filename = Path("base", "A_01_a+_b+", "true.&0.1.txt")
 
         assert finder.make_filename(fixes) == filename
         assert finder.make_filename(**fixes) == filename
@@ -879,7 +919,7 @@ class TestMakeFilename:
             "bool": "d+",
             "optional": "e+",
         }
-        filename = Path("base", "A_a+_b+_c+_d+&e+.txt")
+        filename = Path("base", "A_a+_b+_c+", "d+&e+.txt")
 
         assert finder.make_filename(fixes) == filename
         assert finder.make_filename(**fixes) == filename
@@ -909,11 +949,11 @@ class TestMakeFilename:
             bool=True,
         )
         assert finder.make_filename(custom_rgx="b+", optional=0.5) == Path(
-            "base", "A_01_a+_b+_true.&0.5.txt"
+            "base", "A_01_a+_b+", "true.&0.5.txt"
         )
 
         assert finder.make_filename(custom_rgx="b+", optional=0.5, fmt_int=5) == Path(
-            "base", "A_05_a+_b+_true.&0.5.txt"
+            "base", "A_05_a+_b+", "true.&0.5.txt"
         )
 
     def test_optional(self) -> None:
@@ -927,7 +967,7 @@ class TestMakeFilename:
         )
         assert finder.make_filename(
             fmt_int=1, fmt_str="a", custom_rgx="b", bool=False
-        ) == Path("base", "A_01_a_b_false..txt")
+        ) == Path("base", "A_01_a_b", "false..txt")
 
     def test_multiple_fix(self) -> None:
         """The first value is used when fixed to multiple values."""
@@ -940,11 +980,11 @@ class TestMakeFilename:
         )
         assert finder.make_filename(
             custom_rgx=["b1", "b2"], optional=[0.5, 0.6, 0.7]
-        ) == Path("base", "A_01_a1_b1_true.&0.5.txt")
+        ) == Path("base", "A_01_a1_b1", "true.&0.5.txt")
 
         assert finder.make_filename(
             custom_rgx=["b1"], optional=[0.5, 0.6, 0.7], fmt_int=[2, 3]
-        ) == Path("base", "A_02_a1_b1_true.&0.5.txt")
+        ) == Path("base", "A_02_a1_b1", "true.&0.5.txt")
 
     def test_doubles(self) -> None:
         """Multiple groups with the same name are correctly handled."""

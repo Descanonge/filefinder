@@ -1170,13 +1170,13 @@ class TestFileScan:
 
         # follow_symlinks = False
         finder = Finder(
-            r"%(l1:rgx=a\d\d)/%(l2:rgx=a\d\d).file",
+            rf"%(l1:rgx=a\d\d){os.sep}%(l2:rgx=a\d\d).file",
             root=tmp_dir.base_dir / "a1",
         )
         assert files[:2] == finder.get_files()
 
         finder = Finder(
-            r"%(l1:rgx=a\d\d)/%(l2:rgx=a\d\d).file",
+            rf"%(l1:rgx=a\d\d){os.sep}%(l2:rgx=a\d\d).file",
             root=tmp_dir.base_dir / "a1",
             follow_symlinks=True,
         )

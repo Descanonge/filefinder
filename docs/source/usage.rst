@@ -354,7 +354,7 @@ For more flexibility :meth:`.FileMatch.get_values` will return a list of values
 corresponding to the selected group(s). :meth:`.FileMatch.get_value` will return
 the first element of that list, raise if the list is empty or warn if the values
 are not all equal. Both function can be given the argument ``parse`` to choose
-whether to use the parsed value or solely the string that matched. Note that
+whether to use the parsed value or just the string that matched. Note that
 FileMatch will only parse the value when requested, not at construction.
 
 .. note::
@@ -379,19 +379,14 @@ from relevant matches, see :ref:`date-parsing` for details::
 Directories in pattern
 ++++++++++++++++++++++
 
-If the pattern contains directory separators the :class:`~.finder.Finder` will
+If the pattern contains path separators the :class:`~.finder.Finder` will
 explore sub-directories to find the files.
 
-.. important::
+If the pattern ends in a path separator, only directories will be scanned::
 
-   In the pattern, a directory separator should always be indicated with the
-   forward slash ``/``, even on Windows where a backslash would normally be
-   used. It will be replaced by the correct character when necessary.
+    Finder("only/directories/")
 
-   We do this because the backslash has a special meaning in regular
-   expressions, and it is difficult to disambiguate the two.
-
-The scanning process is as follows. The Finder first generates a regular
+The scanning process is as follows: the Finder first generates a regular
 expression based on the pattern and the fixed values. This expression is meant
 to match paths relative to the root directory and have a capturing group for
 each pattern group.
@@ -400,13 +395,14 @@ two methods.
 
 1. By default, the regular expression is split at each path separator
    occurrence, so that we can eliminate folders that do not match the pattern
-   and avoid exploring irrelevant sub-directories. We only scan files when
-   arriving at the correct depth.
-   However, it cannot deal with some patterns in which a group contains a path
-   separator.
+   and avoid exploring irrelevant sub-directories.
+   It cannot deal with path separator inside group regexes.
 2. For those more complicated patterns, by setting the parameter
    :attr:`~.Finder.scan_everything` to true, we will explore all sub-directories
    up to a depth of :attr:`.Finder.MAX_SCAN_DEPTH`.
+
+In both cases, when a file is found, the whole regular expression is applied and
+if it is successful the filters are applied next.
 
 The second method can be more costly for some directory structures ---with many
 siblings folders for instance--- but can deal with more exotic patterns. A
@@ -416,8 +412,15 @@ likely example could be that of an optional directory::
   basedir/rest_of_pattern
   basedir/subdir_name/rest_of_pattern
 
-In both cases, when a file is found, the whole regular expression is applied and
-if it is successful the filters are applied next.
+.. tip::
+
+   On windows, do not forget to escape the path separator (backslash) and/or use
+   raw strings (see :ref:`python docs <string-escape-escaped-char>`)::
+
+       Finder("A\\my_files.txt")
+       Finder(r"A\my_files.txt")
+       Finder("A.*\\\\my_files\\.txt", regex_outside_groups=True)
+       Finder(r"A.*\\my_files\.txt", regex_outside_groups=True)
 
 .. _generate-filenames:
 

@@ -1195,6 +1195,64 @@ class TestFileScan:
         )
         assert sorted(files) == finder.get_files()
 
+    def test_find_directories(self, tmp_path: Path) -> None:
+        """Finder finds files and directories (if pattern allows)."""
+        tmp_dir = TmpDirectory(tmp_path)
+
+        files = []
+        files.append(tmp_dir.create_dir(Path("A", "b0")))
+        files.append(tmp_dir.create_file(Path("A", "b1")))
+
+        finder = Finder(f"A{os.sep}b%(b:fmt=d)", root=tmp_dir.base_dir)
+        assert finder.get_files() == sorted(files)
+
+        finder = Finder(
+            f"A{os.sep}b%(b:fmt=d)", root=tmp_dir.base_dir, scan_everything=True
+        )
+        assert finder.get_files() == sorted(files)
+
+    def test_only_directories(self, tmp_path: Path) -> None:
+        """Finder finds files and directories (if pattern allows)."""
+        tmp_dir = TmpDirectory(tmp_path)
+
+        files = []
+        files.append(tmp_dir.create_dir(Path("A", "b0")))
+        tmp_dir.create_file(Path("A", "b1"))
+
+        finder = Finder(f"A{os.sep}b%(b:fmt=d){os.sep}", root=tmp_dir.base_dir)
+        assert finder.file_type == "d"
+        assert finder.get_files() == sorted(files)
+
+        finder = Finder(
+            f"A{os.sep}b%(b:fmt=d){re.escape(os.sep)}",
+            root=tmp_dir.base_dir,
+            regex_outside_groups=True,
+        )
+        assert finder.file_type == "d"
+        assert finder.get_files() == sorted(files)
+
+        finder = Finder(
+            f"A{os.sep}b%(b:fmt=d){os.sep}", root=tmp_dir.base_dir, scan_everything=True
+        )
+        assert finder.file_type == "d"
+        assert finder.get_files() == sorted(files)
+
+        finder = Finder(f"A{os.sep}b%(b:fmt=d)", root=tmp_dir.base_dir)
+        finder.file_type = "d"
+        assert finder.get_files() == sorted(files)
+
+    def test_only_files(self, tmp_path: Path) -> None:
+        """Finder finds files and directories (if pattern allows)."""
+        tmp_dir = TmpDirectory(tmp_path)
+
+        files = []
+        tmp_dir.create_dir(Path("A", "b0"))
+        files.append(tmp_dir.create_file(Path("A", "b1")))
+
+        finder = Finder(f"A{os.sep}b%(b:fmt=d)", root=tmp_dir.base_dir)
+        finder.file_type = "f"
+        assert finder.get_files() == sorted(files)
+
 
 class TestFileScanNested:
     """Test simple case of nested filenames output."""

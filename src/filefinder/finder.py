@@ -96,6 +96,17 @@ class Finder:
             group_delimiters = ("%", "(", ")")
         self._group_delimiters: tuple[str, str, str] = group_delimiters
 
+        self.file_type: str = "fd"
+        """Restrict type of files scanned.
+
+        Combination of types that will be kept:
+        - `"f"`: regular file
+        - `"d"`: directory
+
+        Is automatically set to `"d"` (only directories) if the pattern ends by a folder
+        separator.
+        """
+
         self.groups: list[Group] = []
         """Group objects, in the order they appear in the pattern."""
         self.segments: list[str] = []
@@ -684,6 +695,11 @@ class Finder:
 
     def set_pattern(self, pattern: str) -> None:
         """Set pattern, re-create group objects, remove all filters."""
+        sep = re.escape(os.sep) if self.regex_outside_groups else os.sep
+        if pattern.endswith(sep):
+            self.file_type = "d"
+            pattern = pattern.removesuffix(sep)
+
         self.clear_cache()
         self.clear_filters()
         self._pattern = pattern
@@ -829,6 +845,19 @@ class Finder:
             depth = len(dirpath.relative_to(self.root).parts)
             yield depth, dirpath, dirnames, filenames
 
+    def _get_scanned_restricted_type(
+        self, dirnames: Sequence[str], filenames: Sequence[str]
+    ) -> list[str]:
+        out = []
+        for c in set(self.file_type):
+            if c == "f":
+                out += list(filenames)
+            elif c == "d":
+                out += list(dirnames)
+            else:
+                raise KeyError(f"Unknown file type key '{c}', must be one of 'fd'")
+        return out
+
     def _find_files_scan_everything(self) -> None:
         """Find files in all sub-directories.
 
@@ -845,12 +874,13 @@ class Finder:
             logger.debug(
                 "Scanning in %s (depth %d/%d)", dirpath, depth, self.MAX_SCAN_DEPTH
             )
+            found = self._get_scanned_restricted_type(dirnames, filenames)
             if depth > self.MAX_SCAN_DEPTH:
                 dirnames.clear()
 
-            logger.debug("Found %d files", len(filenames))
-            _log_list(logger, filenames, level=logging.DEBUG)
-            for f in filenames:
+            logger.debug("Found %d files", len(found))
+            _log_list(logger, found, level=logging.DEBUG)
+            for f in found:
                 self._add_file((dirpath / f).relative_to(self.root), pattern)
 
     def _find_files_subdirectories(self) -> None:
@@ -861,9 +891,17 @@ class Finder:
         separator. But it will limit the number of sub-directories to explore and
         thus the number of files to check.
         """
-        full_pattern = re.compile(self.get_regex())
-        subpatterns = [re.compile(rgx) for rgx in self.get_regex_subdirs()]
+        regex = self.get_regex()
+        regex_subdirs = self._split_regex_subdirs(regex)
+
+        for rgx in regex_subdirs:
+            if re.escape(os.sep) in rgx:
+                raise ValueError
+
+        full_pattern = re.compile(regex)
+        subpatterns = [re.compile(rgx) for rgx in regex_subdirs]
         maxdepth = len(subpatterns) - 1
+
         for depth, dirpath, dirnames, filenames in self._walk():
             pattern = subpatterns[depth]
 
@@ -882,12 +920,13 @@ class Finder:
                     dirnames.remove(d)
 
             else:
+                found = self._get_scanned_restricted_type(dirnames, filenames)
                 dirnames.clear()  # look no deeper
 
-                logger.debug("Found %d files", len(filenames))
-                _log_list(logger, filenames, level=logging.DEBUG)
+                logger.debug("Found %d files", len(found))
+                _log_list(logger, found, level=logging.DEBUG)
 
-                for f in filenames:
+                for f in found:
                     self._add_file((dirpath / f).relative_to(self.root), full_pattern)
 
     def clear_cache(self) -> None:

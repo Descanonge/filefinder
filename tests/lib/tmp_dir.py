@@ -38,7 +38,7 @@ class TmpDirectory:
 
     def create_dir(self, dirname: str | Path) -> Path:
         new_dir = self.base_dir / dirname
-        new_dir.mkdir()
+        new_dir.mkdir(parents=True, exist_ok=True)
         return new_dir
 
     def get_absolute(self, path: str | Path) -> Path:

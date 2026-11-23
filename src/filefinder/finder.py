@@ -764,7 +764,10 @@ class Finder:
         return output
 
     def get_regex_subdirs(self) -> list[str]:
-        """Return regexes for each sub-directory."""
+        """Return regexes for each sub-directory.
+
+        Only split outside of groups, path separator in group regexes are kept.
+        """
         rgx_subdirs = [""]
 
         for i, segment in enumerate(self.segments):
@@ -782,10 +785,12 @@ class Finder:
 
         return rgx_subdirs
 
+    def _join_regex_subdirs(self, regex_subdirs: list[str]) -> str:
+        return re.escape(os.sep).join(regex_subdirs)
+
     def get_regex(self) -> str:
         """Return regex."""
-        rgx_subdirs = self.get_regex_subdirs()
-        return re.escape(os.sep).join(rgx_subdirs)
+        return self._join_regex_subdirs(self.get_regex_subdirs())
 
     def find_files(self) -> None:
         """Find files to scan and store them in cache.
@@ -891,12 +896,14 @@ class Finder:
         separator. But it will limit the number of sub-directories to explore and
         thus the number of files to check.
         """
-        regex = self.get_regex()
-        regex_subdirs = self._split_regex_subdirs(regex)
+        regex_subdirs = self.get_regex_subdirs()
+        regex = self._join_regex_subdirs(regex_subdirs)
 
-        for rgx in regex_subdirs:
-            if re.escape(os.sep) in rgx:
-                raise ValueError
+        if any(re.escape(os.sep) in rgx for rgx in regex_subdirs):
+            raise ValueError(
+                f"Path separator in subdirectory regex {regex_subdirs}. Use "
+                "`scan_everything=True` if you need a path separator in a group regex."
+            )
 
         full_pattern = re.compile(regex)
         subpatterns = [re.compile(rgx) for rgx in regex_subdirs]

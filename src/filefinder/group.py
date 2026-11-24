@@ -8,7 +8,7 @@ import re
 from collections.abc import Sequence
 from typing import Any, ClassVar, Self
 
-from .dates import DateElement
+from .date_elements import DateElement
 from .format import Format, FormatAbstract
 
 logger = logging.getLogger(__name__)

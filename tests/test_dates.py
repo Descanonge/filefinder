@@ -10,13 +10,8 @@ from hypothesis import given
 from hypothesis import strategies as st
 from lib import Drawer
 
-from filefinder.dates import (
-    DateElement,
-    DateParser,
-    datetime_to_str,
-    datetime_to_value,
-    make_date_groups,
-)
+from filefinder.date_elements import DateElement, datetime_to_str, datetime_to_value
+from filefinder.dates import DateParser, make_date_groups
 from filefinder.group import Group
 from filefinder.matches import GroupMatch
 

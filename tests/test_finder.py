@@ -194,11 +194,10 @@ class TestCreation:
         assert finder._find_groups(pattern) == [("a:fmt=02d", 2, 15)]
 
     def test_get_groups(self) -> None:
-        """Test that Finder.get_groups return the correct indices given a group name."""
+        """Test that Finder.get_groups return the correct groups given a group name."""
 
         def assert_indices(f: Finder, key: str, indices: list[int]) -> None:
-            groups = f.get_groups(key)
-            assert [g.idx for g in groups] == indices
+            assert get_groups_indices(f.groups, key) == indices
 
         f = Finder(pattern_general.pattern)
         for i, name in enumerate(pattern_general.names):

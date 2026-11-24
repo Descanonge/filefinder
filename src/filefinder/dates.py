@@ -137,9 +137,9 @@ class DateParser:
         """
         elements_all: dict[str, list[GroupMatch]] = {}
         for m in self.matches:
-            elt_obj = m.group.date_element
-            if elt_obj is None:
+            if not isinstance(m.group, DateGroup):
                 raise ValueError(f"'{m.group}' is not a date group.")
+            elt_obj = m.group.date_element
             if not elt_obj.parsable:
                 continue
             if elt_obj.key not in elements_all:

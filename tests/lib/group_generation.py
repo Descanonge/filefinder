@@ -9,7 +9,7 @@ import hypothesis.strategies as st
 from hypothesis import example
 
 from filefinder.dates import DateElement
-from filefinder.group import Group
+from filefinder.group import Group, GroupSpecs
 
 from . import (
     MAX_CODEPOINT,
@@ -22,7 +22,7 @@ from .format_generation import FormatSpecs, StFormat
 
 
 @dataclass
-class GroupSpecs:
+class GroupSpecsDrawn:
     """Store group specs and generate a definition."""
 
     name: str = ""
@@ -62,7 +62,7 @@ class GroupSpecs:
     def is_valid(self) -> bool:
         """Return if Group object can be constructed."""
         try:
-            Group(self.definition, 0)
+            Group.from_string(self.definition)
         except Exception:
             return False
         return True
@@ -148,7 +148,7 @@ class GroupSpecs:
 
 
 @dataclass
-class GroupValue(GroupSpecs):
+class GroupValue(GroupSpecsDrawn):
     """Store group specs and one accompanying value."""
 
     value: Any = None
@@ -160,7 +160,7 @@ class GroupValue(GroupSpecs):
 
 
 @dataclass
-class GroupValues(GroupSpecs):
+class GroupValues(GroupSpecsDrawn):
     """Store group specs and multiple accompanying values."""
 
     values: list[Any] = field(default_factory=list)
@@ -171,7 +171,7 @@ class GroupValues(GroupSpecs):
         return [self.get_value_str(v) for v in self.values]
 
 
-G = TypeVar("G", bound=GroupSpecs)
+G = TypeVar("G", bound=GroupSpecsDrawn)
 
 
 class StGroup:
@@ -331,6 +331,9 @@ class StGroup:
             args: dict[str, Any] = {}
             args["name"] = draw(cls.name())
 
+            if "bool" in chosen and "fmt" in chosen:
+                chosen.remove("fmt")
+
             # Randomize order
             chosen_ordered = draw(st.permutations(chosen))
             to_draw = list(chosen_ordered)
@@ -427,9 +430,9 @@ class StGroup:
 
 class GroupSpecsExamples:
     def __init__(self) -> None:
-        self.examples: dict[str, GroupSpecs] = {}
+        self.examples: dict[str, GroupSpecsDrawn] = {}
 
-    def add(self, definition: str, specs: GroupSpecs, regex: str) -> None:
+    def add(self, definition: str, specs: GroupSpecsDrawn, regex: str) -> None:
         assert specs.definition == definition
         assert specs.get_regex() == regex
         self.examples[specs.name] = specs
@@ -440,7 +443,7 @@ class GroupSpecsExamples:
         return func
 
     def get_group(self, name: str) -> Group:
-        return Group(self.examples[name].definition, 0)
+        return Group.from_string(self.examples[name].definition)
 
 
 examples = GroupSpecsExamples()
@@ -449,7 +452,7 @@ examples = GroupSpecsExamples()
 ## Format
 examples.add(
     "fmt_int:fmt=02d",
-    GroupSpecs(
+    GroupSpecsDrawn(
         "fmt_int",
         fmt="02d",
         fmt_struct=FormatSpecs(width=2, fill="0", kind="d", align="="),
@@ -460,7 +463,7 @@ examples.add(
 
 examples.add(
     "fmt_float:fmt=.1f",
-    GroupSpecs(
+    GroupSpecsDrawn(
         "fmt_float",
         fmt=".1f",
         fmt_struct=FormatSpecs(precision=1, kind="f"),
@@ -471,7 +474,7 @@ examples.add(
 
 examples.add(
     "fmt_str:fmt=s",
-    GroupSpecs(
+    GroupSpecsDrawn(
         "fmt_str",
         fmt="s",
         fmt_struct=FormatSpecs(),
@@ -483,7 +486,7 @@ examples.add(
 ## Boolean
 examples.add(
     "bool_basic:bool=a:b",
-    GroupSpecs(
+    GroupSpecsDrawn(
         "bool_basic",
         bool_elts=("a", "b"),
         ordered_specs=["bool"],
@@ -493,7 +496,7 @@ examples.add(
 
 examples.add(
     "bool_empty_false:bool=a:",
-    GroupSpecs(
+    GroupSpecsDrawn(
         "bool_empty_false",
         bool_elts=("a", ""),
         ordered_specs=["bool"],
@@ -503,7 +506,7 @@ examples.add(
 
 examples.add(
     "bool_no_false:bool=a",
-    GroupSpecs(
+    GroupSpecsDrawn(
         "bool_no_false",
         bool_elts=("a", ""),
         bool_elts_sep="",
@@ -515,7 +518,7 @@ examples.add(
 ## Prefix/Suffix
 examples.add(
     "prefix_int:fmt=02d:pre=_",
-    GroupSpecs(
+    GroupSpecsDrawn(
         "prefix_int",
         fmt="02d",
         fmt_struct=FormatSpecs(width=2, fill="0", kind="d", align="="),
@@ -527,7 +530,7 @@ examples.add(
 
 examples.add(
     "suffix_str:fmt=s:post=_",
-    GroupSpecs(
+    GroupSpecsDrawn(
         "suffix_str",
         fmt="s",
         fmt_struct=FormatSpecs(),
@@ -539,7 +542,7 @@ examples.add(
 
 examples.add(
     "prefix_bool:bool=a:b:pre=_",
-    GroupSpecs(
+    GroupSpecsDrawn(
         "prefix_bool",
         bool_elts=("a", "b"),
         pre="_",
@@ -550,7 +553,7 @@ examples.add(
 
 examples.add(
     "prefix_rgx:rgx=.*:pre=_",
-    GroupSpecs(
+    GroupSpecsDrawn(
         "prefix_rgx",
         rgx=".*",
         pre="_",
@@ -561,7 +564,7 @@ examples.add(
 
 examples.add(
     "prefix_opt:rgx=.*:pre=_:opt",
-    GroupSpecs(
+    GroupSpecsDrawn(
         "prefix_opt",
         rgx=".*",
         pre="_",
@@ -575,7 +578,7 @@ examples.add(
 
 examples.add(
     "custom_rgx:rgx=.*",
-    GroupSpecs(
+    GroupSpecsDrawn(
         "custom_rgx",
         rgx=".*",
         ordered_specs=["rgx"],
@@ -586,7 +589,7 @@ examples.add(
 
 examples.add(
     "rgx_override:rgx=.*:fmt=02d",
-    GroupSpecs(
+    GroupSpecsDrawn(
         "rgx_override",
         rgx=".*",
         fmt="02d",
@@ -599,7 +602,7 @@ examples.add(
 ## Others
 examples.add(
     "optional:rgx=.*:opt",
-    GroupSpecs(
+    GroupSpecsDrawn(
         "optional",
         rgx=".*",
         opt=True,

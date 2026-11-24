@@ -140,7 +140,7 @@ class TestFilterExecute:
         return FileMatch(Path(), Path(filename), matches)
 
     def get_int_groups(self, length: int) -> list[Group]:
-        return [Group(f"{chr(97 + i)}:fmt=d", i) for i in range(length)]
+        return [Group.from_string(f"_{chr(97 + i)}:fmt=d") for i in range(length)]
 
     def test_simple(self) -> None:
         def func(finder: Finder, filematch: FileMatch) -> bool:  # noqa: ARG001
@@ -215,8 +215,8 @@ class TestFilterExecute:
 
 class TestParseFailure:
     def test_by_group(self) -> None:
-        g1 = Group("a:fmt=d", 0)
-        g2 = Group("b:fmt=d", 1)
+        g1 = Group.from_string("a:fmt=d")
+        g2 = Group.from_string("b:fmt=d")
         filematch = FileMatch(
             Path(),
             Path("abc_1"),
@@ -249,8 +249,8 @@ class TestParseFailure:
             is_valid(filt, filematch)
 
     def test_by_date(self) -> None:
-        g1 = Group("Y", 0)
-        g2 = Group("Y", 1)
+        g1 = Group.from_string("Y")
+        g2 = Group.from_string("Y")
         filematch = FileMatch(
             Path(),
             Path("2086_2087"),

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Literal, overload
 
 from .filters import FilterByDate, FilterByGroup, FilterList
-from .group import Group, GroupKey, get_date_names, get_groups_indices
+from .group import Group, GroupKey, GroupSpecs, get_date_names, get_groups_indices
 from .matches import DefaultDate, FileMatch, GroupMatch
 
 logger = logging.getLogger(__name__)
@@ -675,10 +675,10 @@ class Finder:
 
         fixed_string: str | list[str] | None
         for key, value in fixes.items():
-            groups = self.get_groups(key)
-            for group in groups:
+            for i in get_groups_indices(self.groups, key):
+                group = self.groups[i]
                 _, fixed_string, _ = group.get_fix_result(value)
-                fixed_strings[group.idx] = fixed_string
+                fixed_strings[i] = fixed_string
 
         for i, fixed_string in enumerate(fixed_strings):
             if fixed_string is not None:
@@ -708,8 +708,8 @@ class Finder:
 
         self.groups = []
         splits = [0]  # separation between groups
-        for idx, (specs, start, end) in enumerate(found_groups):
-            self.groups.append(Group(specs, idx))
+        for specs, start, end in found_groups:
+            self.groups.append(GroupSpecs.from_string(specs).create_group())
             splits += [start, end + 1]
         splits.append(len(pattern))
 

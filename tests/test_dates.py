@@ -274,7 +274,7 @@ class TestDateParser:
         date = date.replace(tzinfo=dt.timezone(tzdelta))
 
         matches = [
-            GroupMatch(Group(name, 0), datetime_to_str(date, name), 0, 0)
+            GroupMatch(Group.from_string(name), datetime_to_str(date, name), 0, 0)
             for name in "YmdHMSfz"
         ]
         assert DateParser(matches).parse() == date
@@ -287,12 +287,12 @@ class TestDateParser:
     def test_parse_weekdaynumber(
         self, date: dt.date, weekday_elt: str, weeknum_elt: str
     ) -> None:
-        gm_year = GroupMatch(Group("Y", 0), datetime_to_str(date, "Y"), 0, 0)
+        gm_year = GroupMatch(Group.from_string("Y"), datetime_to_str(date, "Y"), 0, 0)
         gm_weekday = GroupMatch(
-            Group(weekday_elt, 0), datetime_to_str(date, weekday_elt), 0, 0
+            Group.from_string(weekday_elt), datetime_to_str(date, weekday_elt), 0, 0
         )
         gm_weeknum = GroupMatch(
-            Group(weeknum_elt, 0), datetime_to_str(date, weeknum_elt), 0, 0
+            Group.from_string(weeknum_elt), datetime_to_str(date, weeknum_elt), 0, 0
         )
 
         # Full
@@ -320,8 +320,8 @@ class TestDateParser:
         # Missing one - other match is used
         matches = [
             gm_year,
-            GroupMatch(Group(weeknum_elt, 0), "42", 0, 0),  # should be ignored
-            GroupMatch(Group("j", 0), datetime_to_str(date, "j"), 0, 0),
+            GroupMatch(Group.from_string(weeknum_elt), "42", 0, 0),  # should be ignored
+            GroupMatch(Group.from_string("j"), datetime_to_str(date, "j"), 0, 0),
         ]
         parser = DateParser(matches)
         assert parser.parse().date() == date
@@ -329,8 +329,8 @@ class TestDateParser:
     @given(hour=st.integers(0, 23))
     def test_parse_hour12(self, hour: int) -> None:
         date = dt.datetime(1970, 1, 1, hour, 0, 0)
-        gm_hour = GroupMatch(Group("I", 0), datetime_to_str(date, "I"), 0, 0)
-        gm_ampm = GroupMatch(Group("p", 0), datetime_to_str(date, "p"), 0, 0)
+        gm_hour = GroupMatch(Group.from_string("I"), datetime_to_str(date, "I"), 0, 0)
+        gm_ampm = GroupMatch(Group.from_string("p"), datetime_to_str(date, "p"), 0, 0)
 
         # Full
         assert DateParser([gm_hour, gm_ampm]).parse() == date
@@ -350,8 +350,8 @@ class TestDateParser:
 
         # Missing one - other match is used
         matches = [
-            GroupMatch(Group("I", 0), "05", 0, 0),  # should be ignored
-            GroupMatch(Group("H", 0), datetime_to_str(date, "H"), 0, 0),
+            GroupMatch(Group.from_string("I"), "05", 0, 0),  # should be ignored
+            GroupMatch(Group.from_string("H"), datetime_to_str(date, "H"), 0, 0),
         ]
         parser = DateParser(matches)
         assert parser.parse() == date
@@ -427,7 +427,9 @@ class TestDateParser:
             date_ref = date_ref.replace(tzinfo=dt.timezone(tzdelta))
 
         matches = [
-            GroupMatch(Group(element, 0), datetime_to_str(date_ref, element), 0, 0)
+            GroupMatch(
+                Group.from_string(element), datetime_to_str(date_ref, element), 0, 0
+            )
             for element in elements
         ]
 
@@ -437,11 +439,11 @@ class TestDateParser:
 
     def test_not_date_group(self) -> None:
         matches = [
-            GroupMatch(Group("Y", 0), "2000", 0, 0),
-            GroupMatch(Group("not_a_date_group:fmt=d", 1), "5", 0, 0),
+            GroupMatch(Group.from_string("Y"), "2000", 0, 0),
+            GroupMatch(Group.from_string("not_a_date_group:fmt=d"), "5", 0, 0),
         ]
         with pytest.raises(
-            ValueError, match=r"'not_a_date_group:1' is not a date group."
+            ValueError, match=r"'not_a_date_group' is not a date group."
         ):
             DateParser(matches).parse()
 
@@ -449,9 +451,9 @@ class TestDateParser:
         """Different groups for the same element have different values."""
 
         matches = [
-            GroupMatch(Group("Y", 0), "2000", 0, 0),
-            GroupMatch(Group("m", 1), "05", 0, 0),
-            GroupMatch(Group("Y", 2), "2010", 0, 0),
+            GroupMatch(Group.from_string("Y"), "2000", 0, 0),
+            GroupMatch(Group.from_string("m"), "05", 0, 0),
+            GroupMatch(Group.from_string("Y"), "2010", 0, 0),
         ]
         with pytest.raises(ValueError):
             DateParser(matches).parse()

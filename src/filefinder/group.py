@@ -45,13 +45,15 @@ class GroupSpecs:
         self,
         name: str,
         *,
-        fmt: str | None,
+        definition: str = "",
+        fmt: str | None = None,
         bool: dict[bool, str] | None = None,  # noqa: A002
-        rgx: str | None,
+        rgx: str | None = None,
         pre: str | None = None,
         post: str | None = None,
         opt: bool = False,
     ) -> None:
+        self.definition = definition
         self.name = name
         self.fmt = fmt
         self.bool = bool
@@ -63,8 +65,6 @@ class GroupSpecs:
         self.date_name: str | None = None
         self.date_element: DateElement | None = None
         self.name_to_date_element()
-
-        self.validate()
 
     def __str__(self) -> str:
         return str(self.as_dict(include_none=False))
@@ -85,7 +85,7 @@ class GroupSpecs:
             "".join([s for s in specs.values() if s is not None])
         ):
             raise GroupParseError(
-                f"Duplicate spec detected in group definition '{definition}'"
+                f"Duplicate spec detected in group definition '{definition}'."
             )
 
         for key in cls.KEYVALS:
@@ -101,7 +101,9 @@ class GroupSpecs:
                 False: options[1] if len(options) > 1 else "",
             }
 
-        return cls(**specs)  # type: ignore[arg-type]
+        specs_obj = cls(**specs, definition=definition)  # type: ignore[arg-type]
+        logger.debug("Parsed group definition %s to specs %s.", definition, specs_obj)
+        return specs_obj
 
     def name_to_date_element(self) -> None:
         """Find date name and date element from group name.
@@ -114,34 +116,73 @@ class GroupSpecs:
             if len(parts) != 2 or not parts[0]:
                 raise GroupParseError(
                     f"Invalid group name '{self.name}'. "
-                    "Use format '<date name>__<date element>'.",
-                    self,
+                    f"Use format '<date name>__<date element>' ({self.definition}).",
                 )
             self.date_name, date_element = parts
             if date_element not in DateElement.registered():
                 raise GroupParseError(
-                    f"'{self.date_element}' is not a registered date element.", self
+                    f"'{self.date_element}' is not a registered date element "
+                    f"({self.definition})."
                 )
             self.date_element = DateElement.get(date_element)
         elif self.name in DateElement.registered():
             self.date_name = "date"
             self.date_element = DateElement.get(self.name)
 
-    def validate(self) -> None:
-        """Validate specs."""
+    def create_group(self) -> Group:
         if not self.name:
-            raise GroupParseError("Group name cannot be empty.")
+            raise GroupParseError(f"Group name cannot be empty ({self.definition}).")
 
         if self.fmt is not None and not self.fmt:
-            raise GroupParseError("Format string cannot be empty.")
+            raise GroupParseError(f"Format string cannot be empty ({self.definition}).")
 
         if self.bool is not None:
             self.bool.setdefault(False, "")
             if set(self.bool.keys()) != {False, True}:
                 raise GroupParseError(
                     "Invalid bool spec mapping, it should contain boolean keys, with "
-                    f"at least True defined ({self.bool})."
+                    f"at least True defined ({self.bool}, {self.definition}).",
                 )
+
+            if self.fmt is not None:
+                raise GroupParseError(
+                    f"Cannot specify format and bool options at once ({self.definition})."
+                )
+
+            return BoolGroup(
+                self.name,
+                options=self.bool,
+                rgx=self.rgx,
+                prefix=self.pre,
+                suffix=self.post,
+                optional=self.opt,
+                definition=self.definition,
+            )
+
+        if self.date_element is not None:
+            if not self.date_name:
+                raise GroupParseError(f"Date name cannot be empty ({self.definition}).")
+            return DateGroup(
+                self.name,
+                date_name=self.date_name,
+                date_element=self.date_element,
+                rgx=self.rgx,
+                fmt=self.fmt,
+                prefix=self.pre,
+                suffix=self.post,
+                optional=self.opt,
+                definition=self.definition,
+            )
+
+        return Group(
+            self.name,
+            rgx=self.rgx,
+            fmt=self.fmt,
+            prefix=self.pre,
+            suffix=self.post,
+            optional=self.opt,
+            definition=self.definition,
+        )
 
     def as_dict(self, *, include_none: bool = True) -> dict[str, Any]:
         """Return dictionary containing specs."""
@@ -169,79 +210,66 @@ class Group:
     ----------
     definition:
         Group definition.
-    idx:
-        Index of the group in the filename pattern.
     """
 
-    def __init__(self, definition: str, idx: int) -> None:
-        self.definition: str = definition
-        """The string that created the group ``%(definition)``."""
-        self.idx: int = idx
-        """Index inside the pre-regex."""
+    definition: str
+    """The string that created the group ``%(definition)``."""
 
-        self.name: str = ""
-        """Group name."""
-        self.rgx: str = ""
-        """Regex."""
-        self.fmt: FormatAbstract = Format("s")
-        """Format string object."""
-        self.options: dict[bool, str] | None = None
-        """Dict of the two boolean possibilities."""
-        self.optional: bool = False
-        """Group is optional."""
+    name: str
+    """Group name."""
+    rgx: str
+    """Regex."""
+    fmt: FormatAbstract
+    """Format string object."""
+    optional: bool
+    """Group is optional."""
 
-        self.prefix: str = ""
-        """Group prefix. Added to fixes and regex."""
-        self.suffix: str = ""
-        """Group suffix. Added to fixes and regex."""
+    prefix: str
+    """Group prefix. Added to fixes and regex."""
+    suffix: str
+    """Group suffix. Added to fixes and regex."""
 
-        self.date_name: str | None = None
-        """Name of the parent date pseudo-group. None if not a date group."""
-        self.date_element: DateElement | None = None
-        """Name of the date element (Y, m, d, ...). None if not a date group."""
+    fixed_value: Any | list[Any] | None
+    """Current fixed value(s). None if not fixed."""
+    fixed_string: str | list[str] | None
+    """String representation(s) of current fixed value(s). None if not fixed."""
+    fixed_regex: str | None
+    """Regex to match current fixed value(s). None if not fixed."""
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        rgx: str | None = None,
+        fmt: str | None = None,
+        prefix: str | None = None,
+        suffix: str | None = None,
+        optional: bool = False,
+        definition: str = "",
+    ) -> None:
+        self.definition = definition
+        self.name = name
+        self.optional = optional
 
         self._fixed = False
-        self.fixed_value: Any | list[Any] | None = None
-        """Current fixed value(s). None if not fixed."""
-        self.fixed_string: str | list[str] | None = None
-        """String representation(s) of current fixed value(s). None if not fixed."""
-        self.fixed_regex: str | None = None
-        """Regex to match current fixed value(s). None if not fixed."""
+        self.fixed_value = None
+        self.fixed_string = None
+        self.fixed_regex = None
 
-        specs = GroupSpecs.from_string(definition)
-        logger.debug("Parsed group definition %s to specs %s.", definition, specs)
-        self._apply_specs(specs)
+        self.prefix = prefix if prefix is not None else ""
+        self.suffix = suffix if suffix is not None else ""
 
-    def _apply_specs(self, specs: GroupSpecs) -> None:
-        self.name = specs.name
-        self.date_name = specs.date_name
-        self.date_element = specs.date_element
+        self.rgx = ""
+        self.fmt = Format("s")
 
-        if self.date_element is not None:
-            self.rgx = self.date_element.regex
-            fmt_def = self.date_element.fmt
-            self.fmt = Format(fmt_def)
-
-        if specs.pre is not None:
-            self.prefix = specs.pre
-        if specs.post is not None:
-            self.suffix = specs.post
-        self.optional = specs.opt
-
-        # Override default format
-        if specs.fmt:
-            self.fmt = Format(specs.fmt)
-            if not specs.rgx:  # No need to generate rgx if it is provided
+        if fmt:
+            self.fmt = Format(fmt)
+            if not rgx:  # No need to generate rgx if it is provided
                 self.rgx = self.fmt.get_regex()
 
-        # Boolean format
-        if specs.bool is not None:
-            self.options = specs.bool
-            self.rgx = "|".join(re.escape(s) for s in specs.bool.values())
-
         # Override regex
-        if specs.rgx:
-            self.rgx = specs.rgx
+        if rgx:
+            self.rgx = rgx
 
         if not self.rgx:
             raise GroupParseError(
@@ -255,7 +283,12 @@ class Group:
 
     def __str__(self) -> str:
         """Human readable information."""
-        return f"{self.name}:{self.idx:d}"
+        return self.name
+
+    @classmethod
+    def from_string(cls, definition: str) -> Group:
+        """Create Group object (or subclass) from string definition."""
+        return GroupSpecs.from_string(definition).create_group()
 
     @property
     def fixed(self) -> bool:
@@ -272,15 +305,6 @@ class Group:
             string = string.removeprefix(self.prefix)
         if self.suffix:
             string = string.removesuffix(self.suffix)
-
-        # parsing boolean
-        if self.options is not None:
-            for k, v in self.options.items():
-                if string == v:
-                    return k
-            raise ValueError(
-                f"Cannot parse '{string}' into boolean from options {self.options}"
-            )
 
         return self.fmt.parse(string)
 
@@ -314,25 +338,15 @@ class Group:
         if fix is None and self.optional:
             return fix, "", ""
 
-        # date, select correct element
         if isinstance(fix, dt.date | dt.datetime):
-            if self.date_element is None:
-                raise RuntimeError(
-                    "Cannot fix a date object to a group not corresponding to a "
-                    f"date element ({self})."
-                )
-            fixed_value = self.date_element.datetime_to_value(fix)
-            fixed_string = self.prefix + self.fmt.format(fixed_value) + self.suffix
-            return fixed_value, fixed_string, re.escape(fixed_string)
-
-        # bool for A|B choice
+            raise RuntimeError(
+                "Cannot fix a date object to a group not corresponding to a "
+                f"date element ({self})."
+            )
         if isinstance(fix, bool):
-            if self.options is None:
-                raise ValueError(
-                    f"{self.name} group has no A|B options, cannot fix with a boolean."
-                )
-            fixed_string = self.prefix + self.options[fix] + self.suffix
-            return fix, fixed_string, re.escape(fixed_string)
+            raise ValueError(
+                f"{self.name} group has no A|B options, cannot fix with a boolean."
+            )
 
         # otherwise, assume number
         fixed_string = self.prefix + self.format(fix) + self.suffix
@@ -421,6 +435,124 @@ class Group:
         return rgx
 
 
+class BoolGroup(Group):
+    def __init__(
+        self,
+        name: str,
+        *,
+        definition: str = "",
+        options: dict[bool, str],
+        rgx: str | None = None,
+        prefix: str | None = None,
+        suffix: str | None = None,
+        optional: bool = False,
+    ) -> None:
+        self.options: dict[bool, str] = options
+        """Dict of the two boolean possibilities."""
+
+        if not rgx:
+            rgx = "|".join(re.escape(s) for s in options.values())
+
+        super().__init__(
+            name=name,
+            rgx=rgx,
+            prefix=prefix,
+            suffix=suffix,
+            optional=optional,
+            definition=definition,
+        )
+
+    def get_single_fix_result(self, fix: Any) -> tuple[Any, str, str]:
+        if isinstance(fix, bool):
+            fixed_string = self.prefix + self.options[fix] + self.suffix
+            return fix, fixed_string, re.escape(fixed_string)
+        return super().get_single_fix_result(fix)
+
+    def parse(self, string: str) -> Any:
+        if self.prefix:
+            string = string.removeprefix(self.prefix)
+        if self.suffix:
+            string = string.removesuffix(self.suffix)
+
+        for k, v in self.options.items():
+            if string == v:
+                return k
+        raise ValueError(
+            f"Cannot parse '{string}' into boolean from options {self.options}"
+        )
+
+
+class EnumGroup(Group):
+    def __init__(
+        self,
+        name: str,
+        *,
+        definition: str = "",
+        enum: set[str],
+        rgx: str | None = None,
+        prefix: str | None = None,
+        suffix: str | None = None,
+        optional: bool = False,
+    ) -> None:
+        self.enum: set[str] = enum
+
+        if not rgx:
+            rgx = "|".join(re.escape(s) for s in enum)
+
+        super().__init__(
+            name,
+            rgx=rgx,
+            fmt="s",
+            prefix=prefix,
+            suffix=suffix,
+            optional=optional,
+            definition=definition,
+        )
+
+
+class DateGroup(Group):
+    def __init__(
+        self,
+        name: str,
+        *,
+        definition: str = "",
+        date_name: str,
+        date_element: DateElement,
+        rgx: str | None = None,
+        fmt: str | None = None,
+        prefix: str | None = None,
+        suffix: str | None = None,
+        optional: bool = False,
+    ) -> None:
+        self.date_name: str = date_name
+        """Name of the parent date pseudo-group. None if not a date group."""
+        self.date_element: DateElement = date_element
+        """Name of the date element (Y, m, d, ...). None if not a date group."""
+
+        if not rgx:
+            rgx = Format(fmt).get_regex() if fmt else self.date_element.regex
+        if not fmt:
+            fmt = self.date_element.fmt
+
+        super().__init__(
+            name,
+            rgx=rgx,
+            fmt=fmt,
+            prefix=prefix,
+            suffix=suffix,
+            optional=optional,
+            definition=definition,
+        )
+
+    def get_single_fix_result(self, fix: Any) -> tuple[Any, str, str]:
+        if isinstance(fix, dt.date | dt.datetime):
+            fixed_value = self.date_element.datetime_to_value(fix)
+            fixed_string = self.prefix + self.fmt.format(fixed_value) + self.suffix
+            return fixed_value, fixed_string, re.escape(fixed_string)
+
+        return super().get_single_fix_result(fix)
+
+
 def get_groups_indices(groups: list[Group], key: GroupKey) -> list[int]:
     """Get sorted list of groups indices corresponding to key.
 
@@ -440,7 +572,10 @@ def get_groups_indices(groups: list[Group], key: GroupKey) -> list[int]:
         return [key]
     if isinstance(key, str):
         selected = [
-            i for i, group in enumerate(groups) if key in {group.name, group.date_name}
+            i
+            for i, group in enumerate(groups)
+            if key == group.name
+            or (isinstance(group, DateGroup) and key == group.date_name)
         ]
 
         if len(selected) == 0:
@@ -452,4 +587,4 @@ def get_groups_indices(groups: list[Group], key: GroupKey) -> list[int]:
 
 def get_date_names(groups: Sequence[Group]) -> set[str]:
     """Get the names of date pseudo-groups."""
-    return {g.date_name for g in groups if g.date_name is not None}
+    return {g.date_name for g in groups if isinstance(g, DateGroup)}

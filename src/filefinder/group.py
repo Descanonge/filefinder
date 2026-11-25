@@ -130,6 +130,10 @@ class GroupSpecs:
             self.date_element = DateElement.get(self.name)
 
     def create_group(self) -> Group:
+        """Create corresponding group object.
+
+        Disptach to correct Group subclass.
+        """
         if not self.name:
             raise GroupParseError(f"Group name cannot be empty ({self.definition}).")
 
@@ -436,6 +440,18 @@ class Group:
 
 
 class BoolGroup(Group):
+    """Group selecting between two strings.
+
+    Syntax is ``bool:<true>[:<false>]``. False option may be omitted if empty.
+    The format ``fmt`` cannot be user-specified.
+
+    Parameters
+    ----------
+    options:
+        The two strings
+        Dictionary of boolean to string.
+    """
+
     def __init__(
         self,
         name: str,
@@ -463,12 +479,17 @@ class BoolGroup(Group):
         )
 
     def get_single_fix_result(self, fix: Any) -> tuple[Any, str, str]:
+        """Return the fixed value, fixed string, and regex for a single fix.
+
+        Fix can be a boolean, selecting one of the two options.
+        """
         if isinstance(fix, bool):
             fixed_string = self.prefix + self.options[fix] + self.suffix
             return fix, fixed_string, re.escape(fixed_string)
         return super().get_single_fix_result(fix)
 
     def parse(self, string: str) -> Any:
+        """Parse value from string."""
         if self.prefix:
             string = string.removeprefix(self.prefix)
         if self.suffix:
@@ -483,6 +504,12 @@ class BoolGroup(Group):
 
 
 class EnumGroup(Group):
+    """Group whose value must be from a fixed set.
+
+    Syntax is ``enum:<A>:<B>:...``.
+    The format ``fmt`` cannot be specified.
+    """
+
     def __init__(
         self,
         name: str,
@@ -511,6 +538,27 @@ class EnumGroup(Group):
 
 
 class DateGroup(Group):
+    """Group corresponding to a date element.
+
+    Specific syntax is all in the name, either:
+    - name of the form ``<date_name>__<date_element>``,
+    - a registered date element.
+
+    See :doc:`handling_dates`.
+
+    As for other groups, if a format ``fmt`` is given it will be used to generate a
+    regex, unless a regex ``rgx`` is given. Otherwise, the corresponding
+    :class:`.DateElement` object will dictate the default format and regex.
+
+    Parameters
+    ----------
+    date_name:
+        Date groups with the same date name can be managed as a date pseudo-group.
+    date_element:
+        Object indicating what element the group corresponds to.
+
+    """
+
     def __init__(
         self,
         name: str,
@@ -545,6 +593,11 @@ class DateGroup(Group):
         )
 
     def get_single_fix_result(self, fix: Any) -> tuple[Any, str, str]:
+        """Return the fixed value, fixed string, and regex for a single fix.
+
+        Fix can be a :mod:`datetime` object from which the correct value will be
+        extracted.
+        """
         if isinstance(fix, dt.date | dt.datetime):
             fixed_value = self.date_element.datetime_to_value(fix)
             fixed_string = self.prefix + self.fmt.format(fixed_value) + self.suffix

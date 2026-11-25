@@ -140,6 +140,9 @@ class GroupSpecs:
         if self.fmt is not None and not self.fmt:
             raise GroupParseError(f"Format string cannot be empty ({self.definition}).")
 
+        if self.date_element is not None:
+            return DateGroup.from_specs(self)
+
         if self.bool is not None:
             self.bool.setdefault(False, "")
             if set(self.bool.keys()) != {False, True}:
@@ -147,46 +150,9 @@ class GroupSpecs:
                     "Invalid bool spec mapping, it should contain boolean keys, with "
                     f"at least True defined ({self.bool}, {self.definition}).",
                 )
+            return BoolGroup.from_specs(self)
 
-            if self.fmt is not None:
-                raise GroupParseError(
-                    f"Cannot specify format and bool options at once ({self.definition})."
-                )
-
-            return BoolGroup(
-                self.name,
-                options=self.bool,
-                rgx=self.rgx,
-                prefix=self.pre,
-                suffix=self.post,
-                optional=self.opt,
-                definition=self.definition,
-            )
-
-        if self.date_element is not None:
-            if not self.date_name:
-                raise GroupParseError(f"Date name cannot be empty ({self.definition}).")
-            return DateGroup(
-                self.name,
-                date_name=self.date_name,
-                date_element=self.date_element,
-                rgx=self.rgx,
-                fmt=self.fmt,
-                prefix=self.pre,
-                suffix=self.post,
-                optional=self.opt,
-                definition=self.definition,
-            )
-
-        return Group(
-            self.name,
-            rgx=self.rgx,
-            fmt=self.fmt,
-            prefix=self.pre,
-            suffix=self.post,
-            optional=self.opt,
-            definition=self.definition,
-        )
+        return Group.from_specs(self)
 
     def as_dict(self, *, include_none: bool = True) -> dict[str, Any]:
         """Return dictionary containing specs."""
@@ -288,6 +254,19 @@ class Group:
     def __str__(self) -> str:
         """Human readable information."""
         return self.name
+
+    @classmethod
+    def from_specs(cls, specs: GroupSpecs) -> Self:
+        """Create Group object from specs object. Check conflicts."""
+        return cls(
+            specs.name,
+            rgx=specs.rgx,
+            fmt=specs.fmt,
+            prefix=specs.pre,
+            suffix=specs.post,
+            optional=specs.opt,
+            definition=specs.definition,
+        )
 
     @classmethod
     def from_string(cls, definition: str) -> Group:
@@ -478,6 +457,30 @@ class BoolGroup(Group):
             definition=definition,
         )
 
+    @classmethod
+    def from_specs(cls, specs: GroupSpecs) -> Self:
+        """Create Group object from specs object. Check conflicts."""
+        for attr in ("fmt", "enum"):
+            if getattr(specs, attr) is not None:
+                raise GroupParseError(
+                    f"Cannot specify `{attr}` for a bool group ({specs.definition})."
+                )
+
+        if specs.bool is None:
+            raise GroupParseError(
+                f"`bool` cannot be None for a boolean group ({specs.definition})"
+            )
+
+        return cls(
+            specs.name,
+            options=specs.bool,
+            rgx=specs.rgx,
+            prefix=specs.pre,
+            suffix=specs.post,
+            optional=specs.opt,
+            definition=specs.definition,
+        )
+
     def get_single_fix_result(self, fix: Any) -> tuple[Any, str, str]:
         """Return the fixed value, fixed string, and regex for a single fix.
 
@@ -590,6 +593,32 @@ class DateGroup(Group):
             suffix=suffix,
             optional=optional,
             definition=definition,
+        )
+
+    @classmethod
+    def from_specs(cls, specs: GroupSpecs) -> Self:
+        """Create Group object from specs object. Check conflicts."""
+        for attr in ("enum", "bool"):
+            if getattr(specs, attr) is not None:
+                raise GroupParseError(
+                    f"Cannot specify `{attr}` for a date group ({specs.definition})."
+                )
+
+        if not specs.date_name:
+            raise GroupParseError(f"Date name cannot be empty ({specs.definition}).")
+        if specs.date_element is None:
+            raise GroupParseError(f"Date element cannot be None ({specs.definition}).")
+
+        return cls(
+            specs.name,
+            date_name=specs.date_name,
+            date_element=specs.date_element,
+            rgx=specs.rgx,
+            fmt=specs.fmt,
+            prefix=specs.pre,
+            suffix=specs.post,
+            optional=specs.opt,
+            definition=specs.definition,
         )
 
     def get_single_fix_result(self, fix: Any) -> tuple[Any, str, str]:

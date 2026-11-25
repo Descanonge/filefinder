@@ -144,12 +144,6 @@ class GroupSpecs:
             return DateGroup.from_specs(self)
 
         if self.bool is not None:
-            self.bool.setdefault(False, "")
-            if set(self.bool.keys()) != {False, True}:
-                raise GroupParseError(
-                    "Invalid bool spec mapping, it should contain boolean keys, with "
-                    f"at least True defined ({self.bool}, {self.definition}).",
-                )
             return BoolGroup.from_specs(self)
 
         return Group.from_specs(self)
@@ -442,6 +436,13 @@ class BoolGroup(Group):
         suffix: str | None = None,
         optional: bool = False,
     ) -> None:
+        options.setdefault(False, "")
+        if set(options.keys()) != {False, True}:
+            raise GroupParseError(
+                "Invalid bool spec mapping, it should contain boolean keys, with "
+                f"at least True defined ({options}, {definition}).",
+            )
+
         self.options: dict[bool, str] = options
         """Dict of the two boolean possibilities."""
 
@@ -463,7 +464,7 @@ class BoolGroup(Group):
         for attr in ("fmt", "enum"):
             if getattr(specs, attr) is not None:
                 raise GroupParseError(
-                    f"Cannot specify `{attr}` for a bool group ({specs.definition})."
+                    f"Cannot specify `{attr}` for a boolean group ({specs.definition})."
                 )
 
         if specs.bool is None:

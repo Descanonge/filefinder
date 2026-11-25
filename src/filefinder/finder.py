@@ -86,7 +86,7 @@ class Finder:
     ) -> None:
         if root is None:
             root = Path.cwd()
-        self.root: Path = _to_path(root)
+        self.root: Path = _to_path(root).expanduser()
         """The root directory containing files."""
 
         self._regex_outside_groups: bool = regex_outside_groups

@@ -97,6 +97,9 @@ class FormatAbstract:
                 f"expected one of {self.ALLOWED_TYPES}."
             )
 
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}[{self.fmt}]"
+
     def format(self, value: Any) -> str:
         """Return formatted string of a value."""
         return f"{{:{self.fmt}}}".format(value)

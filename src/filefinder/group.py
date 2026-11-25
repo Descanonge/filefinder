@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import re
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import Any, ClassVar, Self
 
 from .date_elements import DateElement
@@ -172,33 +172,24 @@ class Group:
 
     Parameters
     ----------
+    name:
+        Group name.
+    rgx:
+        Regex. Will override any default regex or regex created from `fmt`.
+    fmt:
+        Format string. Will be used to format numeric values, and to create a regex
+        matching that format.
+    optional:
+        Group is optional. If True, this marks the group regex as optional (equivalent
+        to appending ``?``), the group can be fixed with None (meaning the group
+        does *not* appear), and it does not need to be fixed when generating filenames.
+    prefix:
+        Group prefix. Added to fixes and regex.
+    suffix:
+        Group suffix. Added to fixes and regex.
     definition:
-        Group definition.
+        The string that created the group ``%(definition)``.
     """
-
-    definition: str
-    """The string that created the group ``%(definition)``."""
-
-    name: str
-    """Group name."""
-    rgx: str
-    """Regex."""
-    fmt: FormatAbstract
-    """Format string object."""
-    optional: bool
-    """Group is optional."""
-
-    prefix: str
-    """Group prefix. Added to fixes and regex."""
-    suffix: str
-    """Group suffix. Added to fixes and regex."""
-
-    fixed_value: Any | list[Any] | None
-    """Current fixed value(s). None if not fixed."""
-    fixed_string: str | list[str] | None
-    """String representation(s) of current fixed value(s). None if not fixed."""
-    fixed_regex: str | None
-    """Regex to match current fixed value(s). None if not fixed."""
 
     def __init__(
         self,
@@ -211,20 +202,30 @@ class Group:
         optional: bool = False,
         definition: str = "",
     ) -> None:
-        self.definition = definition
-        self.name = name
-        self.optional = optional
+        self.definition: str = definition
+        """The string that created the group ``%(definition)``."""
+        self.name: str = name
+        """Group name."""
+        self.optional: bool = optional
+        """Group is optional."""
 
         self._fixed = False
-        self.fixed_value = None
-        self.fixed_string = None
-        self.fixed_regex = None
+        self.fixed_value: Any | list[Any] | None = None
+        """Current fixed value(s). None if not fixed."""
+        self.fixed_string: str | list[str] | None = None
+        """String representation(s) of current fixed value(s). None if not fixed."""
+        self.fixed_regex: str | None = None
+        """Regex to match current fixed value(s). None if not fixed."""
 
-        self.prefix = prefix if prefix is not None else ""
-        self.suffix = suffix if suffix is not None else ""
+        self.prefix: str = prefix if prefix is not None else ""
+        """Group prefix. Added to fixes and regex."""
+        self.suffix: str = suffix if suffix is not None else ""
+        """Group suffix. Added to fixes and regex."""
 
-        self.rgx = ""
-        self.fmt = Format("s")
+        self.rgx: str = ""
+        """Regex."""
+        self.fmt: FormatAbstract = Format("s")
+        """Format string object."""
 
         if fmt:
             self.fmt = Format(fmt)
@@ -421,8 +422,8 @@ class BoolGroup(Group):
     Parameters
     ----------
     options:
-        The two strings
-        Dictionary of boolean to string.
+        A mapping giving the two options. The False option can be omitted (then
+        automatically set to the empty string).
     """
 
     def __init__(
@@ -548,7 +549,7 @@ class DateGroup(Group):
     - name of the form ``<date_name>__<date_element>``,
     - a registered date element.
 
-    See :doc:`handling_dates`.
+    See :doc:`/handling_dates`.
 
     As for other groups, if a format ``fmt`` is given it will be used to generate a
     regex, unless a regex ``rgx`` is given. Otherwise, the corresponding
@@ -559,8 +560,7 @@ class DateGroup(Group):
     date_name:
         Date groups with the same date name can be managed as a date pseudo-group.
     date_element:
-        Object indicating what element the group corresponds to.
-
+        Object indicating what element (Y, m, d, ...) the group corresponds to.
     """
 
     def __init__(
@@ -577,9 +577,9 @@ class DateGroup(Group):
         optional: bool = False,
     ) -> None:
         self.date_name: str = date_name
-        """Name of the parent date pseudo-group. None if not a date group."""
+        """Name of the parent date pseudo-group."""
         self.date_element: DateElement = date_element
-        """Name of the date element (Y, m, d, ...). None if not a date group."""
+        """Object representing the date element (Y, m, d, ...)."""
 
         if not rgx:
             rgx = Format(fmt).get_regex() if fmt else self.date_element.regex
@@ -606,9 +606,13 @@ class DateGroup(Group):
                 )
 
         if not specs.date_name:
-            raise GroupParseError(f"Date name cannot be empty ({specs.definition}).")
+            raise GroupParseError(
+                f"Date name cannot be empty for a date group({specs.definition})."
+            )
         if specs.date_element is None:
-            raise GroupParseError(f"Date element cannot be None ({specs.definition}).")
+            raise GroupParseError(
+                f"Date element cannot be None for a date group ({specs.definition})."
+            )
 
         return cls(
             specs.name,

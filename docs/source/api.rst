@@ -16,6 +16,7 @@ API References
    :toctree: _api
 
    dates
+   date_elements
    filters
    finder
    format

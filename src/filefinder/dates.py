@@ -67,8 +67,8 @@ class DateParser:
     Parameters
     ----------
     matches:
-        Matches obtained from a filename, corresponding to date elements. The
-        :attr:`.Group.date_element` attribute must be defined.
+        Matches obtained from a filename, corresponding to date elements. The groups
+        must be instances of :class:`.DateGroup`.
     default_date:
         Default value for elements if not found in the filename. It can be a mapping of
         elements or a :mod:`datetime` object (in which case the elements ``YmdHMSfz``
